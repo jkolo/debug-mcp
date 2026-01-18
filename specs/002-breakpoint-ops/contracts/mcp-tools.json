@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DotnetMcp Breakpoint Tools",
+  "description": "MCP tool definitions for breakpoint management",
+  "tools": [
+    {
+      "name": "breakpoint_set",
+      "description": "Set a breakpoint at a source location. Returns the breakpoint ID and verification status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Absolute path to the source file"
+          },
+          "line": {
+            "type": "integer",
+            "description": "1-based line number in the source file",
+            "minimum": 1
+          },
+          "condition": {
+            "type": "string",
+            "description": "Optional condition expression (C# syntax). Breakpoint only triggers when true."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the breakpoint is initially enabled",
+            "default": true
+          }
+        },
+        "required": ["file", "line"]
+      }
+    },
+    {
+      "name": "breakpoint_remove",
+      "description": "Remove a breakpoint by its ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The breakpoint ID returned by breakpoint_set"
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "breakpoint_list",
+      "description": "List all breakpoints in the current debug session",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "breakpoint_wait",
+      "description": "Wait for a breakpoint to be hit. Blocks until a breakpoint triggers or timeout expires.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "type": "integer",
+            "description": "Maximum time to wait in milliseconds",
+            "default": 30000,
+            "minimum": 1000,
+            "maximum": 300000
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "breakpoint_enable",
+      "description": "Enable or disable a breakpoint without removing it",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The breakpoint ID"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True to enable, false to disable"
+          }
+        },
+        "required": ["id", "enabled"]
+      }
+    }
+  ],
+  "definitions": {
+    "Breakpoint": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique breakpoint identifier"
+        },
+        "location": {
+          "$ref": "#/definitions/BreakpointLocation"
+        },
+        "state": {
+          "$ref": "#/definitions/BreakpointState"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether breakpoint is enabled"
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether breakpoint is bound to executable code"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Condition expression if set"
+        },
+        "hitCount": {
+          "type": "integer",
+          "description": "Number of times breakpoint has been hit",
+          "minimum": 0
+        },
+        "message": {
+          "type": "string",
+          "description": "Status message (e.g., why unverified)"
+        }
+      },
+      "required": ["id", "location", "state", "enabled", "verified", "hitCount"]
+    },
+    "BreakpointLocation": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Absolute path to source file"
+        },
+        "line": {
+          "type": "integer",
+          "description": "1-based line number",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "description": "1-based column number",
+          "minimum": 1
+        },
+        "functionName": {
+          "type": "string",
+          "description": "Name of containing function"
+        },
+        "moduleName": {
+          "type": "string",
+          "description": "Name of containing module/assembly"
+        }
+      },
+      "required": ["file", "line"]
+    },
+    "BreakpointState": {
+      "type": "string",
+      "enum": ["pending", "bound", "disabled"],
+      "description": "Current state of the breakpoint"
+    },
+    "BreakpointHit": {
+      "type": "object",
+      "properties": {
+        "breakpointId": {
+          "type": "string",
+          "description": "ID of the hit breakpoint"
+        },
+        "threadId": {
+          "type": "integer",
+          "description": "Thread that hit the breakpoint"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when hit occurred"
+        },
+        "location": {
+          "$ref": "#/definitions/BreakpointLocation"
+        },
+        "hitCount": {
+          "type": "integer",
+          "description": "Hit count at time of hit",
+          "minimum": 1
+        }
+      },
+      "required": ["breakpointId", "threadId", "timestamp", "location", "hitCount"]
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code for programmatic handling"
+            },
+            "message": {
+              "type": "string",
+              "description": "Human-readable error message"
+            },
+            "details": {
+              "type": "object",
+              "description": "Additional context about the error"
+            }
+          },
+          "required": ["code", "message"]
+        }
+      },
+      "required": ["error"]
+    }
+  }
+}

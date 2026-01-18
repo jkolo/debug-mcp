@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DotnetMcp Debug Session Tools",
+  "description": "MCP tool definitions for debug session management",
+  "tools": [
+    {
+      "name": "debug_attach",
+      "description": "Attach debugger to a running .NET process by process ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "description": "Process ID of the .NET application to debug",
+            "minimum": 1
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Maximum time to wait for attachment in milliseconds",
+            "default": 30000,
+            "minimum": 1000,
+            "maximum": 300000
+          }
+        },
+        "required": ["pid"]
+      }
+    },
+    {
+      "name": "debug_launch",
+      "description": "Launch a .NET executable under debugger control",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "program": {
+            "type": "string",
+            "description": "Path to the .NET executable or DLL to debug"
+          },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Command-line arguments to pass to the program",
+            "default": []
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory for the launched process"
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Environment variables to set for the process"
+          },
+          "stopAtEntry": {
+            "type": "boolean",
+            "description": "Pause at entry point before executing user code",
+            "default": true
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Maximum time to wait for launch in milliseconds",
+            "default": 30000,
+            "minimum": 1000,
+            "maximum": 300000
+          }
+        },
+        "required": ["program"]
+      }
+    },
+    {
+      "name": "debug_disconnect",
+      "description": "Disconnect from the current debug session",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "terminateProcess": {
+            "type": "boolean",
+            "description": "Terminate the process instead of detaching (only for launched processes)",
+            "default": false
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "debug_state",
+      "description": "Get the current state of the debug session",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  ],
+  "definitions": {
+    "DebugSession": {
+      "type": "object",
+      "properties": {
+        "processId": {
+          "type": "integer",
+          "description": "OS process ID of the debuggee"
+        },
+        "processName": {
+          "type": "string",
+          "description": "Name of the executable"
+        },
+        "executablePath": {
+          "type": "string",
+          "description": "Full path to the executable"
+        },
+        "runtimeVersion": {
+          "type": "string",
+          "description": ".NET runtime version"
+        },
+        "state": {
+          "$ref": "#/definitions/SessionState"
+        },
+        "launchMode": {
+          "type": "string",
+          "enum": ["attach", "launch"]
+        },
+        "attachedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp when session started"
+        }
+      },
+      "required": ["processId", "processName", "runtimeVersion", "state", "launchMode", "attachedAt"]
+    },
+    "SessionState": {
+      "type": "string",
+      "enum": ["disconnected", "running", "paused"],
+      "description": "Current execution state of the debug session"
+    },
+    "PauseReason": {
+      "type": "string",
+      "enum": ["breakpoint", "step", "exception", "pause", "entry"],
+      "description": "Reason why execution paused"
+    },
+    "SourceLocation": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Absolute path to source file"
+        },
+        "line": {
+          "type": "integer",
+          "description": "1-based line number",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "description": "1-based column number",
+          "minimum": 1
+        },
+        "functionName": {
+          "type": "string",
+          "description": "Name of containing function"
+        },
+        "moduleName": {
+          "type": "string",
+          "description": "Name of containing module/assembly"
+        }
+      },
+      "required": ["file", "line"]
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code for programmatic handling"
+            },
+            "message": {
+              "type": "string",
+              "description": "Human-readable error message"
+            },
+            "details": {
+              "type": "object",
+              "description": "Additional context about the error"
+            }
+          },
+          "required": ["code", "message"]
+        }
+      },
+      "required": ["error"]
+    }
+  }
+}

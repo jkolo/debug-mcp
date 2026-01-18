@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DotnetMcp Breakpoint Tools",
+  "description": "MCP tool schemas for breakpoint operations in DotnetMcp",
+  "version": "1.0.0",
+  "tools": {
+    "breakpoint_set": {
+      "description": "Set a breakpoint at a source location or function",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Source file path (absolute or relative to project)"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based line number"
+          },
+          "column": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based column for targeting specific sequence point (lambda/inline)"
+          },
+          "function": {
+            "type": "string",
+            "description": "Full method name (alternative to file/line)"
+          },
+          "condition": {
+            "type": "string",
+            "description": "C# condition expression (breakpoint only triggers when true)"
+          },
+          "hitCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Break only after N hits"
+          },
+          "logMessage": {
+            "type": "string",
+            "description": "Log message instead of breaking (logpoint)"
+          }
+        },
+        "oneOf": [
+          { "required": ["file", "line"] },
+          { "required": ["function"] }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "breakpoint": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "location": { "$ref": "#/definitions/BreakpointLocation" },
+              "state": { "enum": ["pending", "bound", "disabled"] },
+              "enabled": { "type": "boolean" },
+              "verified": { "type": "boolean" },
+              "condition": { "type": "string" },
+              "hitCount": { "type": "integer" },
+              "message": { "type": "string" }
+            },
+            "required": ["id", "state", "enabled", "verified", "hitCount"]
+          },
+          "error": { "$ref": "#/definitions/Error" }
+        }
+      }
+    },
+    "breakpoint_set_exception": {
+      "description": "Set a breakpoint that triggers when a specific exception type is thrown",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "exceptionType": {
+            "type": "string",
+            "description": "Full exception type name (e.g., 'System.NullReferenceException')"
+          },
+          "breakOnFirstChance": {
+            "type": "boolean",
+            "default": true,
+            "description": "Break when exception is thrown (before catch handlers)"
+          },
+          "breakOnSecondChance": {
+            "type": "boolean",
+            "default": true,
+            "description": "Break when exception is unhandled"
+          },
+          "includeSubtypes": {
+            "type": "boolean",
+            "default": true,
+            "description": "Also break on derived exception types"
+          }
+        },
+        "required": ["exceptionType"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "breakpoint": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "exceptionType": { "type": "string" },
+              "breakOnFirstChance": { "type": "boolean" },
+              "breakOnSecondChance": { "type": "boolean" },
+              "includeSubtypes": { "type": "boolean" },
+              "enabled": { "type": "boolean" },
+              "verified": { "type": "boolean" },
+              "hitCount": { "type": "integer" },
+              "message": { "type": "string" }
+            },
+            "required": ["id", "exceptionType", "enabled", "verified", "hitCount"]
+          },
+          "error": { "$ref": "#/definitions/Error" }
+        }
+      }
+    },
+    "breakpoint_remove": {
+      "description": "Remove a breakpoint by ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Breakpoint ID to remove"
+          }
+        },
+        "required": ["id"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "error": { "$ref": "#/definitions/Error" }
+        }
+      }
+    },
+    "breakpoint_list": {
+      "description": "List all breakpoints in the current debug session",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "breakpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "type": { "enum": ["source", "function", "exception"] },
+                "location": { "$ref": "#/definitions/BreakpointLocation" },
+                "exceptionType": { "type": "string" },
+                "state": { "enum": ["pending", "bound", "disabled"] },
+                "enabled": { "type": "boolean" },
+                "verified": { "type": "boolean" },
+                "condition": { "type": "string" },
+                "hitCount": { "type": "integer" },
+                "message": { "type": "string" }
+              },
+              "required": ["id", "type", "enabled", "verified", "hitCount"]
+            }
+          },
+          "count": { "type": "integer" }
+        },
+        "required": ["breakpoints", "count"]
+      }
+    },
+    "breakpoint_wait": {
+      "description": "Wait for a breakpoint to be hit",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300000,
+            "default": 30000,
+            "description": "Timeout in milliseconds (default: 30000, max: 300000)"
+          },
+          "breakpoint_id": {
+            "type": "string",
+            "description": "Wait for specific breakpoint only (optional)"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hit": { "type": "boolean" },
+          "breakpointId": { "type": "string" },
+          "threadId": { "type": "integer" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "location": { "$ref": "#/definitions/BreakpointLocation" },
+          "hitCount": { "type": "integer" },
+          "exceptionInfo": { "$ref": "#/definitions/ExceptionInfo" },
+          "timeout": { "type": "boolean" },
+          "message": { "type": "string" }
+        },
+        "required": ["hit"]
+      }
+    }
+  },
+  "definitions": {
+    "BreakpointLocation": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": "integer" },
+        "column": { "type": "integer" },
+        "endLine": { "type": "integer" },
+        "endColumn": { "type": "integer" },
+        "functionName": { "type": "string" },
+        "moduleName": { "type": "string" }
+      }
+    },
+    "ExceptionInfo": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "isFirstChance": { "type": "boolean" },
+        "stackTrace": { "type": "string" }
+      },
+      "required": ["type", "message", "isFirstChance"]
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "NO_SESSION",
+            "INVALID_FILE",
+            "INVALID_LINE",
+            "INVALID_COLUMN",
+            "INVALID_CONDITION",
+            "BREAKPOINT_NOT_FOUND",
+            "BREAKPOINT_EXISTS",
+            "EVAL_FAILED",
+            "TIMEOUT"
+          ]
+        },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      },
+      "required": ["code", "message"]
+    }
+  }
+}
