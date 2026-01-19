@@ -1,5 +1,41 @@
+# Build outputs
 bin/
 obj/
+out/
+
+# NuGet
 /packages/
+*.nupkg
+.nuget/
+
+# IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
 riderModule.iml
 /_ReSharper.Caches/
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.*
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
