@@ -18,17 +18,20 @@ public sealed class BreakpointSetTool
 {
     private readonly IBreakpointManager _breakpointManager;
     private readonly IDebugSessionManager _sessionManager;
+    private readonly IProcessDebugger _processDebugger;
     private readonly IPdbSymbolReader _pdbReader;
     private readonly ILogger<BreakpointSetTool> _logger;
 
     public BreakpointSetTool(
         IBreakpointManager breakpointManager,
         IDebugSessionManager sessionManager,
+        IProcessDebugger processDebugger,
         IPdbSymbolReader pdbReader,
         ILogger<BreakpointSetTool> logger)
     {
         _breakpointManager = breakpointManager;
         _sessionManager = sessionManager;
+        _processDebugger = processDebugger;
         _pdbReader = pdbReader;
         _logger = logger;
     }
@@ -133,9 +136,41 @@ public sealed class BreakpointSetTool
         int? nearestLine = null;
         var session = _sessionManager.CurrentSession;
 
-        // If we have a session, try to find the nearest valid line
-        // For now, just return the error without suggestions
-        // TODO: Implement module enumeration to find assembly path
+        // If we have a session, try to find the nearest valid line by enumerating loaded modules
+        if (session != null)
+        {
+            try
+            {
+                var loadedModules = _processDebugger.GetLoadedModules();
+                foreach (var module in loadedModules)
+                {
+                    // Skip dynamic and in-memory modules (no PDB available)
+                    if (module.IsDynamic || module.IsInMemory || string.IsNullOrEmpty(module.ModulePath))
+                    {
+                        continue;
+                    }
+
+                    // Try to find nearest valid line in this module's PDB
+                    var nearest = await _pdbReader.FindNearestValidLineAsync(
+                        module.ModulePath,
+                        file,
+                        requestedLine,
+                        searchRange: 10);
+
+                    if (nearest.HasValue)
+                    {
+                        nearestLine = nearest.Value;
+                        _logger.LogDebug("Found nearest valid line {NearestLine} for {File}:{RequestedLine} in module {Module}",
+                            nearestLine, file, requestedLine, module.ModulePath);
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to find nearest valid line for {File}:{Line}", file, requestedLine);
+            }
+        }
 
         if (nearestLine.HasValue)
         {

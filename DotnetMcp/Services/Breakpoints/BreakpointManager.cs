@@ -258,6 +258,9 @@ public sealed class BreakpointManager : IBreakpointManager
         string breakpointId,
         CancellationToken cancellationToken = default)
     {
+        // Get native breakpoint before removing from registry
+        var nativeBreakpoint = _registry.GetNativeBreakpoint(breakpointId);
+
         var breakpoint = _registry.Remove(breakpointId);
         if (breakpoint == null)
         {
@@ -265,7 +268,20 @@ public sealed class BreakpointManager : IBreakpointManager
             return Task.FromResult(false);
         }
 
-        // TODO: Deactivate the ICorDebugFunctionBreakpoint if bound
+        // Deactivate the ICorDebugFunctionBreakpoint if bound
+        if (nativeBreakpoint is CorDebugFunctionBreakpoint corBp)
+        {
+            try
+            {
+                corBp.Activate(false);
+                _logger.LogDebug("Deactivated native breakpoint for {Id}", breakpointId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to deactivate native breakpoint for {Id}", breakpointId);
+            }
+        }
+
         _logger.LogInformation("Removed breakpoint {Id}", breakpointId);
         return Task.FromResult(true);
     }
@@ -337,7 +353,22 @@ public sealed class BreakpointManager : IBreakpointManager
 
         _registry.Update(updated);
 
-        // TODO: Call ICorDebugFunctionBreakpoint.Activate(enabled) if bound
+        // Activate or deactivate the native breakpoint if bound
+        var nativeBreakpoint = _registry.GetNativeBreakpoint(breakpointId);
+        if (nativeBreakpoint is CorDebugFunctionBreakpoint corBp)
+        {
+            try
+            {
+                corBp.Activate(enabled);
+                _logger.LogDebug("Native breakpoint {Id} {Action}", breakpointId, enabled ? "activated" : "deactivated");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to {Action} native breakpoint {Id}",
+                    enabled ? "activate" : "deactivate", breakpointId);
+            }
+        }
+
         _logger.LogInformation("Breakpoint {Id} {Action}", breakpointId, enabled ? "enabled" : "disabled");
 
         return Task.FromResult<Breakpoint?>(updated);
@@ -387,7 +418,24 @@ public sealed class BreakpointManager : IBreakpointManager
     /// <inheritdoc />
     public Task ClearAllBreakpointsAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: Deactivate all ICorDebugFunctionBreakpoints
+        // Deactivate all native breakpoints before clearing
+        var nativeBreakpoints = _registry.GetAllNativeBreakpoints();
+        foreach (var (id, nativeBreakpoint) in nativeBreakpoints)
+        {
+            if (nativeBreakpoint is CorDebugFunctionBreakpoint corBp)
+            {
+                try
+                {
+                    corBp.Activate(false);
+                    _logger.LogDebug("Deactivated native breakpoint {Id}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deactivate native breakpoint {Id}", id);
+                }
+            }
+        }
+
         _registry.Clear();
 
         // Clear hit queue

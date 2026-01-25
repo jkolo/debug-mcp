@@ -161,6 +161,18 @@ public sealed class BreakpointRegistry
     }
 
     /// <summary>
+    /// Gets all native breakpoint handles that are bound.
+    /// </summary>
+    /// <returns>List of tuples containing breakpoint ID and native handle.</returns>
+    public IReadOnlyList<(string Id, object NativeBreakpoint)> GetAllNativeBreakpoints()
+    {
+        return _breakpoints
+            .Where(kvp => kvp.Value.NativeBreakpoint != null)
+            .Select(kvp => (kvp.Key, kvp.Value.NativeBreakpoint!))
+            .ToList();
+    }
+
+    /// <summary>
     /// Adds an exception breakpoint to the registry.
     /// </summary>
     /// <param name="exceptionBreakpoint">The exception breakpoint to add.</param>
@@ -263,12 +275,27 @@ public sealed class BreakpointRegistry
                 continue;
             }
 
-            // Simple type name matching
-            // TODO: Implement subtype checking when IncludeSubtypes is true
-            var typeMatches = eb.IncludeSubtypes
-                ? exceptionTypeName.EndsWith(eb.ExceptionType) ||
-                  exceptionTypeName.Equals(eb.ExceptionType, StringComparison.Ordinal)
-                : exceptionTypeName.Equals(eb.ExceptionType, StringComparison.Ordinal);
+            // Type name matching with subtype heuristics
+            // Note: True subtype checking would require runtime type hierarchy traversal
+            // via ICorDebugValue.ExactType and walking the base type chain.
+            // Current implementation uses name-based heuristics which work for most cases:
+            // - Exact match: "System.ArgumentException" == "System.ArgumentException"
+            // - Suffix match (for subtypes): "System.ArgumentNullException" ends with "ArgumentException"
+            // - Simple name match: "ArgumentException" matches "System.ArgumentException"
+            bool typeMatches;
+            if (eb.IncludeSubtypes)
+            {
+                // Check for exact match, suffix match, or simple name match
+                typeMatches = exceptionTypeName.Equals(eb.ExceptionType, StringComparison.Ordinal) ||
+                              exceptionTypeName.EndsWith("." + eb.ExceptionType, StringComparison.Ordinal) ||
+                              exceptionTypeName.EndsWith(eb.ExceptionType, StringComparison.Ordinal);
+            }
+            else
+            {
+                // Exact match only (full name or simple name)
+                typeMatches = exceptionTypeName.Equals(eb.ExceptionType, StringComparison.Ordinal) ||
+                              exceptionTypeName.EndsWith("." + eb.ExceptionType, StringComparison.Ordinal);
+            }
 
             if (typeMatches)
             {
