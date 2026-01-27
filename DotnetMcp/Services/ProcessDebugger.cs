@@ -48,6 +48,14 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private CorDebugEval? _currentEval;
     private readonly object _evalLock = new();
 
+    // Launch state
+    private IntPtr _unregisterToken;
+    private bool _isLaunched;
+    private bool _stopAtEntry;
+    private int _launchPid;
+    private TaskCompletionSource<bool>? _launchCompletionSource;
+    private RuntimeStartupCallback? _startupCallbackDelegate; // prevent GC
+
     public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader)
     {
         _logger = logger;
@@ -214,7 +222,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     }
 
     /// <inheritdoc />
-    public Task<ProcessInfo> LaunchAsync(
+    public async Task<ProcessInfo> LaunchAsync(
         string program,
         string[]? args = null,
         string? cwd = null,
@@ -223,19 +231,213 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
-        // Validate program exists first
+        // Validate program exists
         if (!File.Exists(program))
         {
             throw new FileNotFoundException($"Program not found: {program}");
         }
 
-        // Launch requires different DbgShim approach:
-        // 1. CreateProcessForLaunch to start suspended
-        // 2. RegisterForRuntimeStartup to get callback when CLR loads
-        // This is not yet implemented
-        throw new NotImplementedException(
-            "Launch functionality requires DbgShim.CreateProcessForLaunch and RegisterForRuntimeStartup. " +
-            "Use AttachAsync to attach to an already running process.");
+        // Validate working directory if specified
+        if (cwd != null && !Directory.Exists(cwd))
+        {
+            throw new DirectoryNotFoundException($"Working directory not found: {cwd}");
+        }
+
+        // Default cwd to program's directory
+        cwd ??= Path.GetDirectoryName(Path.GetFullPath(program));
+
+        _stopAtEntry = stopAtEntry;
+        _launchCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Initialize DbgShim
+        InitializeDbgShim();
+
+        // Build command line
+        var commandLine = BuildCommandLine(program, args);
+        _logger.LogDebug("Launch command line: {CommandLine}", commandLine);
+
+        // Build environment block
+        var envPtr = BuildEnvironmentBlock(env);
+
+        // Step 1: Create process in suspended state
+        var launchResult = _dbgShim!.CreateProcessForLaunch(
+            commandLine,
+            bSuspendProcess: true,
+            lpEnvironment: envPtr,
+            lpCurrentDirectory: cwd);
+
+        var pid = (int)launchResult.ProcessId;
+        _launchPid = pid;
+        var resumeHandle = launchResult.ResumeHandle;
+        _logger.LogDebug("Process created suspended, PID: {Pid}", pid);
+
+        try
+        {
+            // Step 2: Register for runtime startup callback
+            _startupCallbackDelegate = OnRuntimeStartup;
+            _unregisterToken = _dbgShim.RegisterForRuntimeStartup(
+                pid,
+                _startupCallbackDelegate,
+                IntPtr.Zero);
+
+            _logger.LogDebug("Registered for runtime startup, PID: {Pid}", pid);
+
+            // Step 3: Resume the process so CLR can load
+            _dbgShim.ResumeProcess(resumeHandle);
+            _dbgShim.CloseResumeHandle(resumeHandle);
+            resumeHandle = IntPtr.Zero;
+            _logger.LogDebug("Process resumed, waiting for CLR startup callback");
+
+            // Step 4: Wait for the startup callback to complete
+            var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(effectiveTimeout);
+
+            try
+            {
+                await _launchCompletionSource.Task.WaitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Clean up the launched process on timeout
+                try { Process.GetProcessById(pid).Kill(); } catch { /* ignore */ }
+                throw new OperationCanceledException(
+                    $"Launch timed out after {effectiveTimeout.TotalSeconds}s waiting for CLR startup");
+            }
+
+            _isLaunched = true;
+
+            var processName = Path.GetFileNameWithoutExtension(program);
+            var runtimeVersion = GetRuntimeVersion() ?? ".NET";
+
+            _logger.LaunchedProcess(pid, processName);
+
+            return new ProcessInfo(
+                Pid: pid,
+                Name: processName,
+                ExecutablePath: Path.GetFullPath(program),
+                IsManaged: true,
+                CommandLine: commandLine,
+                RuntimeVersion: runtimeVersion);
+        }
+        catch
+        {
+            // Clean up on failure
+            if (resumeHandle != IntPtr.Zero)
+            {
+                try { _dbgShim.CloseResumeHandle(resumeHandle); } catch { /* ignore */ }
+            }
+            CleanupLaunchState();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Callback invoked by DbgShim when the CLR runtime starts in the launched process.
+    /// Initializes ICorDebug, sets managed handler, and signals launch completion.
+    /// </summary>
+    private void OnRuntimeStartup(CorDebug? pCordb, IntPtr parameter, HRESULT hr)
+    {
+        try
+        {
+            if (hr != HRESULT.S_OK)
+            {
+                _logger.LogError("Runtime startup callback failed: {HR}", hr);
+                _launchCompletionSource?.TrySetException(
+                    new InvalidOperationException($"CLR startup failed: {hr}"));
+                return;
+            }
+
+            if (pCordb == null)
+            {
+                _launchCompletionSource?.TrySetException(
+                    new InvalidOperationException("Runtime startup callback received null CorDebug"));
+                return;
+            }
+
+            _logger.LogDebug("Runtime startup callback received, initializing debugger");
+
+            lock (_lock)
+            {
+                _corDebug = pCordb;
+                _corDebug.Initialize();
+
+                var callback = CreateManagedCallback();
+                _corDebug.SetManagedHandler(callback);
+
+                // Start debugging the process — this triggers OnCreateProcess callback
+                _process = _corDebug.DebugActiveProcess(_launchPid, win32Attach: false);
+
+                if (_stopAtEntry)
+                {
+                    UpdateState(SessionState.Paused, PauseReason.Entry);
+                }
+                else
+                {
+                    UpdateState(SessionState.Running);
+                }
+            }
+
+            _launchCompletionSource?.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in runtime startup callback");
+            _launchCompletionSource?.TrySetException(ex);
+        }
+    }
+
+    /// <summary>
+    /// Builds a null-terminated Unicode environment block for CreateProcessForLaunch.
+    /// Format: "VAR1=val1\0VAR2=val2\0\0"
+    /// </summary>
+    private static IntPtr BuildEnvironmentBlock(Dictionary<string, string>? env)
+    {
+        if (env == null || env.Count == 0)
+            return IntPtr.Zero;
+
+        // Build null-terminated Unicode environment block: "VAR1=val1\0VAR2=val2\0\0"
+        var sb = new StringBuilder();
+
+        // Start with inherited environment
+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+        {
+            sb.Append($"{entry.Key}={entry.Value}\0");
+        }
+
+        // Override/add custom variables
+        foreach (var (key, value) in env)
+        {
+            sb.Append($"{key}={value}\0");
+        }
+
+        sb.Append('\0'); // Double null terminator
+
+        var block = sb.ToString();
+        var ptr = Marshal.StringToHGlobalUni(block);
+        return ptr;
+    }
+
+    /// <summary>
+    /// Cleans up launch-specific state: unregisters runtime startup callback and resets fields.
+    /// </summary>
+    private void CleanupLaunchState()
+    {
+        if (_unregisterToken != IntPtr.Zero)
+        {
+            try
+            {
+                _dbgShim?.UnregisterForRuntimeStartup(_unregisterToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "UnregisterForRuntimeStartup cleanup failed");
+            }
+            _unregisterToken = IntPtr.Zero;
+        }
+        _startupCallbackDelegate = null;
+        _isLaunched = false;
+        _launchCompletionSource = null;
     }
 
     /// <inheritdoc />
@@ -270,6 +472,9 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     }
                     _process = null;
                 }
+
+                // Clean up launch-specific state
+                CleanupLaunchState();
 
                 // BUGFIX: Terminate ICorDebug instance after detach to allow reattachment.
                 // The previous comment was incorrect - ICorDebug cannot be reused after detach
@@ -1734,6 +1939,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         lock (_lock)
         {
+            CleanupLaunchState();
+
             if (_process != null)
             {
                 try
@@ -1773,10 +1980,23 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // Events without specific handlers would cause the process to hang,
         // so we've added handlers for all known events.
 
-        // CRITICAL: Handle process creation (needed for attach)
+        // CRITICAL: Handle process creation (needed for attach and launch)
         callback.OnCreateProcess += (sender, e) =>
         {
-            _logger.LogDebug("Process created/attached");
+            _logger.LogDebug("Process created/attached (isLaunched={IsLaunched}, stopAtEntry={StopAtEntry})",
+                _isLaunched, _stopAtEntry);
+
+            lock (_lock)
+            {
+                _process ??= e.Process;
+            }
+
+            if (_isLaunched && _stopAtEntry)
+            {
+                _logger.LogDebug("Launched with stopAtEntry - process will remain paused");
+                return;
+            }
+
             e.Controller.Continue(false);
         };
 

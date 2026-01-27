@@ -145,14 +145,6 @@ public sealed class DebugLaunchTool
                 "Could not find dbgshim library. Ensure .NET SDK is installed.",
                 new { program, originalError = ex.Message });
         }
-        catch (NotImplementedException)
-        {
-            _logger.ToolError("debug_launch", ErrorCodes.LaunchFailed);
-            return CreateErrorResponse(
-                ErrorCodes.LaunchFailed,
-                "Launch functionality is not yet fully implemented",
-                new { program });
-        }
         catch (UnauthorizedAccessException ex)
         {
             _logger.ToolError("debug_launch", ErrorCodes.PermissionDenied);

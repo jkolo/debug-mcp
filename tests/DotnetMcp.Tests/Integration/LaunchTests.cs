@@ -13,7 +13,7 @@ namespace DotnetMcp.Tests.Integration;
 /// These tests verify launching processes under debugger control.
 /// </summary>
 [Collection("ProcessTests")]
-public class LaunchTests : IDisposable
+public class LaunchTests : IAsyncLifetime
 {
     private readonly Mock<ILogger<ProcessDebugger>> _debuggerLoggerMock;
     private readonly Mock<ILogger<DebugSessionManager>> _managerLoggerMock;
@@ -30,8 +30,12 @@ public class LaunchTests : IDisposable
         _sessionManager = new DebugSessionManager(_processDebugger, _managerLoggerMock.Object);
     }
 
-    public void Dispose()
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
     {
+        try { await _sessionManager.DisconnectAsync(terminateProcess: true); }
+        catch { /* ignore cleanup errors */ }
         _processDebugger.Dispose();
     }
 
@@ -364,36 +368,71 @@ public class LaunchTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", "E2E")]
     public async Task LaunchAsync_RealProcess_StartsAndAttaches()
     {
-        // This test verifies that LaunchAsync can start a real .NET process.
-        // Uses the TestTargetApp - a simple hello world console app.
-
         var testDll = TestTargetProcess.TestTargetDllPath;
         var timeout = TimeSpan.FromSeconds(30);
 
-        // Verify the test target exists
         File.Exists(testDll).Should().BeTrue($"Test target should exist at {testDll}. Run 'dotnet build' on TestTargetApp.");
 
-        // Act - attempt to launch
-        try
-        {
-            var session = await _sessionManager.LaunchAsync(testDll, timeout: timeout);
-            session.Should().NotBeNull();
-            session.ProcessId.Should().BePositive();
-            session.LaunchMode.Should().Be(LaunchMode.Launch);
-            await _sessionManager.DisconnectAsync(terminateProcess: true);
-        }
-        catch (NotImplementedException)
-        {
-            // Expected - LaunchAsync stub throws NotImplementedException
-            // This is acceptable until launch is fully implemented
-        }
-        catch (InvalidOperationException ex)
-        {
-            // If implemented but fails, should not be about missing dbgshim
-            ex.Message.Should().NotContain("dbgshim", "dbgshim should be found");
-            throw; // Re-throw to fail the test
-        }
+        // Act
+        var session = await _sessionManager.LaunchAsync(testDll, timeout: timeout);
+
+        // Assert
+        session.Should().NotBeNull();
+        session.ProcessId.Should().BePositive();
+        session.LaunchMode.Should().Be(LaunchMode.Launch);
+        session.State.Should().Be(SessionState.Paused, "default stopAtEntry=true should pause");
+        session.PauseReason.Should().Be(PauseReason.Entry);
+    }
+
+    [Fact]
+    [Trait("Category", "E2E")]
+    public async Task LaunchAsync_RealProcess_WithStopAtEntryFalse_IsRunning()
+    {
+        var testDll = TestTargetProcess.TestTargetDllPath;
+        var timeout = TimeSpan.FromSeconds(30);
+
+        // Act
+        var session = await _sessionManager.LaunchAsync(testDll, stopAtEntry: false, timeout: timeout);
+
+        // Assert
+        session.Should().NotBeNull();
+        session.State.Should().Be(SessionState.Running);
+        session.PauseReason.Should().BeNull();
+    }
+
+    [Fact]
+    [Trait("Category", "E2E")]
+    public async Task LaunchAsync_RealProcess_ContinueAfterEntry_Runs()
+    {
+        var testDll = TestTargetProcess.TestTargetDllPath;
+        var timeout = TimeSpan.FromSeconds(30);
+
+        // Arrange - launch paused at entry
+        var session = await _sessionManager.LaunchAsync(testDll, stopAtEntry: true, timeout: timeout);
+        session.State.Should().Be(SessionState.Paused);
+
+        // Act - continue execution
+        await _sessionManager.ContinueAsync();
+
+        // Assert
+        var currentState = _sessionManager.GetCurrentState();
+        currentState.Should().Be(SessionState.Running);
+    }
+
+    [Fact]
+    public async Task LaunchAsync_WithInvalidCwd_ThrowsDirectoryNotFoundException()
+    {
+        var testDll = TestTargetProcess.TestTargetDllPath;
+
+        // Act
+        var act = async () => await _sessionManager.LaunchAsync(
+            testDll,
+            cwd: "/nonexistent/directory/path");
+
+        // Assert
+        await act.Should().ThrowAsync<DirectoryNotFoundException>();
     }
 }

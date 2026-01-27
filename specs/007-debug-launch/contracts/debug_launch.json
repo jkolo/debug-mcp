@@ -1,0 +1,109 @@
+{
+  "name": "debug_launch",
+  "description": "Launch a .NET executable under debugger control",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "program": {
+        "type": "string",
+        "description": "Path to the .NET executable or DLL to debug"
+      },
+      "args": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Command-line arguments to pass to the program"
+      },
+      "cwd": {
+        "type": "string",
+        "description": "Working directory for the launched process"
+      },
+      "env": {
+        "type": "string",
+        "description": "Environment variables to set for the process (JSON object)"
+      },
+      "stopAtEntry": {
+        "type": "boolean",
+        "default": true,
+        "description": "Pause at entry point before executing user code"
+      },
+      "timeout": {
+        "type": "integer",
+        "default": 30000,
+        "minimum": 1000,
+        "maximum": 300000,
+        "description": "Maximum time to wait for launch in milliseconds"
+      }
+    },
+    "required": ["program"]
+  },
+  "outputSchema": {
+    "oneOf": [
+      {
+        "type": "object",
+        "description": "Success response",
+        "properties": {
+          "success": { "const": true },
+          "session": {
+            "type": "object",
+            "properties": {
+              "processId": { "type": "integer", "description": "OS process ID" },
+              "processName": { "type": "string", "description": "Executable name" },
+              "executablePath": { "type": "string", "description": "Full path to executable" },
+              "runtimeVersion": { "type": "string", "description": ".NET runtime version" },
+              "state": {
+                "type": "string",
+                "enum": ["running", "paused"],
+                "description": "Current execution state"
+              },
+              "launchMode": { "const": "launch" },
+              "attachedAt": { "type": "string", "format": "date-time" },
+              "pauseReason": {
+                "type": "string",
+                "enum": ["entry", null],
+                "description": "Why execution is paused (when state=paused)"
+              },
+              "commandLineArgs": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Arguments passed to process"
+              },
+              "workingDirectory": {
+                "type": "string",
+                "description": "Working directory of process"
+              }
+            },
+            "required": ["processId", "processName", "executablePath", "runtimeVersion", "state", "launchMode", "attachedAt"]
+          }
+        },
+        "required": ["success", "session"]
+      },
+      {
+        "type": "object",
+        "description": "Error response",
+        "properties": {
+          "success": { "const": false },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "INVALID_PATH",
+                  "ALREADY_ATTACHED",
+                  "LAUNCH_FAILED",
+                  "PERMISSION_DENIED",
+                  "TIMEOUT",
+                  "INVALID_ENV"
+                ]
+              },
+              "message": { "type": "string" },
+              "details": { "type": "object" }
+            },
+            "required": ["code", "message"]
+          }
+        },
+        "required": ["success", "error"]
+      }
+    ]
+  }
+}
