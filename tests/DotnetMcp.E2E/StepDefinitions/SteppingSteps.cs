@@ -46,4 +46,12 @@ public sealed class SteppingSteps
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage($"*{expectedMessage}*");
     }
+
+    [Then(@"the current stack frame should be in method ""(.*)""")]
+    public void ThenTheCurrentStackFrameShouldBeInMethod(string methodName)
+    {
+        var (frames, _) = _ctx.SessionManager.GetStackFrames();
+        frames.Should().NotBeNullOrEmpty("Expected stack trace but got none");
+        frames[0].Function.Should().Contain(methodName);
+    }
 }

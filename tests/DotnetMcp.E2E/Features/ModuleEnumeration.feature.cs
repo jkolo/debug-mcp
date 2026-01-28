@@ -168,34 +168,34 @@ namespace DotnetMcp.E2E.Features
         await testRunner.ThenAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 11
-        await testRunner.AndAsync("the module list should contain \"TestLib1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"BaseTypes\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 12
-        await testRunner.AndAsync("the module list should contain \"TestLib2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"Collections\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 13
-        await testRunner.AndAsync("the module list should contain \"TestLib3\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"Exceptions\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 14
-        await testRunner.AndAsync("the module list should contain \"TestLib4\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"Recursion\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 15
-        await testRunner.AndAsync("the module list should contain \"TestLib5\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"Expressions\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 16
-        await testRunner.AndAsync("the module list should contain \"TestLib6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"Threading\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 17
-        await testRunner.AndAsync("the module list should contain \"TestLib7\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"AsyncOps\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 18
-        await testRunner.AndAsync("the module list should contain \"TestLib8\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"MemoryStructs\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 19
-        await testRunner.AndAsync("the module list should contain \"TestLib9\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"ComplexObjects\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 20
-        await testRunner.AndAsync("the module list should contain \"TestLib10\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("the module list should contain \"Scenarios\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

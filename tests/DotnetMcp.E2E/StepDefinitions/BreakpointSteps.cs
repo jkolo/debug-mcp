@@ -8,6 +8,8 @@ namespace DotnetMcp.E2E.StepDefinitions;
 public sealed class BreakpointSteps
 {
     private readonly DebuggerContext _ctx;
+    private ExceptionBreakpoint? _lastExceptionBreakpoint;
+    private IReadOnlyList<Breakpoint>? _lastBreakpointList;
 
     public BreakpointSteps(DebuggerContext ctx)
     {
@@ -60,7 +62,10 @@ public sealed class BreakpointSteps
     public void ThenTheDebuggerShouldPauseAtLine(string file, int line)
     {
         _ctx.LastBreakpointHit.Should().NotBeNull();
-        _ctx.LastBreakpointHit!.BreakpointId.Should().Be(_ctx.LastSetBreakpoint!.Id);
+        // Verify the hit location matches the expected file and line
+        _ctx.LastBreakpointHit!.Location.Should().NotBeNull();
+        _ctx.LastBreakpointHit.Location.File.Should().Contain(file);
+        _ctx.LastBreakpointHit.Location.Line.Should().Be(line);
     }
 
     [Then(@"the breakpoint hit count should be (\d+)")]
@@ -76,5 +81,109 @@ public sealed class BreakpointSteps
         var hit = await _ctx.BreakpointManager.WaitForBreakpointAsync(
             TimeSpan.FromSeconds(seconds), CancellationToken.None);
         hit.Should().BeNull("no breakpoint should have been hit");
+    }
+
+    // --- Exception Breakpoints ---
+
+    [When(@"I set an exception breakpoint for ""(.*)""")]
+    public async Task WhenISetAnExceptionBreakpointFor(string exceptionType)
+    {
+        _lastExceptionBreakpoint = await _ctx.BreakpointManager.SetExceptionBreakpointAsync(
+            exceptionType,
+            breakOnFirstChance: true,
+            breakOnSecondChance: true,
+            includeSubtypes: true,
+            CancellationToken.None);
+    }
+
+    [Then("the exception breakpoint should be set")]
+    public void ThenTheExceptionBreakpointShouldBeSet()
+    {
+        _lastExceptionBreakpoint.Should().NotBeNull();
+        _lastExceptionBreakpoint!.Id.Should().NotBeNullOrEmpty();
+    }
+
+    [Then(@"the exception breakpoint should be for type ""(.*)""")]
+    public void ThenTheExceptionBreakpointShouldBeForType(string expectedType)
+    {
+        _lastExceptionBreakpoint.Should().NotBeNull();
+        _lastExceptionBreakpoint!.ExceptionType.Should().Be(expectedType);
+    }
+
+    [Then("the last hit should be an exception breakpoint")]
+    [Then("the breakpoint hit should be an exception")]
+    public void ThenTheLastHitShouldBeAnExceptionBreakpoint()
+    {
+        _ctx.LastBreakpointHit.Should().NotBeNull();
+        _ctx.LastBreakpointHit!.ExceptionInfo.Should().NotBeNull("Expected an exception breakpoint hit");
+    }
+
+    // --- Breakpoint Listing ---
+
+    [When("I list all breakpoints")]
+    public async Task WhenIListAllBreakpoints()
+    {
+        _lastBreakpointList = await _ctx.BreakpointManager.GetBreakpointsAsync(CancellationToken.None);
+    }
+
+    [Then(@"the breakpoint list should contain (\d+) breakpoints")]
+    public void ThenTheBreakpointListShouldContainBreakpoints(int expectedCount)
+    {
+        _lastBreakpointList.Should().NotBeNull();
+        _lastBreakpointList!.Count.Should().Be(expectedCount);
+    }
+
+    [Then(@"the breakpoint list should contain a breakpoint on ""(.*)""")]
+    public void ThenTheBreakpointListShouldContainABreakpointOn(string file)
+    {
+        _lastBreakpointList.Should().NotBeNull();
+        _lastBreakpointList!.Should().Contain(bp => bp.Location.File.Contains(file));
+    }
+
+    // --- Enable/Disable ---
+
+    [When("I disable the last set breakpoint")]
+    public async Task WhenIDisableTheLastSetBreakpoint()
+    {
+        _ctx.LastSetBreakpoint.Should().NotBeNull();
+        await _ctx.BreakpointManager.SetBreakpointEnabledAsync(
+            _ctx.LastSetBreakpoint!.Id, enabled: false, CancellationToken.None);
+    }
+
+    [When("I enable the last set breakpoint")]
+    public async Task WhenIEnableTheLastSetBreakpoint()
+    {
+        _ctx.LastSetBreakpoint.Should().NotBeNull();
+        await _ctx.BreakpointManager.SetBreakpointEnabledAsync(
+            _ctx.LastSetBreakpoint!.Id, enabled: true, CancellationToken.None);
+    }
+
+    [Then("the last set breakpoint should be disabled")]
+    public async Task ThenTheLastSetBreakpointShouldBeDisabled()
+    {
+        var breakpoints = await _ctx.BreakpointManager.GetBreakpointsAsync(CancellationToken.None);
+        var bp = breakpoints.FirstOrDefault(b => b.Id == _ctx.LastSetBreakpoint!.Id);
+        bp.Should().NotBeNull();
+        bp!.Enabled.Should().BeFalse();
+    }
+
+    [Then("the last set breakpoint should be enabled")]
+    public async Task ThenTheLastSetBreakpointShouldBeEnabled()
+    {
+        var breakpoints = await _ctx.BreakpointManager.GetBreakpointsAsync(CancellationToken.None);
+        var bp = breakpoints.FirstOrDefault(b => b.Id == _ctx.LastSetBreakpoint!.Id);
+        bp.Should().NotBeNull();
+        bp!.Enabled.Should().BeTrue();
+    }
+
+    // --- Remove by ID ---
+
+    [When("I remove the first breakpoint by ID")]
+    public async Task WhenIRemoveTheFirstBreakpointByID()
+    {
+        _ctx.SetBreakpoints.Should().NotBeEmpty();
+        var firstBp = _ctx.SetBreakpoints[0];
+        await _ctx.BreakpointManager.RemoveBreakpointAsync(firstBp.Id, CancellationToken.None);
+        _ctx.SetBreakpoints.RemoveAt(0);
     }
 }

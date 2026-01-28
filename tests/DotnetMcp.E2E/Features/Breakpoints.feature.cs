@@ -106,7 +106,7 @@ namespace DotnetMcp.E2E.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Breakpoints.feature.ndjson", 6);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Breakpoints.feature.ndjson", 13);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -296,6 +296,334 @@ namespace DotnetMcp.E2E.Features
 #line hidden
 #line 34
         await testRunner.ThenAsync("the debugger should not pause within 1 seconds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Set exception breakpoint for InvalidOperationException")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "Set exception breakpoint for InvalidOperationException")]
+        public async global::System.Threading.Tasks.Task SetExceptionBreakpointForInvalidOperationException()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "4";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Set exception breakpoint for InvalidOperationException", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 36
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 37
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 38
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 39
+        await testRunner.WhenAsync("I set an exception breakpoint for \"System.InvalidOperationException\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 40
+        await testRunner.ThenAsync("the exception breakpoint should be set", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 41
+        await testRunner.AndAsync("the exception breakpoint should be for type \"System.InvalidOperationException\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Exception breakpoint triggers on throw")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "Exception breakpoint triggers on throw")]
+        public async global::System.Threading.Tasks.Task ExceptionBreakpointTriggersOnThrow()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "5";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Exception breakpoint triggers on throw", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 43
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 44
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 45
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 46
+        await testRunner.WhenAsync("I set an exception breakpoint for \"System.InvalidOperationException\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 47
+        await testRunner.AndAsync("the test target executes the \"exception\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 48
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 49
+        await testRunner.ThenAsync("the last hit should be an exception breakpoint", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="List all breakpoints returns set breakpoints")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "List all breakpoints returns set breakpoints")]
+        public async global::System.Threading.Tasks.Task ListAllBreakpointsReturnsSetBreakpoints()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "6";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("List all breakpoints returns set breakpoints", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 51
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 52
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 53
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 54
+        await testRunner.AndAsync("a breakpoint on \"MethodTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 55
+        await testRunner.AndAsync("a breakpoint on \"LoopTarget.cs\" line 17", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 56
+        await testRunner.WhenAsync("I list all breakpoints", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 57
+        await testRunner.ThenAsync("the breakpoint list should contain 2 breakpoints", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 58
+        await testRunner.AndAsync("the breakpoint list should contain a breakpoint on \"MethodTarget.cs\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 59
+        await testRunner.AndAsync("the breakpoint list should contain a breakpoint on \"LoopTarget.cs\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Enable and disable breakpoint toggle")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "Enable and disable breakpoint toggle")]
+        public async global::System.Threading.Tasks.Task EnableAndDisableBreakpointToggle()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "7";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Enable and disable breakpoint toggle", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 61
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 62
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 63
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 64
+        await testRunner.AndAsync("a breakpoint on \"MethodTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 65
+        await testRunner.WhenAsync("I disable the last set breakpoint", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 66
+        await testRunner.ThenAsync("the last set breakpoint should be disabled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 67
+        await testRunner.WhenAsync("I enable the last set breakpoint", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 68
+        await testRunner.ThenAsync("the last set breakpoint should be enabled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Multiple breakpoints hit in order")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "Multiple breakpoints hit in order")]
+        public async global::System.Threading.Tasks.Task MultipleBreakpointsHitInOrder()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "8";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Multiple breakpoints hit in order", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 70
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 71
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 72
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 73
+        await testRunner.AndAsync("a breakpoint on \"NestedTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 74
+        await testRunner.AndAsync("a breakpoint on \"NestedTarget.cs\" line 23", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 75
+        await testRunner.WhenAsync("the test target executes the \"nested\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 76
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 77
+        await testRunner.ThenAsync("the debugger should pause at \"NestedTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 78
+        await testRunner.WhenAsync("I continue execution", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 79
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 80
+        await testRunner.ThenAsync("the debugger should pause at \"NestedTarget.cs\" line 23", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Disabled breakpoint does not trigger")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "Disabled breakpoint does not trigger")]
+        public async global::System.Threading.Tasks.Task DisabledBreakpointDoesNotTrigger()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "9";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Disabled breakpoint does not trigger", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 82
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 83
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 84
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 85
+        await testRunner.AndAsync("a breakpoint on \"MethodTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 86
+        await testRunner.WhenAsync("I disable the last set breakpoint", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 87
+        await testRunner.AndAsync("the test target executes the \"method\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 88
+        await testRunner.ThenAsync("the debugger should not pause within 2 seconds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Remove breakpoint by ID removes from list")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Breakpoints")]
+        [global::Xunit.TraitAttribute("Description", "Remove breakpoint by ID removes from list")]
+        public async global::System.Threading.Tasks.Task RemoveBreakpointByIDRemovesFromList()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "10";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Remove breakpoint by ID removes from list", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 90
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 91
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 92
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 93
+        await testRunner.AndAsync("a breakpoint on \"MethodTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 94
+        await testRunner.AndAsync("a breakpoint on \"LoopTarget.cs\" line 17", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 95
+        await testRunner.WhenAsync("I list all breakpoints", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 96
+        await testRunner.ThenAsync("the breakpoint list should contain 2 breakpoints", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 97
+        await testRunner.WhenAsync("I remove the first breakpoint by ID", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 98
+        await testRunner.AndAsync("I list all breakpoints", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 99
+        await testRunner.ThenAsync("the breakpoint list should contain 1 breakpoints", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

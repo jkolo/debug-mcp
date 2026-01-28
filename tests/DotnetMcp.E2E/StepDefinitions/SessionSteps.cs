@@ -107,4 +107,12 @@ public sealed class SessionSteps
         session.Should().NotBeNull();
         session!.ProcessId.Should().BePositive();
     }
+
+    [Then(@"getting stack trace should fail with ""(.*)""")]
+    public void ThenGettingStackTraceShouldFailWith(string expectedMessage)
+    {
+        var act = () => _ctx.SessionManager.GetStackFrames();
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage($"*{expectedMessage}*");
+    }
 }

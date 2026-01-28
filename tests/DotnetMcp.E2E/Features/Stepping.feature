@@ -51,3 +51,32 @@ Feature: Stepping
         Given a running test target process
         And the debugger is attached to the test target
         Then stepping over should fail with "not paused"
+
+    Scenario: Step over multiple times in loop
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "LoopTarget.cs" line 17
+        When the test target executes the "loop" command
+        And I wait for a breakpoint hit
+        And I step over
+        And I step over
+        And I step over
+        Then the session state should be "Paused"
+
+    Scenario: Step into nested method verifies location change
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "NestedTarget.cs" line 14
+        When the test target executes the "nested" command
+        And I wait for a breakpoint hit
+        And I step into
+        Then the current stack frame should be in method "Level2"
+
+    Scenario: Step out returns to caller
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "NestedTarget.cs" line 23
+        When the test target executes the "nested" command
+        And I wait for a breakpoint hit
+        And I step out
+        Then the current stack frame should be in method "Level1"

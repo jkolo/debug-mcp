@@ -1,6 +1,7 @@
 using DotnetMcp.Models;
 using DotnetMcp.Models.Breakpoints;
 using DotnetMcp.Models.Inspection;
+using DotnetMcp.Models.Memory;
 using DotnetMcp.Models.Modules;
 using DotnetMcp.Services;
 using DotnetMcp.Services.Breakpoints;
@@ -47,6 +48,29 @@ public sealed class DebuggerContext : IDisposable
     public string? LastEvalResultValue { get; set; }
     public string? LastEvalResultType { get; set; }
     public IReadOnlyList<ModuleInfo>? LastModules { get; set; }
+
+    // Thread inspection state
+    public IReadOnlyList<ThreadInfo>? LastThreads { get; set; }
+
+    // Expression evaluation error state
+    public string? LastExpressionError { get; set; }
+
+    // Debug state info
+    public string? LastDebugState { get; set; }
+
+    // Module/type search state
+    public SearchResult? LastSearchResult { get; set; }
+    public TypesResult? LastTypesResult { get; set; }
+    public TypeMembersResult? LastMembersResult { get; set; }
+
+    // Memory/object inspection state
+    public ObjectInspection? LastObjectInspection { get; set; }
+    public TypeLayout? LastTypeLayout { get; set; }
+    public ReferencesResult? LastReferencesResult { get; set; }
+    public byte[]? LastMemoryBytes { get; set; }
+
+    // Error tracking for scenarios testing error paths
+    public string? LastOperationError { get; set; }
 
     public DebuggerContext()
     {

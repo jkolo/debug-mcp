@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Expressions/Expressions.csproj" />
+    <ProjectReference Include="../AsyncOps/AsyncOps.csproj" />
+    <ProjectReference Include="../MemoryStructs/MemoryStructs.csproj" />
+  </ItemGroup>
+</Project>

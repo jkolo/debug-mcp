@@ -106,7 +106,7 @@ namespace DotnetMcp.E2E.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/StackTrace.feature.ndjson", 4);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/StackTrace.feature.ndjson", 7);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -224,6 +224,153 @@ namespace DotnetMcp.E2E.Features
 #line hidden
 #line 23
         await testRunner.ThenAsync("the stack trace should contain at least 1 frames", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Stack trace contains expected nested methods in order")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Stack Trace")]
+        [global::Xunit.TraitAttribute("Description", "Stack trace contains expected nested methods in order")]
+        public async global::System.Threading.Tasks.Task StackTraceContainsExpectedNestedMethodsInOrder()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "2";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Stack trace contains expected nested methods in order", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 25
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 26
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 27
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 28
+        await testRunner.AndAsync("a breakpoint on \"NestedTarget.cs\" line 32", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 29
+        await testRunner.WhenAsync("the test target executes the \"nested\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 30
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 31
+        await testRunner.AndAsync("I request the stack trace", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 32
+        await testRunner.ThenAsync("the stack trace should contain method \"Level3\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 33
+        await testRunner.AndAsync("the stack trace should contain method \"Level2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 34
+        await testRunner.AndAsync("the stack trace should contain method \"Level1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="List threads at breakpoint")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Stack Trace")]
+        [global::Xunit.TraitAttribute("Description", "List threads at breakpoint")]
+        public async global::System.Threading.Tasks.Task ListThreadsAtBreakpoint()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "3";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("List threads at breakpoint", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 36
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 37
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 38
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 39
+        await testRunner.AndAsync("a breakpoint on \"MethodTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 40
+        await testRunner.WhenAsync("the test target executes the \"method\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 41
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 42
+        await testRunner.AndAsync("I list all threads", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 43
+        await testRunner.ThenAsync("the thread list should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 44
+        await testRunner.AndAsync("the thread list should have a current thread", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Stack frame contains source location")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Stack Trace")]
+        [global::Xunit.TraitAttribute("Description", "Stack frame contains source location")]
+        public async global::System.Threading.Tasks.Task StackFrameContainsSourceLocation()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "4";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Stack frame contains source location", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 46
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 47
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 48
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 49
+        await testRunner.AndAsync("a breakpoint on \"MethodTarget.cs\" line 14", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 50
+        await testRunner.WhenAsync("the test target executes the \"method\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 51
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 52
+        await testRunner.AndAsync("I request the stack trace", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 53
+        await testRunner.ThenAsync("the top frame should have source location containing \"MethodTarget.cs\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

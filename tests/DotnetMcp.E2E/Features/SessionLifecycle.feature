@@ -27,3 +27,12 @@ Feature: Session Lifecycle
         Given a launched process paused at entry
         When I continue execution
         Then the session state should be "Running"
+
+    Scenario: Operations on disconnected session fail gracefully
+        Given a running test target process
+        And the debugger is attached to the test target
+        When I detach the debugger
+        Then getting stack trace should fail with "No active debug session"
+
+    Scenario: Get session state when not attached
+        Then the session state should be "Disconnected"
