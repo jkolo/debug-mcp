@@ -24,12 +24,16 @@ Unlike similar tools that use external debuggers via DAP protocol, DotnetMcp int
 
 ```bash
 # As .NET global tool
-dotnet tool install -g DotnetMcp
+dotnet tool install -g dotnet-mcp
 
-# Or build from source
-git clone https://github.com/yourname/DotnetMcp
+# As local tool (per-project)
+dotnet new tool-manifest   # if not already present
+dotnet tool install dotnet-mcp
+
+# Or run from source
+git clone https://github.com/jurek/DotnetMcp
 cd DotnetMcp
-dotnet build
+dotnet run --project DotnetMcp/DotnetMcp.csproj
 ```
 
 ### Requirements
