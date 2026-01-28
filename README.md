@@ -31,7 +31,7 @@ dotnet new tool-manifest   # if not already present
 dotnet tool install dotnet-mcp
 
 # Or run from source
-git clone https://github.com/jurek/DotnetMcp
+git clone https://github.com/jkolo/dotnet-mcp
 cd DotnetMcp
 dotnet run --project DotnetMcp/DotnetMcp.csproj
 ```

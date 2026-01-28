@@ -19,7 +19,7 @@
         <Authors>Jurek</Authors>
         <Description>MCP server for debugging .NET applications via the ICorDebug API</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <RepositoryUrl>https://github.com/jurek/DotnetMcp</RepositoryUrl>
+        <RepositoryUrl>https://github.com/jkolo/dotnet-mcp</RepositoryUrl>
         <PackageTags>mcp;debugger;dotnet;icordebug</PackageTags>
     </PropertyGroup>
 
