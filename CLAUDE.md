@@ -14,6 +14,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-17
 - N/A (in-memory, reads module metadata on demand) (005-module-ops)
 - N/A (in-memory debug session state) (006-fix-debugger-bugs)
 - C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Diagnostics.DbgShim.linux-x64 9.0.661903 (007-debug-launch)
+- C# / .NET 10.0 + Reqnroll 3.3.2, Reqnroll.xUnit, Reqnroll.Tools.MsBuild.Generation, FluentAssertions 8.0.0 (008-reqnroll-e2e-tests)
+- N/A (test-only feature) (008-reqnroll-e2e-tests)
 
 - C# / .NET 10.0 + Microsoft.Diagnostics.Runtime (ClrMD), System.Text.Json, (001-debug-session)
 
@@ -33,9 +35,9 @@ tests/
 C# / .NET 10.0: Follow standard conventions
 
 ## Recent Changes
+- 008-reqnroll-e2e-tests: Added C# / .NET 10.0 + Reqnroll 3.3.2, Reqnroll.xUnit, Reqnroll.Tools.MsBuild.Generation, FluentAssertions 8.0.0
 - 007-debug-launch: Added C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Diagnostics.DbgShim.linux-x64 9.0.661903
 - 006-fix-debugger-bugs: Added C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Reflection.Metadata
-- 005-module-ops: Added C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK + ClrDebug (for ICorDebug APIs), System.Reflection.Metadata (for metadata reading),
 
 
 <!-- MANUAL ADDITIONS START -->

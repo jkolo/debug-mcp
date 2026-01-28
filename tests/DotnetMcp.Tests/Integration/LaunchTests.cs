@@ -368,61 +368,6 @@ public class LaunchTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Category", "E2E")]
-    public async Task LaunchAsync_RealProcess_StartsAndAttaches()
-    {
-        var testDll = TestTargetProcess.TestTargetDllPath;
-        var timeout = TimeSpan.FromSeconds(30);
-
-        File.Exists(testDll).Should().BeTrue($"Test target should exist at {testDll}. Run 'dotnet build' on TestTargetApp.");
-
-        // Act
-        var session = await _sessionManager.LaunchAsync(testDll, timeout: timeout);
-
-        // Assert
-        session.Should().NotBeNull();
-        session.ProcessId.Should().BePositive();
-        session.LaunchMode.Should().Be(LaunchMode.Launch);
-        session.State.Should().Be(SessionState.Paused, "default stopAtEntry=true should pause");
-        session.PauseReason.Should().Be(PauseReason.Entry);
-    }
-
-    [Fact]
-    [Trait("Category", "E2E")]
-    public async Task LaunchAsync_RealProcess_WithStopAtEntryFalse_IsRunning()
-    {
-        var testDll = TestTargetProcess.TestTargetDllPath;
-        var timeout = TimeSpan.FromSeconds(30);
-
-        // Act
-        var session = await _sessionManager.LaunchAsync(testDll, stopAtEntry: false, timeout: timeout);
-
-        // Assert
-        session.Should().NotBeNull();
-        session.State.Should().Be(SessionState.Running);
-        session.PauseReason.Should().BeNull();
-    }
-
-    [Fact]
-    [Trait("Category", "E2E")]
-    public async Task LaunchAsync_RealProcess_ContinueAfterEntry_Runs()
-    {
-        var testDll = TestTargetProcess.TestTargetDllPath;
-        var timeout = TimeSpan.FromSeconds(30);
-
-        // Arrange - launch paused at entry
-        var session = await _sessionManager.LaunchAsync(testDll, stopAtEntry: true, timeout: timeout);
-        session.State.Should().Be(SessionState.Paused);
-
-        // Act - continue execution
-        await _sessionManager.ContinueAsync();
-
-        // Assert
-        var currentState = _sessionManager.GetCurrentState();
-        currentState.Should().Be(SessionState.Running);
-    }
-
-    [Fact]
     public async Task LaunchAsync_WithInvalidCwd_ThrowsDirectoryNotFoundException()
     {
         var testDll = TestTargetProcess.TestTargetDllPath;

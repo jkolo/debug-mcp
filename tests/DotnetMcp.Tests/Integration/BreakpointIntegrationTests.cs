@@ -32,8 +32,6 @@ public class BreakpointIntegrationTests : IAsyncLifetime
     private readonly SimpleConditionEvaluator _conditionEvaluator;
     private readonly BreakpointManager _breakpointManager;
 
-    private TestTargetProcess? _targetProcess;
-
     public BreakpointIntegrationTests()
     {
         _debuggerLoggerMock = new Mock<ILogger<ProcessDebugger>>();
@@ -65,7 +63,6 @@ public class BreakpointIntegrationTests : IAsyncLifetime
         await _breakpointManager.ClearAllBreakpointsAsync(CancellationToken.None);
         await _sessionManager.DisconnectAsync();
         _processDebugger.Dispose();
-        _targetProcess?.Dispose();
     }
 
     /// <summary>
@@ -227,146 +224,6 @@ public class BreakpointIntegrationTests : IAsyncLifetime
         exceptionBp.BreakOnFirstChance.Should().BeTrue();
         exceptionBp.BreakOnSecondChance.Should().BeTrue();
         exceptionBp.Enabled.Should().BeTrue();
-    }
-
-    /// <summary>
-    /// E2E test: Attach to process, set breakpoint, trigger code, verify hit.
-    /// NOTE: This test requires the dbgshim library and may need elevated permissions.
-    /// Run with: dotnet test --filter "FullyQualifiedName~AttachAndHitBreakpoint"
-    /// </summary>
-    [Fact]
-    [Trait("Category", "E2E")]
-    public async Task AttachAndHitBreakpoint_WhenCodeExecutes_BreakpointIsHit()
-    {
-        // Arrange - start the test target process
-        _targetProcess = new TestTargetProcess();
-        await _targetProcess.StartAsync();
-        _targetProcess.IsRunning.Should().BeTrue("test target should be running");
-
-        var targetPid = _targetProcess.ProcessId;
-        var timeout = TimeSpan.FromSeconds(30);
-
-        // Verify it's detected as a .NET process
-        _processDebugger.IsNetProcess(targetPid).Should().BeTrue("test target is a .NET process");
-
-        // Attach to the target
-        var session = await _sessionManager.AttachAsync(targetPid, timeout);
-        session.Should().NotBeNull();
-        session.State.Should().Be(SessionState.Running);
-
-        // Set breakpoint on MethodTarget.SayHello line 14 (the greeting assignment)
-        var sourceFile = TestTargetProcess.GetSourceFilePath("MethodTarget.cs");
-        var breakpoint = await _breakpointManager.SetBreakpointAsync(
-            sourceFile,
-            line: 14,
-            column: null,
-            condition: null,
-            CancellationToken.None);
-
-        breakpoint.Should().NotBeNull();
-
-        // Start waiting for breakpoint hit
-        var waitTask = _breakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromSeconds(10),
-            CancellationToken.None);
-
-        // Trigger the code path by sending "method" command
-        await _targetProcess.SendCommandAsync("method");
-
-        // Wait for breakpoint hit
-        var hit = await waitTask;
-
-        // Assert
-        hit.Should().NotBeNull("breakpoint should have been hit");
-        hit!.BreakpointId.Should().Be(breakpoint.Id);
-        hit.HitCount.Should().Be(1);
-
-        // Verify session is paused
-        _sessionManager.GetCurrentState().Should().Be(SessionState.Paused);
-    }
-
-    /// <summary>
-    /// E2E test: Multiple breakpoint hits with hit count tracking.
-    /// </summary>
-    [Fact]
-    [Trait("Category", "E2E")]
-    public async Task LoopBreakpoint_WhenLoopExecutes_HitMultipleTimes()
-    {
-        // Arrange - start the test target process
-        _targetProcess = new TestTargetProcess();
-        await _targetProcess.StartAsync();
-
-        var targetPid = _targetProcess.ProcessId;
-        var timeout = TimeSpan.FromSeconds(30);
-
-        // Attach to the target
-        var session = await _sessionManager.AttachAsync(targetPid, timeout);
-        session.Should().NotBeNull();
-
-        // Set breakpoint on LoopTarget.RunLoop line 17 (Console.WriteLine in loop)
-        var sourceFile = TestTargetProcess.GetSourceFilePath("LoopTarget.cs");
-        var breakpoint = await _breakpointManager.SetBreakpointAsync(
-            sourceFile,
-            line: 17,
-            column: null,
-            condition: null,
-            CancellationToken.None);
-
-        // Send "loop" command to run 5 iterations
-        await _targetProcess.SendCommandAsync("loop");
-
-        // Wait for first hit
-        var hit1 = await _breakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromSeconds(10),
-            CancellationToken.None);
-
-        hit1.Should().NotBeNull();
-        hit1!.HitCount.Should().Be(1);
-
-        // Continue execution and wait for more hits
-        // Note: In a full implementation, we would call Continue() here
-        // For now, verify the first hit works
-    }
-
-    /// <summary>
-    /// E2E test: Conditional breakpoint only breaks when condition is met.
-    /// Note: Currently conditions are validated but not evaluated at runtime.
-    /// </summary>
-    [Fact]
-    [Trait("Category", "E2E")]
-    public async Task ConditionalBreakpoint_OnlyHitsWhenConditionMet()
-    {
-        // Arrange - start the test target process
-        _targetProcess = new TestTargetProcess();
-        await _targetProcess.StartAsync();
-
-        var targetPid = _targetProcess.ProcessId;
-        var timeout = TimeSpan.FromSeconds(30);
-
-        // Attach to the target
-        var session = await _sessionManager.AttachAsync(targetPid, timeout);
-        session.Should().NotBeNull();
-
-        // Set breakpoint with condition: only break on 3rd hit
-        var sourceFile = TestTargetProcess.GetSourceFilePath("LoopTarget.cs");
-        var breakpoint = await _breakpointManager.SetBreakpointAsync(
-            sourceFile,
-            line: 17,
-            column: null,
-            condition: "hitCount == 3",
-            CancellationToken.None);
-
-        // Send "loop" command to run 5 iterations
-        await _targetProcess.SendCommandAsync("loop");
-
-        // Wait for the breakpoint hit (should be on 3rd iteration)
-        var hit = await _breakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromSeconds(10),
-            CancellationToken.None);
-
-        // Assert - should only pause when hitCount == 3
-        hit.Should().NotBeNull();
-        hit!.HitCount.Should().Be(3, "condition was hitCount == 3");
     }
 
     /// <summary>
