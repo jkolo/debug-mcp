@@ -515,40 +515,6 @@ public class BreakpointManagerTests
     }
 
     /// <summary>
-    /// SC-006: Multiple hits from different threads maintain correct thread IDs.
-    /// </summary>
-    [Fact]
-    public async Task OnBreakpointHit_MultipleThreadsSequentially_PreservesEachThreadId()
-    {
-        // Arrange
-        _processDebuggerMock.Setup(x => x.IsAttached).Returns(false);
-        var breakpoint = await _manager.SetBreakpointAsync("/app/Program.cs", 10);
-
-        var threadIds = new[] { 1, 5, 42, 100 };
-
-        // Queue multiple hits from different threads
-        foreach (var tid in threadIds)
-        {
-            var hit = new BreakpointHit(
-                BreakpointId: breakpoint.Id,
-                ThreadId: tid,
-                Timestamp: DateTime.UtcNow,
-                Location: breakpoint.Location,
-                HitCount: tid);
-            _manager.OnBreakpointHit(hit);
-        }
-
-        // Act & Assert - verify each hit returns with correct thread ID
-        foreach (var expectedTid in threadIds)
-        {
-            var result = await _manager.WaitForBreakpointAsync(TimeSpan.FromSeconds(1));
-            result.Should().NotBeNull();
-            result!.ThreadId.Should().Be(expectedTid,
-                $"hit from thread {expectedTid} must preserve its thread ID");
-        }
-    }
-
-    /// <summary>
     /// ConditionContext includes correct thread ID for condition evaluation.
     /// </summary>
     [Fact]

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using ClrDebug;
 using DotnetMcp.Models.Breakpoints;
 using Microsoft.Extensions.Logging;
@@ -16,8 +15,9 @@ public sealed class BreakpointManager : IBreakpointManager
     private readonly IConditionEvaluator _conditionEvaluator;
     private readonly ILogger<BreakpointManager> _logger;
 
-    private readonly ConcurrentQueue<BreakpointHit> _hitQueue = new();
-    private readonly SemaphoreSlim _hitSemaphore = new(0);
+    private readonly Lock _hitLock = new();
+    private BreakpointHit? _pendingHit;
+    private TaskCompletionSource<BreakpointHit?>? _hitWaiter;
 
     /// <summary>
     /// Event raised when a breakpoint's state changes (Pending→Bound or Bound→Pending).
@@ -311,23 +311,42 @@ public sealed class BreakpointManager : IBreakpointManager
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
+        TaskCompletionSource<BreakpointHit?> waiter;
+
+        lock (_hitLock)
+        {
+            if (_pendingHit != null)
+            {
+                var hit = _pendingHit;
+                _pendingHit = null;
+                return hit;
+            }
+
+            waiter = new TaskCompletionSource<BreakpointHit?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _hitWaiter = waiter;
+        }
+
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
         try
         {
-            await _hitSemaphore.WaitAsync(timeoutCts.Token);
+            await waiter.Task.WaitAsync(timeoutCts.Token);
 
-            if (_hitQueue.TryDequeue(out var hit))
+            lock (_hitLock)
             {
+                var hit = _pendingHit;
+                _pendingHit = null;
+                _hitWaiter = null;
                 return hit;
             }
-
-            return null;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Timeout occurred
+            lock (_hitLock)
+            {
+                _hitWaiter = null;
+            }
             return null;
         }
     }
@@ -443,9 +462,6 @@ public sealed class BreakpointManager : IBreakpointManager
 
         _registry.Clear();
 
-        // Clear hit queue
-        while (_hitQueue.TryDequeue(out _)) { }
-
         _logger.LogInformation("Cleared all breakpoints");
         return Task.CompletedTask;
     }
@@ -492,9 +508,15 @@ public sealed class BreakpointManager : IBreakpointManager
             }
         }
 
-        // Queue the hit for waiting clients
-        _hitQueue.Enqueue(hit);
-        _hitSemaphore.Release();
+        // Signal the hit for waiting clients
+        lock (_hitLock)
+        {
+            _pendingHit = hit;
+            if (_hitWaiter is { Task.IsCompleted: false } waiter)
+            {
+                waiter.TrySetResult(hit);
+            }
+        }
 
         _logger.LogDebug("Breakpoint {Id} hit on thread {ThreadId}", hit.BreakpointId, hit.ThreadId);
         return true; // Pause execution
@@ -511,39 +533,48 @@ public sealed class BreakpointManager : IBreakpointManager
             e.ExceptionType,
             e.IsFirstChance);
 
-        foreach (var exBp in matchingBreakpoints)
+        // Pick first matching exception breakpoint only — ICorDebug stops all threads,
+        // so there's only one stop event per hit.
+        var exBp = matchingBreakpoints.FirstOrDefault();
+        if (exBp == null)
+            return;
+
+        // Increment hit count
+        var updated = exBp with { HitCount = exBp.HitCount + 1 };
+        _registry.UpdateException(updated);
+
+        // Create exception info
+        var exceptionInfo = new ExceptionInfo(
+            Type: e.ExceptionType,
+            Message: e.ExceptionMessage,
+            IsFirstChance: e.IsFirstChance,
+            StackTrace: null);
+
+        // Create hit with resolved location
+        var location = e.Location != null
+            ? new BreakpointLocation(e.Location.File, e.Location.Line, null)
+            : new BreakpointLocation("Unknown", 0, null);
+
+        var hit = new BreakpointHit(
+            BreakpointId: exBp.Id,
+            ThreadId: e.ThreadId,
+            Timestamp: e.Timestamp,
+            Location: location,
+            HitCount: updated.HitCount,
+            ExceptionInfo: exceptionInfo);
+
+        // Signal the hit for waiting clients
+        lock (_hitLock)
         {
-            // Increment hit count
-            var updated = exBp with { HitCount = exBp.HitCount + 1 };
-            _registry.UpdateException(updated);
-
-            // Create exception info
-            var exceptionInfo = new ExceptionInfo(
-                Type: e.ExceptionType,
-                Message: e.ExceptionMessage,
-                IsFirstChance: e.IsFirstChance,
-                StackTrace: null);
-
-            // Create hit with resolved location
-            var location = e.Location != null
-                ? new BreakpointLocation(e.Location.File, e.Location.Line, null)
-                : new BreakpointLocation("Unknown", 0, null);
-
-            var hit = new BreakpointHit(
-                BreakpointId: exBp.Id,
-                ThreadId: e.ThreadId,
-                Timestamp: e.Timestamp,
-                Location: location,
-                HitCount: updated.HitCount,
-                ExceptionInfo: exceptionInfo);
-
-            // Queue the hit for waiting clients
-            _hitQueue.Enqueue(hit);
-            _hitSemaphore.Release();
-
-            _logger.LogInformation("Exception breakpoint {Id} hit: {ExceptionType} on thread {ThreadId}",
-                exBp.Id, e.ExceptionType, e.ThreadId);
+            _pendingHit = hit;
+            if (_hitWaiter is { Task.IsCompleted: false } waiter)
+            {
+                waiter.TrySetResult(hit);
+            }
         }
+
+        _logger.LogInformation("Exception breakpoint {Id} hit: {ExceptionType} on thread {ThreadId}",
+            exBp.Id, e.ExceptionType, e.ThreadId);
     }
 
     private void OnModuleLoaded(object? sender, ModuleLoadedEventArgs e)
