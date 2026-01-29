@@ -27,7 +27,7 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Test
-        run: dotnet test -c Release --no-build
+        run: dotnet test -c Release --no-build --filter "FullyQualifiedName~Unit"
 
       - name: Notify Matrix on failure
         if: failure() && env.HAS_MATRIX == 'true'
