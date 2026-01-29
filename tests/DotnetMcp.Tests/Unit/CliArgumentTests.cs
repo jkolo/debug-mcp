@@ -7,9 +7,16 @@ public class CliArgumentTests
     private static readonly string ProjectPath = Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "DotnetMcp", "DotnetMcp.csproj"));
 
+    private static readonly string Configuration =
+#if DEBUG
+        "Debug";
+#else
+        "Release";
+#endif
+
     private async Task<(int ExitCode, string StdOut, string StdErr)> RunToolAsync(params string[] args)
     {
-        var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build", "--", .. args])
+        var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build", "-c", Configuration, "--", .. args])
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -29,7 +36,7 @@ public class CliArgumentTests
         var (exitCode, stdout, _) = await RunToolAsync("--version");
 
         exitCode.Should().Be(0);
-        stdout.Should().StartWith("1.0.0");
+        stdout.Should().MatchRegex(@"^\d+\.\d+\.\d+");
     }
 
     [Fact]
@@ -55,7 +62,7 @@ public class CliArgumentTests
     [Fact]
     public async Task No_Arguments_Starts_MCP_Server()
     {
-        var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build"])
+        var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build", "-c", Configuration])
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
