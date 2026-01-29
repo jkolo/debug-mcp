@@ -8,60 +8,38 @@ sidebar_position: 1
 
 DebugMcp is structured as a bridge between the MCP protocol (JSON-RPC over stdio) and the .NET debugging infrastructure (ICorDebug COM APIs).
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              LLM Agent (Claude, GPT)                        │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       │ MCP Protocol (JSON-RPC)
-                                       │ Transport: stdio
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              DebugMcp Server                               │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         MCP Layer                                    │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────┐ │   │
-│  │  │ SessionTools │  │BreakpointTools│ │ExecutionTools│  │Inspection│ │   │
-│  │  │              │  │              │  │              │  │  Tools   │ │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                       │                                     │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      Debugger Core                                   │   │
-│  │  ┌───────────────┐  ┌─────────────────┐  ┌──────────────────────┐  │   │
-│  │  │ DebugSession  │  │BreakpointManager│  │ExpressionEvaluator   │  │   │
-│  │  │               │  │                 │  │                      │  │   │
-│  │  └───────────────┘  └─────────────────┘  └──────────────────────┘  │   │
-│  │         │                                                            │   │
-│  │  ┌───────────────┐  ┌─────────────────┐                             │   │
-│  │  │DebugEvent-    │  │ SourceMapper    │                             │   │
-│  │  │Handler        │  │ (PDB/Symbols)   │                             │   │
-│  │  │(Callbacks)    │  │                 │                             │   │
-│  │  └───────────────┘  └─────────────────┘                             │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                       │                                     │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      Infrastructure                                  │   │
-│  │  ┌───────────────┐  ┌─────────────────┐                             │   │
-│  │  │DbgShimLoader  │  │CorDebugFactory  │                             │   │
-│  │  └───────────────┘  └─────────────────┘                             │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       │ ClrDebug (Managed Wrapper)
-                                       │ ICorDebug COM Interfaces
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         dbgshim.dll (Native)                                │
-│                     .NET Runtime Debugging Shim                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       │ ICorDebug Protocol
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Target .NET Application                             │
-│                              (debuggee)                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Agent["LLM Agent<br/>(Claude, GPT, etc.)"]
+    Agent -->|"MCP Protocol (JSON-RPC over stdio)"| Server
+
+    subgraph Server["debug-mcp Server"]
+        direction TB
+        subgraph MCP["MCP Layer"]
+            ST[SessionTools]
+            BT[BreakpointTools]
+            ET[ExecutionTools]
+            IT[InspectionTools]
+            MT[MemoryTools]
+            MOT[ModuleTools]
+        end
+        subgraph Core["Debugger Core"]
+            DS[DebugSession]
+            BM[BreakpointManager]
+            EE[ExpressionEvaluator]
+            DEH[DebugEventHandler]
+            SM[SourceMapper]
+        end
+        subgraph Infra["Infrastructure"]
+            DSL[DbgShimLoader]
+            CDF[CorDebugFactory]
+        end
+        MCP --> Core
+        Core --> Infra
+    end
+
+    Server -->|"ClrDebug / ICorDebug COM"| DbgShim["dbgshim (Native)<br/>.NET Debugging Shim"]
+    DbgShim -->|"ICorDebug Protocol"| Target["Target .NET Application<br/>(debuggee)"]
 ```
 
 ## Components
@@ -166,57 +144,74 @@ Creates and initializes ICorDebug instances:
 
 ### Setting a Breakpoint
 
-```
-1. MCP Client → breakpoint_set { file: "Foo.cs", line: 42 }
-2. BreakpointTools.SetBreakpoint() validates input
-3. SourceMapper.GetILOffset("Foo.cs", 42) → IL offset 0x15
-4. BreakpointManager.CreateBreakpoint(module, methodToken, 0x15)
-5. ICorDebugCode.CreateBreakpoint() → ICorDebugBreakpoint
-6. Returns { id: 1, verified: true }
+```mermaid
+sequenceDiagram
+    participant C as MCP Client
+    participant BT as BreakpointTools
+    participant SM as SourceMapper
+    participant BM as BreakpointManager
+    participant ICD as ICorDebugCode
+
+    C->>BT: breakpoint_set { file: "Foo.cs", line: 42 }
+    BT->>SM: GetILOffset("Foo.cs", 42)
+    SM-->>BT: IL offset 0x15
+    BT->>BM: CreateBreakpoint(module, methodToken, 0x15)
+    BM->>ICD: CreateBreakpoint(0x15)
+    ICD-->>BM: ICorDebugBreakpoint
+    BM-->>BT: breakpoint created
+    BT-->>C: { id: 1, verified: true }
 ```
 
 ### Waiting for Breakpoint
 
-```
-1. MCP Client → breakpoint_wait { timeout_ms: 30000 }
-2. BreakpointTools creates TaskCompletionSource
-3. DebugEventHandler receives ICorDebugManagedCallback.Breakpoint()
-4. Event signals the TaskCompletionSource
-5. Returns { hit: true, breakpoint_id: 1, thread_id: 5, ... }
+```mermaid
+sequenceDiagram
+    participant C as MCP Client
+    participant BT as BreakpointTools
+    participant DEH as DebugEventHandler
+    participant CLR as .NET Runtime
+
+    C->>BT: breakpoint_wait { timeout_ms: 30000 }
+    BT->>BT: Create TaskCompletionSource
+    Note over CLR: Breakpoint hit!
+    CLR->>DEH: ICorDebugManagedCallback.Breakpoint()
+    DEH->>BT: Signal TaskCompletionSource
+    BT-->>C: { hit: true, breakpoint_id: 1, thread_id: 5 }
 ```
 
 ### Inspecting Variables
 
-```
-1. MCP Client → variables_get { thread_id: 5, frame_index: 0 }
-2. InspectionTools gets ICorDebugThread from session
-3. Gets ICorDebugFrame at index 0
-4. Casts to ICorDebugILFrame for locals
-5. Enumerates ICorDebugValueEnum
-6. Formats each ICorDebugValue → Variable JSON
-7. Returns { variables: [...] }
+```mermaid
+sequenceDiagram
+    participant C as MCP Client
+    participant IT as InspectionTools
+    participant S as DebugSession
+    participant ICD as ICorDebug
+
+    C->>IT: variables_get { thread_id: 5, frame_index: 0 }
+    IT->>S: GetThread(5)
+    S-->>IT: ICorDebugThread
+    IT->>ICD: GetFrame(0)
+    ICD-->>IT: ICorDebugILFrame
+    IT->>ICD: EnumerateLocalVariables()
+    ICD-->>IT: ICorDebugValueEnum
+    IT->>IT: Format values → JSON
+    IT-->>C: { variables: [...] }
 ```
 
 ## Threading Model
 
 DebugMcp uses a single-threaded apartment (STA) for COM interop with ICorDebug:
 
-```
-┌────────────────────────────────────────────────────┐
-│                  Main Thread                        │
-│  ┌────────────────────────────────────────────┐    │
-│  │        MCP Message Loop (async)            │    │
-│  └────────────────────────────────────────────┘    │
-└────────────────────────────────────────────────────┘
-                         │
-                         │ Marshal via SynchronizationContext
-                         ▼
-┌────────────────────────────────────────────────────┐
-│               COM STA Thread                        │
-│  ┌────────────────────────────────────────────┐    │
-│  │    ICorDebug Callbacks & Operations        │    │
-│  └────────────────────────────────────────────┘    │
-└────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Main["Main Thread"]
+        MCP["MCP Message Loop (async)"]
+    end
+    subgraph STA["COM STA Thread"]
+        ICD["ICorDebug Callbacks & Operations"]
+    end
+    Main -->|"Marshal via SynchronizationContext"| STA
 ```
 
 ## Dependencies

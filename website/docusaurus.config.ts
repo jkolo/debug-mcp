@@ -20,6 +20,12 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
+  markdown: {
+    mermaid: true,
+  },
+
+  themes: ['@docusaurus/theme-mermaid'],
+
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -31,7 +37,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/jkolo/netinspect-mcp/tree/main/website/',
+          editUrl: 'https://github.com/jkolo/debug-mcp/tree/main/website/',
         },
         blog: false,
         theme: {
@@ -55,7 +61,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/jkolo/netinspect-mcp',
+          href: 'https://github.com/jkolo/debug-mcp',
           label: 'GitHub',
           position: 'right',
         },
@@ -67,9 +73,9 @@ const config: Config = {
         {
           title: 'Docs',
           items: [
+            {label: 'Getting Started', to: '/docs/getting-started'},
+            {label: 'Tools Reference', to: '/docs/tools/session'},
             {label: 'Architecture', to: '/docs/architecture'},
-            {label: 'MCP Tools Reference', to: '/docs/mcp-tools'},
-            {label: 'Development Guide', to: '/docs/development'},
           ],
         },
         {
@@ -77,16 +83,19 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/jkolo/netinspect-mcp',
+              href: 'https://github.com/jkolo/debug-mcp',
             },
             {
               label: 'NuGet',
-              href: 'https://www.nuget.org/packages/NetInspect.Mcp',
+              href: 'https://www.nuget.org/packages/debug-mcp',
             },
           ],
         },
       ],
       copyright: `Copyright © ${new Date().getFullYear()} Jerzy Kołosowski. AGPL-3.0 License.`,
+    },
+    mermaid: {
+      theme: {light: 'neutral', dark: 'dark'},
     },
     prism: {
       theme: prismThemes.github,

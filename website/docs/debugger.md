@@ -17,48 +17,35 @@ This document explains the .NET debugging infrastructure that DebugMcp uses.
 
 ## The Debugging Stack
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Debugger (DebugMcp)                            │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                    ClrDebug                                   │  │
-│  │            Managed wrappers for COM interfaces                │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 │ P/Invoke / COM Interop
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         dbgshim.dll                                 │
-│                   Debugging Shim Library                            │
-│  - Locates target CLR runtime                                       │
-│  - Creates ICorDebug instance for specific runtime version          │
-│  - Entry point: CreateDebuggingInterfaceFromVersion()               │
-└─────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         mscordbi.dll                                │
-│                  CLR Debugging Interface                            │
-│  - Implements ICorDebug* interfaces                                 │
-│  - Part of the .NET runtime                                         │
-│  - Communicates with runtime via DAC (Data Access Component)        │
-└─────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 │ In-process communication
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Target .NET Process                            │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                        CLR                                    │  │
-│  │   JIT Compiler | Garbage Collector | Thread Manager           │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                    User Application                           │  │
-│  │                 (managed assemblies)                          │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Debugger["Debugger (debug-mcp)"]
+        ClrDebug["ClrDebug<br/>Managed wrappers for COM interfaces"]
+    end
+
+    subgraph DbgShim["dbgshim.dll — Debugging Shim"]
+        D1["Locates target CLR runtime"]
+        D2["Creates ICorDebug instance"]
+        D3["Entry: CreateDebuggingInterfaceFromVersion()"]
+    end
+
+    subgraph Mscordbi["mscordbi.dll — CLR Debugging Interface"]
+        M1["Implements ICorDebug* interfaces"]
+        M2["Communicates via DAC"]
+    end
+
+    subgraph Target["Target .NET Process"]
+        subgraph CLR["CLR"]
+            JIT["JIT Compiler"]
+            GC["Garbage Collector"]
+            TM["Thread Manager"]
+        end
+        App["User Application<br/>(managed assemblies)"]
+    end
+
+    Debugger -->|"P/Invoke / COM Interop"| DbgShim
+    DbgShim --> Mscordbi
+    Mscordbi -->|"In-process communication"| Target
 ```
 
 ## Key ICorDebug Interfaces
@@ -280,20 +267,13 @@ To map source code lines to IL offsets, debuggers use symbol files:
 
 ### Mapping Process
 
-```
-Source: UserService.cs, Line 42
-         │
-         ▼
-┌─────────────────────────────────────────────┐
-│           PDB Symbol File                    │
-│  - Document references (source files)        │
-│  - Sequence points (IL offset <-> line)      │
-│  - Local variable scopes                     │
-└─────────────────────────────────────────────┘
-         │
-         ▼
-Method: UserService.GetUser
-IL Offset: 0x15
+```mermaid
+graph TD
+    Source["Source: UserService.cs, Line 42"]
+    PDB["PDB Symbol File<br/>• Document references (source files)<br/>• Sequence points (IL offset ↔ line)<br/>• Local variable scopes"]
+    IL["Method: UserService.GetUser<br/>IL Offset: 0x15"]
+
+    Source --> PDB --> IL
 ```
 
 ### Reading Portable PDBs

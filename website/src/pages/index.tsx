@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
+import AsciinemaPlayer from '@site/src/components/AsciinemaPlayer';
 
 const features = [
   {
@@ -38,34 +39,26 @@ export default function Home(): ReactNode {
               .NET applications interactively.
             </p>
             <div className="hero-actions">
-              <Link className="btn-primary" to="/docs/architecture">
+              <Link className="btn-primary" to="/docs/getting-started">
                 Get Started →
               </Link>
-              <Link className="btn-ghost" href="https://github.com/jkolo/netinspect-mcp">
+              <Link className="btn-ghost" href="https://github.com/jkolo/debug-mcp.net">
                 GitHub
               </Link>
             </div>
           </div>
         </section>
 
-        {/* Terminal */}
+        {/* Terminal Recording */}
         <section className="terminal-section">
-          <div className="terminal">
-            <div className="terminal-bar">
-              <div className="terminal-dot" />
-              <div className="terminal-dot" />
-              <div className="terminal-dot" />
-              <span>terminal</span>
-              <div style={{width: 30}} />
-            </div>
-            <div className="terminal-body">
-              <div className="terminal-comment"># no install needed</div>
-              <div className="terminal-line">
-                <span className="terminal-prompt">$</span>
-                <span className="terminal-cmd">dnx debug-mcp</span>
-              </div>
-            </div>
-          </div>
+          <AsciinemaPlayer
+            src="/casts/setup-mcp.cast"
+            rows={24}
+            cols={120}
+            idleTimeLimit={2}
+            speed={1.5}
+            fit="width"
+          />
         </section>
 
         {/* Features */}

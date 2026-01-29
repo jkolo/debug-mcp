@@ -14,8 +14,8 @@ sidebar_position: 4
 
 ```bash
 # Clone repository
-git clone https://github.com/yourname/DebugMcp
-cd DebugMcp
+git clone https://github.com/jkolo/debug-mcp.net
+cd debug-mcp.net
 
 # Restore and build
 dotnet build
