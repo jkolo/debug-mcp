@@ -1,4 +1,4 @@
-# DotnetMcp
+# NetInspect.Mcp
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple)](https://dotnet.microsoft.com/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io/)
@@ -6,9 +6,9 @@
 
 **MCP server for .NET debugging** — enable AI agents to debug .NET applications interactively.
 
-## What is DotnetMcp?
+## What is NetInspect.Mcp?
 
-DotnetMcp is a [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes .NET debugging capabilities as structured API tools. It allows AI assistants like Claude, GPT, or Copilot to:
+NetInspect.Mcp is a [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes .NET debugging capabilities as structured API tools. It allows AI assistants like Claude, GPT, or Copilot to:
 
 - Attach to running .NET processes
 - Set breakpoints and wait for them to trigger
@@ -16,7 +16,7 @@ DotnetMcp is a [Model Context Protocol](https://modelcontextprotocol.io/) server
 - Inspect variables and evaluate expressions
 - Analyze stack traces across threads
 
-Unlike similar tools that use external debuggers via DAP protocol, DotnetMcp interfaces **directly with the .NET runtime** using ICorDebug APIs — the same approach used by JetBrains Rider.
+Unlike similar tools that use external debuggers via DAP protocol, NetInspect.Mcp interfaces **directly with the .NET runtime** using ICorDebug APIs — the same approach used by JetBrains Rider.
 
 ## Quick Start
 
@@ -24,16 +24,16 @@ Unlike similar tools that use external debuggers via DAP protocol, DotnetMcp int
 
 ```bash
 # As .NET global tool
-dotnet tool install -g dotnetmcp
+dotnet tool install -g NetInspect.Mcp
 
 # As local tool (per-project)
 dotnet new tool-manifest   # if not already present
-dotnet tool install dotnetmcp
+dotnet tool install NetInspect.Mcp
 
 # Or run from source
-git clone https://github.com/jkolo/dotnet-mcp
-cd DotnetMcp
-dotnet run --project DotnetMcp/DotnetMcp.csproj
+git clone https://github.com/jkolo/netinspect-mcp
+cd netinspect-mcp
+dotnet run --project NetInspect.Mcp/NetInspect.Mcp.csproj
 ```
 
 ### Requirements
@@ -49,7 +49,7 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "dotnet-debugger": {
-      "command": "dotnet-mcp"
+      "command": "netinspect-mcp"
     }
   }
 }
@@ -96,7 +96,7 @@ Claude: I'll attach to your application and investigate.
 | [mcp-debugger](https://github.com/debugmcp/mcp-debugger) | TypeScript | DAP | Via external debugger |
 | [dap-mcp](https://github.com/KashunCheng/dap_mcp) | Python | DAP | Via external debugger |
 | [LLDB MCP](https://lldb.llvm.org/use/mcp.html) | C++ | Native | No |
-| **DotnetMcp** | C# | ICorDebug | Native, direct |
+| **NetInspect.Mcp** | C# | ICorDebug | Native, direct |
 
 ## License
 
