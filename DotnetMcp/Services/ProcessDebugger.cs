@@ -5262,7 +5262,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 if (!baseTypeHandle.IsNil)
                 {
                     var inheritedMembers = await ReadInheritedMembersAsync(
-                        baseTypeHandle, metadataReader, peReader, moduleInfo.Path,
+                        baseTypeHandle, metadataReader, peReader, moduleInfo.Path!,
                         memberKinds, visibility, includeStatic, includeInstance, cancellationToken);
 
                     if (includeMethods) methods.AddRange(inheritedMembers.Methods);
@@ -5305,7 +5305,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 throw new InvalidOperationException($"Module '{moduleName}' not found in loaded modules");
             }
 
-            var (handle, reader, peReader) = FindTypeInModule(moduleInfo.Path, typeName);
+            var (handle, reader, peReader) = FindTypeInModule(moduleInfo.Path!, typeName);
             return (moduleInfo, handle, reader, peReader);
         }
 
@@ -6106,7 +6106,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         ref int totalMatches,
         int maxResults)
     {
-        using var peReader = new PEReader(File.OpenRead(moduleInfo.Path));
+        using var peReader = new PEReader(File.OpenRead(moduleInfo.Path!));
         if (!peReader.HasMetadata)
             return;
 

@@ -127,7 +127,7 @@ public class ModuleSearchTests : IAsyncLifetime
         result.Types.Should().NotBeEmpty("there are many System types");
         result.Types.Should().OnlyContain(t =>
             t.Name.StartsWith("System", StringComparison.OrdinalIgnoreCase) ||
-            t.Namespace.StartsWith("System", StringComparison.OrdinalIgnoreCase) ||
+            (t.Namespace != null && t.Namespace.StartsWith("System", StringComparison.OrdinalIgnoreCase)) ||
             t.FullName.StartsWith("System", StringComparison.OrdinalIgnoreCase),
             "should only match types starting with System");
     }

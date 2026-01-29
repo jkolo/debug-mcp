@@ -82,7 +82,7 @@ public class TypeBrowsingTests : IAsyncLifetime
 
         // Assert
         result.Types.Should().OnlyContain(t =>
-            t.Namespace.StartsWith("System.Collections", StringComparison.OrdinalIgnoreCase),
+            t.Namespace != null && t.Namespace.StartsWith("System.Collections", StringComparison.OrdinalIgnoreCase),
             "should only return types in System.Collections namespace");
     }
 
