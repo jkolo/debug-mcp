@@ -14,7 +14,7 @@
         <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
 
         <!-- NuGet Metadata -->
-        <PackageId>dotnet-mcp</PackageId>
+        <PackageId>dotnetmcp</PackageId>
         <Authors>Jerzy Kołosowski</Authors>
         <Description>MCP server for debugging .NET applications via the ICorDebug API</Description>
         <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
