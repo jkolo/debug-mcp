@@ -717,6 +717,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         return ".NET (version detection pending)";
     }
 
+    /// <summary>
+    /// Builds a command line string for CreateProcessForLaunch.
+    /// For .dll files, prepends "dotnet". Quotes arguments containing spaces.
+    /// </summary>
     private static string BuildCommandLine(string program, string[]? args)
     {
         if (program.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))

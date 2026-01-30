@@ -20,8 +20,8 @@
 
 **Purpose**: Verify existing infrastructure supports launch functionality
 
-- [ ] T001 Verify ClrDebug DbgShim wrapper supports CreateProcessForLaunch, RegisterForRuntimeStartup, ResumeProcess APIs
-- [ ] T002 Review existing ProcessDebugger.cs structure and identify insertion points for launch logic
+- [x] T001 Verify ClrDebug DbgShim wrapper supports CreateProcessForLaunch, RegisterForRuntimeStartup, ResumeProcess APIs
+- [x] T002 Review existing ProcessDebugger.cs structure and identify insertion points for launch logic
 
 ---
 
@@ -31,11 +31,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Add private fields to ProcessDebugger.cs for launch state: `_resumeHandle`, `_unregisterToken`, `_startupCallbackDelegate`, `_launchCompletionSource`
-- [ ] T004 Implement `BuildCommandLine(string program, string[]? args)` helper in DotnetMcp/Services/ProcessDebugger.cs
-- [ ] T005 [P] Implement `BuildEnvironmentBlock(Dictionary<string, string>? env)` helper in DotnetMcp/Services/ProcessDebugger.cs
-- [ ] T006 Implement startup callback delegate `OnRuntimeStartup` in DotnetMcp/Services/ProcessDebugger.cs (handles ICorDebug initialization)
-- [ ] T007 Update `DetachAsync` to call `UnregisterForRuntimeStartup` if launch token exists in DotnetMcp/Services/ProcessDebugger.cs
+- [x] T003 Add private fields to ProcessDebugger.cs for launch state: `_resumeHandle`, `_unregisterToken`, `_startupCallbackDelegate`, `_launchCompletionSource`
+- [x] T004 Implement `BuildCommandLine(string program, string[]? args)` helper in DotnetMcp/Services/ProcessDebugger.cs
+- [x] T005 [P] Implement `BuildEnvironmentBlock(Dictionary<string, string>? env)` helper in DotnetMcp/Services/ProcessDebugger.cs
+- [x] T006 Implement startup callback delegate `OnRuntimeStartup` in DotnetMcp/Services/ProcessDebugger.cs (handles ICorDebug initialization)
+- [x] T007 Update `DetachAsync` to call `UnregisterForRuntimeStartup` if launch token exists in DotnetMcp/Services/ProcessDebugger.cs
 
 **Checkpoint**: Foundation ready - user story implementation can begin
 
@@ -51,23 +51,23 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T008 [US1] Create LaunchIntegrationTests.cs test class in tests/DotnetMcp.Tests/Integration/
-- [ ] T009 [US1] Write test: LaunchValidDll_ReturnsSessionWithProcessId in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T010 [P] [US1] Write test: LaunchNonExistentPath_ThrowsFileNotFoundException in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T011 [P] [US1] Write test: LaunchWhileSessionActive_ThrowsInvalidOperationException in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T008 [US1] Create LaunchIntegrationTests.cs test class in tests/DotnetMcp.Tests/Integration/
+- [x] T009 [US1] Write test: LaunchValidDll_ReturnsSessionWithProcessId in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T010 [P] [US1] Write test: LaunchNonExistentPath_ThrowsFileNotFoundException in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T011 [P] [US1] Write test: LaunchWhileSessionActive_ThrowsInvalidOperationException in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Implement core `LaunchAsync` method in DotnetMcp/Services/ProcessDebugger.cs:
+- [x] T012 [US1] Implement core `LaunchAsync` method in DotnetMcp/Services/ProcessDebugger.cs:
   - Call `CreateProcessForLaunch` with command line
   - Register for runtime startup with callback
   - Call `ResumeProcess`
   - Wait for callback completion via TaskCompletionSource
   - Return ProcessInfo
-- [ ] T013 [US1] Handle startup callback thread synchronization using TaskCompletionSource
-- [ ] T014 [US1] Add path validation before launch attempt in DotnetMcp/Services/ProcessDebugger.cs
-- [ ] T015 [US1] Add error handling for common launch failures (file not found, invalid assembly, permission denied)
-- [ ] T016 [US1] Run T009-T011 tests, verify they pass
+- [x] T013 [US1] Handle startup callback thread synchronization using TaskCompletionSource
+- [x] T014 [US1] Add path validation before launch attempt in DotnetMcp/Services/ProcessDebugger.cs
+- [x] T015 [US1] Add error handling for common launch failures (file not found, invalid assembly, permission denied)
+- [x] T016 [US1] Run T009-T011 tests, verify they pass
 
 **Checkpoint**: Basic launch works - can launch DLL and debug it
 
@@ -81,16 +81,16 @@
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T017 [US2] Write test: LaunchWithStopAtEntryTrue_StateIsPausedWithEntryReason in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T018 [P] [US2] Write test: LaunchWithStopAtEntryFalse_StateIsRunning in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T017 [US2] Write test: LaunchWithStopAtEntryTrue_StateIsPausedWithEntryReason in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T018 [P] [US2] Write test: LaunchWithStopAtEntryFalse_StateIsRunning in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Implement stopAtEntry logic in startup callback:
+- [x] T019 [US2] Implement stopAtEntry logic in startup callback:
   - If stopAtEntry=true: call `_process.Stop(0)` in callback
   - Set `SessionState.Paused` and `PauseReason.Entry`
-- [ ] T020 [US2] If stopAtEntry=false: call `_process.Continue(false)` after debugger setup
-- [ ] T021 [US2] Run T017-T018 tests, verify they pass
+- [x] T020 [US2] If stopAtEntry=false: call `_process.Continue(false)` after debugger setup
+- [x] T021 [US2] Run T017-T018 tests, verify they pass
 
 **Checkpoint**: stopAtEntry functionality complete
 
@@ -104,14 +104,14 @@
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T022 [US3] Write test: LaunchWithArgs_ArgsPassedToProcess in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T023 [P] [US3] Write test: LaunchWithArgsContainingSpaces_ArgsProperlyEscaped in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T022 [US3] Write test: LaunchWithArgs_ArgsPassedToProcess in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T023 [P] [US3] Write test: LaunchWithArgsContainingSpaces_ArgsProperlyEscaped in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Enhance `BuildCommandLine` to properly quote/escape arguments with spaces and special characters
-- [ ] T025 [US3] Add test app command to echo arguments for verification (update TestTargetApp if needed)
-- [ ] T026 [US3] Run T022-T023 tests, verify they pass
+- [x] T024 [US3] Enhance `BuildCommandLine` to properly quote/escape arguments with spaces and special characters
+- [x] T025 [US3] Add test app command to echo arguments for verification (update TestTargetApp if needed)
+- [x] T026 [US3] Run T022-T023 tests, verify they pass
 
 **Checkpoint**: Command line arguments work correctly
 
@@ -125,16 +125,16 @@
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T027 [US4] Write test: LaunchWithCwd_ProcessUsesSpecifiedDirectory in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T028 [P] [US4] Write test: LaunchWithInvalidCwd_ThrowsDirectoryNotFoundException in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T029 [P] [US4] Write test: LaunchWithoutCwd_UsesDefaultDirectory in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T027 [US4] Write test: LaunchWithCwd_ProcessUsesSpecifiedDirectory in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T028 [P] [US4] Write test: LaunchWithInvalidCwd_ThrowsDirectoryNotFoundException in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T029 [P] [US4] Write test: LaunchWithoutCwd_UsesDefaultDirectory in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] Add working directory validation in `LaunchAsync` (exists, is directory)
-- [ ] T031 [US4] Pass working directory to `CreateProcessForLaunch` call
-- [ ] T032 [US4] If cwd not specified, default to program's directory
-- [ ] T033 [US4] Run T027-T029 tests, verify they pass
+- [x] T030 [US4] Add working directory validation in `LaunchAsync` (exists, is directory)
+- [x] T031 [US4] Pass working directory to `CreateProcessForLaunch` call
+- [x] T032 [US4] If cwd not specified, default to program's directory
+- [x] T033 [US4] Run T027-T029 tests, verify they pass
 
 **Checkpoint**: Working directory functionality complete
 
@@ -148,15 +148,15 @@
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T034 [US5] Write test: LaunchWithEnvVars_ProcessHasAccessToVariables in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
-- [ ] T035 [P] [US5] Write test: LaunchWithEnvOverride_CustomValueTakesPrecedence in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T034 [US5] Write test: LaunchWithEnvVars_ProcessHasAccessToVariables in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
+- [x] T035 [P] [US5] Write test: LaunchWithEnvOverride_CustomValueTakesPrecedence in tests/DotnetMcp.Tests/Integration/LaunchIntegrationTests.cs
 
 ### Implementation for User Story 5
 
-- [ ] T036 [US5] Implement environment block building with proper null-terminated format
-- [ ] T037 [US5] Pass environment block to `CreateProcessForLaunch` call
-- [ ] T038 [US5] Add test app command to echo environment variables (update TestTargetApp if needed)
-- [ ] T039 [US5] Run T034-T035 tests, verify they pass
+- [x] T036 [US5] Implement environment block building with proper null-terminated format
+- [x] T037 [US5] Pass environment block to `CreateProcessForLaunch` call
+- [x] T038 [US5] Add test app command to echo environment variables (update TestTargetApp if needed)
+- [x] T039 [US5] Run T034-T035 tests, verify they pass
 
 **Checkpoint**: Environment variables functionality complete
 
@@ -166,11 +166,11 @@
 
 **Purpose**: Final improvements and validation
 
-- [ ] T040 [P] Run full test suite: `dotnet test --filter "FullyQualifiedName~Launch"`
-- [ ] T041 [P] Manual verification using quickstart.md scenarios
-- [ ] T042 Verify timeout handling doesn't leave orphan processes
-- [ ] T043 [P] Add/update XML documentation for all public methods in ProcessDebugger.cs
-- [ ] T044 Run full project build and test suite: `dotnet build && dotnet test`
+- [x] T040 [P] Run full test suite: `dotnet test --filter "FullyQualifiedName~Launch"`
+- [x] T041 [P] Manual verification using quickstart.md scenarios
+- [x] T042 Verify timeout handling doesn't leave orphan processes
+- [x] T043 [P] Add/update XML documentation for all public methods in ProcessDebugger.cs
+- [x] T044 Run full project build and test suite: `dotnet build && dotnet test`
 
 ---
 

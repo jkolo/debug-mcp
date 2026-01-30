@@ -380,4 +380,124 @@ public class LaunchTests : IAsyncLifetime
         // Assert
         await act.Should().ThrowAsync<DirectoryNotFoundException>();
     }
+
+    [Fact]
+    public async Task LaunchAsync_WithArgsContainingSpaces_ArgsProperlyEscaped()
+    {
+        // Arrange
+        var mockDebugger = new Mock<IProcessDebugger>();
+        string[]? capturedArgs = null;
+
+        mockDebugger
+            .Setup(d => d.LaunchAsync(
+                It.IsAny<string>(),
+                It.IsAny<string[]?>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, string>?>(),
+                It.IsAny<bool>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, string[]?, string?, Dictionary<string, string>?, bool, TimeSpan?, CancellationToken>(
+                (_, args, _, _, _, _, _) => capturedArgs = args)
+            .ReturnsAsync(new ProcessInfo(
+                Pid: 1234,
+                Name: "test",
+                ExecutablePath: "/path/to/test.dll",
+                IsManaged: true,
+                CommandLine: null,
+                RuntimeVersion: ".NET 8.0"));
+
+        var manager = new DebugSessionManager(mockDebugger.Object, _managerLoggerMock.Object);
+
+        // Act
+        await manager.LaunchAsync(
+            "/path/to/test.dll",
+            args: new[] { "--path", "/some dir/with spaces", "--name", "hello world" });
+
+        // Assert
+        capturedArgs.Should().NotBeNull();
+        capturedArgs.Should().HaveCount(4);
+        capturedArgs![1].Should().Be("/some dir/with spaces", "args with spaces should be passed as-is to debugger");
+        capturedArgs[3].Should().Be("hello world", "args with spaces should be passed as-is to debugger");
+    }
+
+    [Fact]
+    public async Task LaunchAsync_WithoutCwd_UsesDefaultDirectory()
+    {
+        // Arrange
+        var mockDebugger = new Mock<IProcessDebugger>();
+        string? capturedCwd = null;
+
+        mockDebugger
+            .Setup(d => d.LaunchAsync(
+                It.IsAny<string>(),
+                It.IsAny<string[]?>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, string>?>(),
+                It.IsAny<bool>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, string[]?, string?, Dictionary<string, string>?, bool, TimeSpan?, CancellationToken>(
+                (_, _, cwd, _, _, _, _) => capturedCwd = cwd)
+            .ReturnsAsync(new ProcessInfo(
+                Pid: 1234,
+                Name: "test",
+                ExecutablePath: "/path/to/test.dll",
+                IsManaged: true,
+                CommandLine: null,
+                RuntimeVersion: ".NET 8.0"));
+
+        var manager = new DebugSessionManager(mockDebugger.Object, _managerLoggerMock.Object);
+
+        // Act - no cwd specified
+        await manager.LaunchAsync("/path/to/test.dll");
+
+        // Assert - cwd should be null (ProcessDebugger defaults to program's directory)
+        capturedCwd.Should().BeNull("when no cwd specified, null should be passed to let debugger use default");
+    }
+
+    [Fact]
+    public async Task LaunchAsync_WithEnvOverride_CustomValueTakesPrecedence()
+    {
+        // Arrange
+        var mockDebugger = new Mock<IProcessDebugger>();
+        Dictionary<string, string>? capturedEnv = null;
+
+        mockDebugger
+            .Setup(d => d.LaunchAsync(
+                It.IsAny<string>(),
+                It.IsAny<string[]?>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, string>?>(),
+                It.IsAny<bool>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, string[]?, string?, Dictionary<string, string>?, bool, TimeSpan?, CancellationToken>(
+                (_, _, _, env, _, _, _) => capturedEnv = env)
+            .ReturnsAsync(new ProcessInfo(
+                Pid: 1234,
+                Name: "test",
+                ExecutablePath: "/path/to/test.dll",
+                IsManaged: true,
+                CommandLine: null,
+                RuntimeVersion: ".NET 8.0"));
+
+        var manager = new DebugSessionManager(mockDebugger.Object, _managerLoggerMock.Object);
+
+        var env = new Dictionary<string, string>
+        {
+            ["PATH"] = "/custom/path",
+            ["MY_VAR"] = "custom_value",
+            ["DOTNET_ROOT"] = "/custom/dotnet"
+        };
+
+        // Act
+        await manager.LaunchAsync("/path/to/test.dll", env: env);
+
+        // Assert - all custom env vars should be passed through
+        capturedEnv.Should().NotBeNull();
+        capturedEnv.Should().ContainKey("PATH").WhoseValue.Should().Be("/custom/path");
+        capturedEnv.Should().ContainKey("MY_VAR").WhoseValue.Should().Be("custom_value");
+        capturedEnv.Should().ContainKey("DOTNET_ROOT").WhoseValue.Should().Be("/custom/dotnet");
+    }
 }
