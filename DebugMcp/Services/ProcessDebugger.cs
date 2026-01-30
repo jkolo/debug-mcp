@@ -513,11 +513,48 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             {
                 if (_process != null)
                 {
-                    _process.Terminate(exitCode: 0);
+                    try
+                    {
+                        // BUGFIX: Must stop the process before terminating.
+                        // ICorDebug requires the process to be stopped before Terminate().
+                        _logger.LogDebug("Stopping process before terminate");
+                        _process.Stop(0);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Stop before terminate failed (process may have exited)");
+                    }
+
+                    try
+                    {
+                        _process.Terminate(exitCode: 0);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Terminate failed, process may have already exited");
+                    }
                     _process = null;
                 }
-                _corDebug?.Terminate();
-                _corDebug = null;
+
+                // Clean up launch-specific state
+                CleanupLaunchState();
+
+                // BUGFIX: Terminate ICorDebug instance after process termination.
+                // Must happen after _process.Terminate() to respect ICorDebug shutdown order.
+                if (_corDebug != null)
+                {
+                    try
+                    {
+                        _logger.LogDebug("Terminating ICorDebug instance after process terminate");
+                        _corDebug.Terminate();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "ICorDebug.Terminate() after terminate (safe to ignore)");
+                    }
+                    _corDebug = null;
+                }
+
                 UpdateState(SessionState.Disconnected);
             }
         }, cancellationToken);

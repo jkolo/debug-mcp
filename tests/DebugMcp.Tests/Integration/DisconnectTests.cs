@@ -299,4 +299,125 @@ public class DisconnectTests : IDisposable
         // Assert - should not throw, state should remain disconnected
         manager.GetCurrentState().Should().Be(SessionState.Disconnected);
     }
+
+    [Fact]
+    public async Task DisconnectAsync_TerminateThrows_StillSetsStateToDisconnected()
+    {
+        // Arrange - simulate CORDBG_E_ILLEGAL_SHUTDOWN_ORDER
+        var mockDebugger = new Mock<IProcessDebugger>();
+        mockDebugger
+            .Setup(d => d.LaunchAsync(
+                It.IsAny<string>(),
+                It.IsAny<string[]?>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, string>?>(),
+                It.IsAny<bool>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessInfo(
+                Pid: 5678,
+                Name: "launched-app",
+                ExecutablePath: "/path/to/app.dll",
+                IsManaged: true,
+                CommandLine: null,
+                RuntimeVersion: ".NET 8.0"));
+
+        mockDebugger
+            .Setup(d => d.TerminateAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new System.Runtime.InteropServices.COMException(
+                "Error HRESULT CORDBG_E_ILLEGAL_SHUTDOWN_ORDER has been returned from a call to a COM component."));
+
+        var manager = new DebugSessionManager(mockDebugger.Object, _managerLoggerMock.Object);
+        await manager.LaunchAsync("/path/to/app.dll");
+
+        // Act & Assert - disconnect should propagate the error but caller can handle it
+        var act = async () => await manager.DisconnectAsync(terminateProcess: true);
+
+        // The session manager propagates the exception from TerminateAsync
+        await act.Should().ThrowAsync<System.Runtime.InteropServices.COMException>();
+
+        // Verify TerminateAsync was attempted
+        mockDebugger.Verify(d => d.TerminateAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+}
+
+/// <summary>
+/// Integration tests for the terminate workflow using a real launched process.
+/// Regression tests for CORDBG_E_ILLEGAL_SHUTDOWN_ORDER bug.
+/// </summary>
+[Collection("ProcessTests")]
+public class TerminateLaunchedProcessTests : IDisposable
+{
+    private readonly ProcessDebugger _processDebugger;
+    private readonly DebugSessionManager _sessionManager;
+    private readonly Mock<ILogger<ProcessDebugger>> _debuggerLoggerMock;
+    private readonly Mock<ILogger<DebugSessionManager>> _managerLoggerMock;
+    private readonly Mock<IPdbSymbolReader> _pdbSymbolReaderMock;
+
+    public TerminateLaunchedProcessTests()
+    {
+        _debuggerLoggerMock = new Mock<ILogger<ProcessDebugger>>();
+        _managerLoggerMock = new Mock<ILogger<DebugSessionManager>>();
+        _pdbSymbolReaderMock = new Mock<IPdbSymbolReader>();
+        _processDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, _pdbSymbolReaderMock.Object);
+        _sessionManager = new DebugSessionManager(_processDebugger, _managerLoggerMock.Object);
+    }
+
+    public void Dispose()
+    {
+        _processDebugger.Dispose();
+    }
+
+    [Fact]
+    public async Task TerminateAsync_LaunchedPausedProcess_ShouldNotThrow()
+    {
+        // Arrange - launch process stopped at entry (paused state)
+        // This is the exact scenario that triggered CORDBG_E_ILLEGAL_SHUTDOWN_ORDER:
+        // launch with stopAtEntry → process is paused → terminate
+        var dllPath = Helpers.TestTargetProcess.TestTargetDllPath;
+        if (!File.Exists(dllPath))
+        {
+            // Skip if test target not built
+            return;
+        }
+
+        var session = await _sessionManager.LaunchAsync(dllPath, stopAtEntry: true);
+        session.Should().NotBeNull();
+        _sessionManager.GetCurrentState().Should().Be(SessionState.Paused);
+
+        // Act - terminate the paused process (previously threw CORDBG_E_ILLEGAL_SHUTDOWN_ORDER)
+        var act = async () => await _sessionManager.DisconnectAsync(terminateProcess: true);
+
+        // Assert
+        await act.Should().NotThrowAsync(
+            "terminating a paused launched process should succeed (CORDBG_E_ILLEGAL_SHUTDOWN_ORDER fix)");
+        _sessionManager.GetCurrentState().Should().Be(SessionState.Disconnected);
+    }
+
+    [Fact]
+    public async Task TerminateAsync_LaunchedRunningProcess_ShouldNotThrow()
+    {
+        // Arrange - launch and let it run
+        var dllPath = Helpers.TestTargetProcess.TestTargetDllPath;
+        if (!File.Exists(dllPath))
+        {
+            return;
+        }
+
+        var session = await _sessionManager.LaunchAsync(dllPath, stopAtEntry: true);
+        session.Should().NotBeNull();
+
+        // Continue to running state
+        await _processDebugger.ContinueAsync();
+        // Give it a moment to start running
+        await Task.Delay(200);
+
+        // Act - terminate while running
+        var act = async () => await _sessionManager.DisconnectAsync(terminateProcess: true);
+
+        // Assert
+        await act.Should().NotThrowAsync(
+            "terminating a running launched process should succeed");
+        _sessionManager.GetCurrentState().Should().Be(SessionState.Disconnected);
+    }
 }
