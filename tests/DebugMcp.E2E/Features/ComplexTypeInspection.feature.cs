@@ -17,22 +17,23 @@ namespace DebugMcp.E2E.Features
     
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    public partial class ModuleEnumerationFeature : object, global::Xunit.IClassFixture<ModuleEnumerationFeature.FixtureData>, global::Xunit.IAsyncLifetime
+    public partial class ComplexTypeInspectionFeature : object, global::Xunit.IClassFixture<ComplexTypeInspectionFeature.FixtureData>, global::Xunit.IAsyncLifetime
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Module Enumeration", "    As a debugger user\n    I want to list all loaded modules after attaching to a" +
-                " process\n    So that I can set breakpoints in any loaded assembly", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Complex Type Inspection", "    As a debugger user\n    I want to inspect complex variable types like collecti" +
+                "ons, enums, and nullables\n    So that I can understand diverse program state at " +
+                "breakpoints", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         
-#line 1 "ModuleEnumeration.feature"
+#line 1 "ComplexTypeInspection.feature"
 #line hidden
         
-        public ModuleEnumerationFeature(ModuleEnumerationFeature.FixtureData fixtureData, global::Xunit.Abstractions.ITestOutputHelper testOutputHelper)
+        public ComplexTypeInspectionFeature(ComplexTypeInspectionFeature.FixtureData fixtureData, global::Xunit.Abstractions.ITestOutputHelper testOutputHelper)
         {
             this._testOutputHelper = testOutputHelper;
         }
@@ -106,7 +107,7 @@ namespace DebugMcp.E2E.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/ModuleEnumeration.feature.ndjson", 8);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/ComplexTypeInspection.feature.ndjson", 8);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -134,15 +135,15 @@ namespace DebugMcp.E2E.Features
             await this.TestTearDownAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="All modules are visible after attach")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "All modules are visible after attach")]
-        public async global::System.Threading.Tasks.Task AllModulesAreVisibleAfterAttach()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Inspect variables at collections breakpoint")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Inspect variables at collections breakpoint")]
+        public async global::System.Threading.Tasks.Task InspectVariablesAtCollectionsBreakpoint()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "0";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("All modules are visible after attach", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Inspect variables at collections breakpoint", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 6
@@ -162,57 +163,39 @@ namespace DebugMcp.E2E.Features
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 9
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 88", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 10
-        await testRunner.ThenAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+        await testRunner.WhenAsync("the test target executes the \"collections\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 11
-        await testRunner.AndAsync("the module list should contain \"BaseTypes\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 12
-        await testRunner.AndAsync("the module list should contain \"Collections\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 13
-        await testRunner.AndAsync("the module list should contain \"Exceptions\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 14
-        await testRunner.AndAsync("the module list should contain \"Recursion\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 15
-        await testRunner.AndAsync("the module list should contain \"Expressions\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 16
-        await testRunner.AndAsync("the module list should contain \"Threading\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 17
-        await testRunner.AndAsync("the module list should contain \"AsyncOps\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 18
-        await testRunner.AndAsync("the module list should contain \"MemoryStructs\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 19
-        await testRunner.AndAsync("the module list should contain \"ComplexObjects\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 20
-        await testRunner.AndAsync("the module list should contain \"Scenarios\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("a variable with type containing \"CollectionHolder\" should exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="System modules visible when filter is off")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "System modules visible when filter is off")]
-        public async global::System.Threading.Tasks.Task SystemModulesVisibleWhenFilterIsOff()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Inspect collection holder object has fields")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Inspect collection holder object has fields")]
+        public async global::System.Threading.Tasks.Task InspectCollectionHolderObjectHasFields()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "1";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("System modules visible when filter is off", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Inspect collection holder object has fields", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 22
+#line 16
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -222,37 +205,46 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 23
+#line 17
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 24
+#line 18
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 25
-        await testRunner.WhenAsync("I list all modules including system modules", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line 19
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 88", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 26
-        await testRunner.ThenAsync("the module list should contain \"System.Private.CoreLib\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line 20
+        await testRunner.WhenAsync("the test target executes the \"collections\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 27
-        await testRunner.AndAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line 21
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 22
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 23
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 24
+        await testRunner.AndAsync("the variable count should be at least 1", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Module count is greater with system modules included")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Module count is greater with system modules included")]
-        public async global::System.Threading.Tasks.Task ModuleCountIsGreaterWithSystemModulesIncluded()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Inspect enum variables at breakpoint")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Inspect enum variables at breakpoint")]
+        public async global::System.Threading.Tasks.Task InspectEnumVariablesAtBreakpoint()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "2";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Module count is greater with system modules included", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Inspect enum variables at breakpoint", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 29
+#line 26
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -262,40 +254,46 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 30
+#line 27
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 31
+#line 28
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
+#line 29
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 112", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 30
+        await testRunner.WhenAsync("the test target executes the \"enums\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 31
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
 #line 32
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 33
-        await testRunner.ThenAsync("the module count should be at least 11", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 34
-        await testRunner.WhenAsync("I list all modules including system modules", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 35
-        await testRunner.ThenAsync("the module count should be greater than 11", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+        await testRunner.AndAsync("the variable count should be at least 2", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Modules have path information")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Modules have path information")]
-        public async global::System.Threading.Tasks.Task ModulesHavePathInformation()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Enum variables have expected count")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Enum variables have expected count")]
+        public async global::System.Threading.Tasks.Task EnumVariablesHaveExpectedCount()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "3";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Modules have path information", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Enum variables have expected count", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 37
+#line 36
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -305,34 +303,46 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 38
+#line 37
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 39
+#line 38
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
+#line 39
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 112", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
 #line 40
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+        await testRunner.WhenAsync("the test target executes the \"enums\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 41
-        await testRunner.ThenAsync("the module \"TestTargetApp\" should have a non-empty path", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 42
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 43
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 44
+        await testRunner.AndAsync("the variable count should be at least 1", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Modules after launch show same assemblies")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Modules after launch show same assemblies")]
-        public async global::System.Threading.Tasks.Task ModulesAfterLaunchShowSameAssemblies()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Variables at enum breakpoint have types")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Variables at enum breakpoint have types")]
+        public async global::System.Threading.Tasks.Task VariablesAtEnumBreakpointHaveTypes()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "4";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Modules after launch show same assemblies", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Variables at enum breakpoint have types", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 43
+#line 46
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -342,31 +352,46 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 44
-        await testRunner.GivenAsync("a launched process paused at entry", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line 47
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 45
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line 48
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 46
-        await testRunner.ThenAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line 49
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 112", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 50
+        await testRunner.WhenAsync("the test target executes the \"enums\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 51
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 52
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 53
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 54
+        await testRunner.AndAsync("all variables should have a type", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Module has base address")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Module has base address")]
-        public async global::System.Threading.Tasks.Task ModuleHasBaseAddress()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Inspect struct type layout")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Inspect struct type layout")]
+        public async global::System.Threading.Tasks.Task InspectStructTypeLayout()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "5";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Module has base address", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Inspect struct type layout", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 48
+#line 56
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -376,17 +401,32 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 49
+#line 57
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 50
+#line 58
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 51
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line 59
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 104", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 52
-        await testRunner.ThenAsync("all modules should have non-null base addresses", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line 60
+        await testRunner.WhenAsync("the test target executes the \"structs\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 61
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 62
+        await testRunner.WhenAsync("I get the type layout for \"MemoryStructs.LayoutStruct\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 63
+        await testRunner.ThenAsync("the type layout should have name containing \"LayoutStruct\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 64
+        await testRunner.AndAsync("the type total size should be greater than 0", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 65
+        await testRunner.AndAsync("the type should be a value type", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -399,12 +439,12 @@ namespace DebugMcp.E2E.Features
             
             async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
             {
-                await ModuleEnumerationFeature.FeatureSetupAsync();
+                await ComplexTypeInspectionFeature.FeatureSetupAsync();
             }
             
             async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.DisposeAsync()
             {
-                await ModuleEnumerationFeature.FeatureTearDownAsync();
+                await ComplexTypeInspectionFeature.FeatureTearDownAsync();
             }
         }
     }

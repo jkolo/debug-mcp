@@ -371,6 +371,7 @@ public sealed class PdbSymbolReader : IPdbSymbolReader
         var reader = _cache.GetOrCreateReader(assemblyPath);
         if (reader == null)
         {
+            _logger.LogDebug("No PDB reader for assembly: {AssemblyPath}", assemblyPath);
             return Task.FromResult(false);
         }
 

@@ -198,6 +198,12 @@ public sealed class DebugSessionManager : IDebugSessionManager
     }
 
     /// <inheritdoc />
+    public async Task WaitForModulesAsync(string? targetModuleName = null, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    {
+        await _processDebugger.WaitForModulesAsync(targetModuleName, timeout, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<DebugSession> StepAsync(StepMode mode, CancellationToken cancellationToken = default)
     {
         DebugSession session;

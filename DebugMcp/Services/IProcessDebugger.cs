@@ -134,6 +134,11 @@ public interface IProcessDebugger
     Task ContinueAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Continues the paused process until modules are loaded, then re-pauses.
+    /// </summary>
+    Task WaitForModulesAsync(string? targetModuleName = null, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Steps through code in the specified mode.
     /// </summary>
     /// <param name="mode">The stepping mode (In, Over, Out).</param>

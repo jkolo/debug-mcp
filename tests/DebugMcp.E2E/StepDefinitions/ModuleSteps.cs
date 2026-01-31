@@ -87,6 +87,38 @@ public sealed class ModuleSteps
             $"module list should contain '{moduleName}'");
     }
 
+    [Then(@"the module count should be at least (\d+)")]
+    public void ThenTheModuleCountShouldBeAtLeast(int minCount)
+    {
+        _ctx.LastModules.Should().NotBeNull();
+        _ctx.LastModules!.Count.Should().BeGreaterThanOrEqualTo(minCount);
+    }
+
+    [Then(@"the module count should be greater than (\d+)")]
+    public void ThenTheModuleCountShouldBeGreaterThan(int count)
+    {
+        _ctx.LastModules.Should().NotBeNull();
+        _ctx.LastModules!.Count.Should().BeGreaterThan(count);
+    }
+
+    [Then(@"the module ""(.*)"" should have a non-empty path")]
+    public void ThenTheModuleShouldHaveANonEmptyPath(string moduleName)
+    {
+        _ctx.LastModules.Should().NotBeNull();
+        var module = _ctx.LastModules!.FirstOrDefault(
+            m => m.Name.Contains(moduleName, StringComparison.OrdinalIgnoreCase));
+        module.Should().NotBeNull($"module '{moduleName}' should exist");
+        module!.Path.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Then("all modules should have non-null base addresses")]
+    public void ThenAllModulesShouldHaveNonNullBaseAddresses()
+    {
+        _ctx.LastModules.Should().NotBeNull();
+        _ctx.LastModules!.Should().AllSatisfy(m =>
+            m.BaseAddress.Should().NotBeNullOrWhiteSpace());
+    }
+
     // --- Then: Search Results ---
 
     [Then("the search result should not be empty")]

@@ -98,10 +98,9 @@ public sealed partial class SimpleConditionEvaluator : IConditionEvaluator
             return ConditionValidation.Invalid("Missing operand after operator", condition.Length - 1);
         }
 
-        // If we don't recognize it, it might be valid for debugger evaluator
-        // but not for simple evaluator
-        return ConditionValidation.Invalid(
-            $"Condition may require debugger evaluation: '{condition}'");
+        // If we don't recognize it as a hit count expression, assume it's a
+        // valid C# expression that will be evaluated by the debugger at runtime.
+        return ConditionValidation.Valid();
     }
 
     private static ConditionResult? EvaluateHitCountCondition(string condition, int hitCount)
