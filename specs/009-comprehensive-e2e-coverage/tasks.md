@@ -75,15 +75,15 @@
 
 ### Scenarios
 
-- [ ] T016 [US2] Add 8 new scenarios to `tests/DotnetMcp.E2E/Features/Breakpoints.feature`: (1) set exception breakpoint for InvalidOperationException, (2) exception breakpoint triggers on throw, (3) list all breakpoints returns set breakpoints, (4) enable/disable breakpoint toggle, (5) multiple breakpoints hit in order, (6) conditional breakpoint skips when condition false, (7) breakpoint_wait with timeout returns null, (8) remove breakpoint by ID from list
+- [x] T016 [US2] Add 8 new scenarios to `tests/DotnetMcp.E2E/Features/Breakpoints.feature`: (1) set exception breakpoint for InvalidOperationException, (2) exception breakpoint triggers on throw, (3) list all breakpoints returns set breakpoints, (4) enable/disable breakpoint toggle, (5) multiple breakpoints hit in order, (6) conditional breakpoint skips when condition false, (7) breakpoint_wait with timeout returns null, (8) remove breakpoint by ID from list
 
 ### Step Definitions
 
-- [ ] T017 [US2] Add new steps to `tests/DotnetMcp.E2E/StepDefinitions/BreakpointSteps.cs`: Given "an exception breakpoint for {string}" → SetExceptionBreakpointAsync, When "I list all breakpoints" → ListBreakpointsAsync, When "I disable breakpoint {int}" → DisableBreakpointAsync, When "I enable breakpoint {int}" → EnableBreakpointAsync, Then "the breakpoint list should contain {int} breakpoints", Then "breakpoint {int} should be disabled"
+- [x] T017 [US2] Add new steps to `tests/DotnetMcp.E2E/StepDefinitions/BreakpointSteps.cs`: Given "an exception breakpoint for {string}" → SetExceptionBreakpointAsync, When "I list all breakpoints" → ListBreakpointsAsync, When "I disable breakpoint {int}" → DisableBreakpointAsync, When "I enable breakpoint {int}" → EnableBreakpointAsync, Then "the breakpoint list should contain {int} breakpoints", Then "breakpoint {int} should be disabled"
 
 ### Verification
 
-- [ ] T018 [US2] Run breakpoint tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Breakpoints"`
+- [x] T018 [US2] Run breakpoint tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Breakpoints"`
 
 **Checkpoint**: Advanced breakpoints fully covered
 
@@ -97,15 +97,15 @@
 
 ### Scenarios
 
-- [ ] T019 [US3] Create `tests/DotnetMcp.E2E/Features/MemoryInspection.feature` with 6 scenarios: (1) inspect object with depth 1 shows top-level fields, (2) inspect deeply nested object with depth 3, (3) inspect null reference returns null indicator, (4) read memory at object address returns hex bytes, (5) get type layout for LayoutStruct shows field offsets, (6) analyze outbound references for complex object
+- [x] T019 [US3] Create `tests/DotnetMcp.E2E/Features/MemoryInspection.feature` with 6 scenarios: (1) inspect object with depth 1 shows top-level fields, (2) inspect deeply nested object with depth 3, (3) inspect null reference returns null indicator, (4) read memory at object address returns hex bytes, (5) get type layout for LayoutStruct shows field offsets, (6) analyze outbound references for complex object
 
 ### Step Definitions
 
-- [ ] T020 [US3] Add steps to `tests/DotnetMcp.E2E/StepDefinitions/InspectionSteps.cs` if not already present: When "I inspect the object {string} with depth {int}" (may exist), Then "the object should have at least {int} fields", Then "the object field {string} should have value {string}", Then "the layout field count should be {int}"
+- [x] T020 [US3] Add steps to `tests/DotnetMcp.E2E/StepDefinitions/InspectionSteps.cs` if not already present: When "I inspect the object {string} with depth {int}" (may exist), Then "the object should have at least {int} fields", Then "the object field {string} should have value {string}", Then "the layout field count should be {int}"
 
 ### Verification
 
-- [ ] T021 [US3] Run memory inspection tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Memory Inspection"`
+- [x] T021 [US3] Run memory inspection tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Memory Inspection"`
 
 **Checkpoint**: Memory/object inspection fully covered
 
@@ -119,15 +119,15 @@
 
 ### Scenarios
 
-- [ ] T022 [US4] Create `tests/DotnetMcp.E2E/Features/ModuleTypeOperations.feature` with 8 scenarios: (1) search types matching "*Util" finds 10 classes, (2) search methods matching "GetName" across modules, (3) get types for BaseTypes module filtered by namespace, (4) get types filtered by kind "class", (5) get members of BaseTypesUtil filtered by methods, (6) get members including inherited from Object, (7) search with wildcard "*Calculator*", (8) get types with pagination (max_results)
+- [x] T022 [US4] Create `tests/DotnetMcp.E2E/Features/ModuleTypeOperations.feature` with 8 scenarios: (1) search types matching "*Util" finds 10 classes, (2) search methods matching "GetName" across modules, (3) get types for BaseTypes module filtered by namespace, (4) get types filtered by kind "class", (5) get members of BaseTypesUtil filtered by methods, (6) get members including inherited from Object, (7) search with wildcard "*Calculator*", (8) get types with pagination (max_results)
 
 ### Step Definitions
 
-- [ ] T023 [US4] Create `tests/DotnetMcp.E2E/StepDefinitions/ModuleTypeSteps.cs` with steps: When "I search modules for types matching {string}" → SearchModulesAsync, When "I get types for module {string}" → GetTypesAsync, When "I get members of type {string}" → GetMembersAsync, Then "the search should find at least {int} results", Then "the types list should contain {string}", Then "the members should include method {string}"
+- [x] T023 [US4] Create `tests/DotnetMcp.E2E/StepDefinitions/ModuleTypeSteps.cs` with steps: When "I search modules for types matching {string}" → SearchModulesAsync, When "I get types for module {string}" → GetTypesAsync, When "I get members of type {string}" → GetMembersAsync, Then "the search should find at least {int} results", Then "the types list should contain {string}", Then "the members should include method {string}"
 
 ### Verification
 
-- [ ] T024 [US4] Run module type operations tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Module Type Operations"`
+- [x] T024 [US4] Run module type operations tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Module Type Operations"`
 
 **Checkpoint**: Module/type operations fully covered
 
@@ -230,15 +230,15 @@
 
 ### Scenarios
 
-- [ ] T038 [US8] Create `tests/DotnetMcp.E2E/Features/DebugWorkflows.feature` with 6 scenarios: (1) set breakpoint → hit → inspect variables → step over → inspect again, (2) set two breakpoints → continue past first → stop at second → inspect, (3) attach → set breakpoint → hit → evaluate expression → continue, (4) launch → breakpoint → stack trace → variables → step in → stack trace, (5) breakpoint → inspect object → get references → read memory, (6) attach → list modules → search types → get members
+- [x] T038 [US8] Create `tests/DotnetMcp.E2E/Features/DebugWorkflows.feature` with 6 scenarios: (1) set breakpoint → hit → inspect variables → step over → inspect again, (2) set two breakpoints → continue past first → stop at second → inspect, (3) attach → set breakpoint → hit → evaluate expression → continue, (4) launch → breakpoint → stack trace → variables → step in → stack trace, (5) breakpoint → inspect object → get references → read memory, (6) attach → list modules → search types → get members
 
 ### Step Definitions
 
-- [ ] T039 [US8] No new step definitions expected — workflows reuse existing steps from all previous phases. If any missing steps found, add to appropriate existing step definition file.
+- [x] T039 [US8] No new step definitions expected — workflows reuse existing steps from all previous phases. If any missing steps found, add to appropriate existing step definition file.
 
 ### Verification
 
-- [ ] T040 [US8] Run workflow tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Debug Workflows"`
+- [x] T040 [US8] Run workflow tests and fix any failures: `dotnet test tests/DotnetMcp.E2E/ --filter "FeatureTitle=Debug Workflows"`
 
 **Checkpoint**: Multi-step workflows fully covered
 
@@ -256,7 +256,7 @@
 
 ### Step Definitions
 
-- [ ] T042 Add steps to `tests/DotnetMcp.E2E/StepDefinitions/ModuleSteps.cs` if needed: Then "the module list should have at least {int} modules", Then "the module {string} should have symbols", Then "the module {string} should have a path"
+- [x] T042 Add steps to `tests/DotnetMcp.E2E/StepDefinitions/ModuleSteps.cs` if needed: Then "the module list should have at least {int} modules", Then "the module {string} should have symbols", Then "the module {string} should have a path"
 
 ### Verification
 
