@@ -18,3 +18,35 @@ Feature: Module Enumeration
         And the module list should contain "MemoryStructs"
         And the module list should contain "ComplexObjects"
         And the module list should contain "Scenarios"
+
+    Scenario: System modules visible when filter is off
+        Given a running test target process
+        And the debugger is attached to the test target
+        When I list all modules including system modules
+        Then the module list should contain "System.Private.CoreLib"
+        And the module list should contain "TestTargetApp"
+
+    Scenario: Module count is greater with system modules included
+        Given a running test target process
+        And the debugger is attached to the test target
+        When I list all modules without system filter
+        Then the module count should be at least 11
+        When I list all modules including system modules
+        Then the module count should be greater than 11
+
+    Scenario: Modules have path information
+        Given a running test target process
+        And the debugger is attached to the test target
+        When I list all modules without system filter
+        Then the module "TestTargetApp" should have a non-empty path
+
+    Scenario: Modules after launch show same assemblies
+        Given a launched process paused at entry
+        When I list all modules without system filter
+        Then the module list should contain "TestTargetApp"
+
+    Scenario: Module has base address
+        Given a running test target process
+        And the debugger is attached to the test target
+        When I list all modules without system filter
+        Then all modules should have non-null base addresses

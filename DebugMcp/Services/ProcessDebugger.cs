@@ -56,6 +56,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private TaskCompletionSource<bool>? _launchCompletionSource;
     private RuntimeStartupCallback? _startupCallbackDelegate; // prevent GC
 
+    // WaitForModulesAsync state
+    private string? _waitForModuleTarget;
+    private TaskCompletionSource<bool>? _moduleLoadedTcs;
+
     public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader)
     {
         _logger = logger;
@@ -845,6 +849,86 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 _logger.LogInformation("Execution resumed");
             }
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// After a launch with stopAtEntry, continues the process until the target module loads,
+    /// then pauses again. This allows modules to be enumerated after launch.
+    /// </summary>
+    /// <param name="targetModuleName">Module name to wait for (e.g. "TestTargetApp"). If null, waits for any user module.</param>
+    /// <param name="timeout">Maximum time to wait for the module to load.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task WaitForModulesAsync(
+        string? targetModuleName = null,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        timeout ??= TimeSpan.FromSeconds(10);
+
+        lock (_lock)
+        {
+            if (_process == null)
+                throw new InvalidOperationException("No process attached");
+        }
+
+        // Set up module wait BEFORE allowing auto-continue
+        _moduleLoadedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _waitForModuleTarget = targetModuleName;
+
+        // Allow callbacks to auto-continue so modules can load
+        _stopAtEntry = false;
+
+        // Resume the process — it may be frozen in a callback or already running.
+        lock (_lock)
+        {
+            try
+            {
+                _process!.Continue(false);
+            }
+            catch
+            {
+                // Process may already be running — that's fine
+            }
+            UpdateState(SessionState.Running);
+        }
+
+        // Wait for the target module to load (signaled from OnLoadModule callback)
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(timeout.Value);
+
+        try
+        {
+            await using (cts.Token.Register(() => _moduleLoadedTcs.TrySetCanceled()))
+            {
+                await _moduleLoadedTcs.Task;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout — use whatever modules loaded so far
+        }
+        finally
+        {
+            _waitForModuleTarget = null;
+            _moduleLoadedTcs = null;
+
+            // Re-pause the process
+            lock (_lock)
+            {
+                if (_process != null)
+                {
+                    try
+                    {
+                        _process.Stop(0);
+                        UpdateState(SessionState.Paused, PauseReason.Entry);
+                    }
+                    catch
+                    {
+                        // Process may have exited
+                    }
+                }
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -2219,6 +2303,17 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     IsInMemory = isInMemory,
                     NativeModule = module
                 });
+
+                // Signal WaitForModulesAsync if waiting for this module
+                if (_moduleLoadedTcs != null)
+                {
+                    var name = Path.GetFileNameWithoutExtension(moduleName);
+                    if (_waitForModuleTarget == null ||
+                        name.Contains(_waitForModuleTarget, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _moduleLoadedTcs.TrySetResult(true);
+                    }
+                }
             }
             catch (Exception ex)
             {

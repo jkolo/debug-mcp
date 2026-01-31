@@ -87,6 +87,19 @@ Feature: Breakpoints
         And the test target executes the "method" command
         Then the debugger should not pause within 2 seconds
 
+    Scenario: Conditional breakpoint set before attach is accepted
+        Given a running test target process
+        When I set a conditional breakpoint on "MethodTarget.cs" line 14 with condition "x > 5"
+        Then the breakpoint state should be "Pending"
+
+    Scenario: Conditional breakpoint set before attach binds after attach
+        Given a running test target process
+        When I set a conditional breakpoint on "MethodTarget.cs" line 14 with condition "true"
+        And I attach the debugger to the test target
+        And the test target executes the "method" command
+        And I wait for a breakpoint hit
+        Then the debugger should pause at "MethodTarget.cs" line 14
+
     Scenario: Remove breakpoint by ID removes from list
         Given a running test target process
         And the debugger is attached to the test target

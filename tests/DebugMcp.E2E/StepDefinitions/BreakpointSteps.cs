@@ -1,6 +1,7 @@
 using DebugMcp.E2E.Support;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Tests.Helpers;
+using FluentAssertions;
 
 namespace DebugMcp.E2E.StepDefinitions;
 
@@ -22,6 +23,8 @@ public sealed class BreakpointSteps
         var sourceFile = TestTargetProcess.GetSourceFilePath(file);
         var bp = await _ctx.BreakpointManager.SetBreakpointAsync(
             sourceFile, line, column: null, condition: null, CancellationToken.None);
+        bp.State.Should().Be(BreakpointState.Bound,
+            $"breakpoint at {sourceFile}:{line} should be bound (message: {bp.Message})");
         _ctx.LastSetBreakpoint = bp;
         _ctx.SetBreakpoints.Add(bp);
     }
@@ -36,10 +39,38 @@ public sealed class BreakpointSteps
         _ctx.SetBreakpoints.Add(bp);
     }
 
+    [When(@"I set a conditional breakpoint on ""(.*)"" line (\d+) with condition ""(.*)""")]
+    public async Task WhenISetAConditionalBreakpointOnLineWithCondition(string file, int line, string condition)
+    {
+        var sourceFile = TestTargetProcess.GetSourceFilePath(file);
+        var bp = await _ctx.BreakpointManager.SetBreakpointAsync(
+            sourceFile, line, column: null, condition: condition, CancellationToken.None);
+        _ctx.LastSetBreakpoint = bp;
+        _ctx.SetBreakpoints.Add(bp);
+    }
+
     [When(@"the test target executes the ""(.*)"" command")]
     public async Task WhenTheTestTargetExecutesTheCommand(string command)
     {
         await _ctx.TargetProcess!.SendCommandAsync(command);
+    }
+
+    [When(@"I set a breakpoint on ""(.*)"" line (\d+)")]
+    public async Task WhenISetABreakpointOnLine(string file, int line)
+    {
+        var sourceFile = TestTargetProcess.GetSourceFilePath(file);
+        var bp = await _ctx.BreakpointManager.SetBreakpointAsync(
+            sourceFile, line, column: null, condition: null, CancellationToken.None);
+        _ctx.LastSetBreakpoint = bp;
+        _ctx.SetBreakpoints.Add(bp);
+    }
+
+    [Then(@"the breakpoint state should be ""(.*)""")]
+    public void ThenTheBreakpointStateShouldBe(string expectedState)
+    {
+        _ctx.LastSetBreakpoint.Should().NotBeNull();
+        var expected = Enum.Parse<BreakpointState>(expectedState, ignoreCase: true);
+        _ctx.LastSetBreakpoint!.State.Should().Be(expected);
     }
 
     [When("I wait for a breakpoint hit")]

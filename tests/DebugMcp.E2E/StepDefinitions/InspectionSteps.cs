@@ -86,6 +86,48 @@ public sealed class InspectionSteps
         _ctx.LastVariables.Should().NotBeNullOrEmpty();
     }
 
+    [Then(@"a variable named ""(.*)"" should exist")]
+    public void ThenAVariableNamedShouldExist(string name)
+    {
+        _ctx.LastVariables.Should().NotBeNull();
+        _ctx.LastVariables!.Should().Contain(
+            v => v.Name == name,
+            $"expected a variable named '{name}'");
+    }
+
+    [Then(@"the variable ""(.*)"" type should contain ""(.*)""")]
+    public void ThenTheVariableTypeShouldContain(string name, string typePart)
+    {
+        _ctx.LastVariables.Should().NotBeNull();
+        var variable = _ctx.LastVariables!.FirstOrDefault(v => v.Name == name);
+        variable.Should().NotBeNull($"expected a variable named '{name}'");
+        variable!.Type.Should().Contain(typePart);
+    }
+
+    [Then(@"a variable with type containing ""(.*)"" should exist")]
+    public void ThenAVariableWithTypeContainingShouldExist(string typePart)
+    {
+        _ctx.LastVariables.Should().NotBeNull();
+        _ctx.LastVariables!.Should().Contain(
+            v => v.Type.Contains(typePart, StringComparison.OrdinalIgnoreCase),
+            $"expected a variable with type containing '{typePart}'");
+    }
+
+    [Then(@"the variable count should be at least (\d+)")]
+    public void ThenTheVariableCountShouldBeAtLeast(int minCount)
+    {
+        _ctx.LastVariables.Should().NotBeNull();
+        _ctx.LastVariables!.Length.Should().BeGreaterThanOrEqualTo(minCount);
+    }
+
+    [Then("all variables should have a type")]
+    public void ThenAllVariablesShouldHaveAType()
+    {
+        _ctx.LastVariables.Should().NotBeNull();
+        _ctx.LastVariables!.Should().AllSatisfy(v =>
+            v.Type.Should().NotBeNullOrWhiteSpace());
+    }
+
     // --- Then: Object Inspection ---
 
     [Then("the object should not be null")]

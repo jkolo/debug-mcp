@@ -64,4 +64,26 @@ public sealed class StackTraceSteps
         _ctx.LastThreads.Should().NotBeNull();
         _ctx.LastThreads!.Should().Contain(t => t.IsCurrent, "at least one thread should be marked as current");
     }
+
+    [Then(@"the thread list should contain at least (\d+) threads")]
+    public void ThenTheThreadListShouldContainAtLeastThreads(int minThreads)
+    {
+        _ctx.LastThreads.Should().NotBeNull();
+        _ctx.LastThreads!.Count.Should().BeGreaterThanOrEqualTo(minThreads);
+    }
+
+    [Then("all threads should have positive IDs")]
+    public void ThenAllThreadsShouldHavePositiveIDs()
+    {
+        _ctx.LastThreads.Should().NotBeNull();
+        _ctx.LastThreads!.Should().AllSatisfy(t => t.Id.Should().BePositive());
+    }
+
+    [Then("all thread IDs should be unique")]
+    public void ThenAllThreadIDsShouldBeUnique()
+    {
+        _ctx.LastThreads.Should().NotBeNull();
+        var ids = _ctx.LastThreads!.Select(t => t.Id).ToList();
+        ids.Should().OnlyHaveUniqueItems();
+    }
 }

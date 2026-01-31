@@ -17,22 +17,22 @@ namespace DebugMcp.E2E.Features
     
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    public partial class ModuleEnumerationFeature : object, global::Xunit.IClassFixture<ModuleEnumerationFeature.FixtureData>, global::Xunit.IAsyncLifetime
+    public partial class SessionEdgeCasesFeature : object, global::Xunit.IClassFixture<SessionEdgeCasesFeature.FixtureData>, global::Xunit.IAsyncLifetime
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Module Enumeration", "    As a debugger user\n    I want to list all loaded modules after attaching to a" +
-                " process\n    So that I can set breakpoints in any loaded assembly", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Session Edge Cases", "    As a debugger user\n    I want session management to handle edge cases gracefu" +
+                "lly\n    So that error conditions don\'t crash or hang the debugger", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         
-#line 1 "ModuleEnumeration.feature"
+#line 1 "SessionEdgeCases.feature"
 #line hidden
         
-        public ModuleEnumerationFeature(ModuleEnumerationFeature.FixtureData fixtureData, global::Xunit.Abstractions.ITestOutputHelper testOutputHelper)
+        public SessionEdgeCasesFeature(SessionEdgeCasesFeature.FixtureData fixtureData, global::Xunit.Abstractions.ITestOutputHelper testOutputHelper)
         {
             this._testOutputHelper = testOutputHelper;
         }
@@ -106,7 +106,7 @@ namespace DebugMcp.E2E.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/ModuleEnumeration.feature.ndjson", 8);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/SessionEdgeCases.feature.ndjson", 7);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -134,15 +134,15 @@ namespace DebugMcp.E2E.Features
             await this.TestTearDownAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="All modules are visible after attach")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "All modules are visible after attach")]
-        public async global::System.Threading.Tasks.Task AllModulesAreVisibleAfterAttach()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Query debug state with no session returns Disconnected")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Session Edge Cases")]
+        [global::Xunit.TraitAttribute("Description", "Query debug state with no session returns Disconnected")]
+        public async global::System.Threading.Tasks.Task QueryDebugStateWithNoSessionReturnsDisconnected()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "0";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("All modules are visible after attach", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Query debug state with no session returns Disconnected", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 6
@@ -156,63 +156,24 @@ namespace DebugMcp.E2E.Features
             {
                 await this.ScenarioStartAsync();
 #line 7
-        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 8
-        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 9
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 10
-        await testRunner.ThenAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 11
-        await testRunner.AndAsync("the module list should contain \"BaseTypes\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 12
-        await testRunner.AndAsync("the module list should contain \"Collections\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 13
-        await testRunner.AndAsync("the module list should contain \"Exceptions\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 14
-        await testRunner.AndAsync("the module list should contain \"Recursion\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 15
-        await testRunner.AndAsync("the module list should contain \"Expressions\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 16
-        await testRunner.AndAsync("the module list should contain \"Threading\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 17
-        await testRunner.AndAsync("the module list should contain \"AsyncOps\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 18
-        await testRunner.AndAsync("the module list should contain \"MemoryStructs\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 19
-        await testRunner.AndAsync("the module list should contain \"ComplexObjects\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 20
-        await testRunner.AndAsync("the module list should contain \"Scenarios\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.ThenAsync("the session state should be \"Disconnected\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="System modules visible when filter is off")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "System modules visible when filter is off")]
-        public async global::System.Threading.Tasks.Task SystemModulesVisibleWhenFilterIsOff()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Debug state returns correct info after attach")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Session Edge Cases")]
+        [global::Xunit.TraitAttribute("Description", "Debug state returns correct info after attach")]
+        public async global::System.Threading.Tasks.Task DebugStateReturnsCorrectInfoAfterAttach()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "1";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("System modules visible when filter is off", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Debug state returns correct info after attach", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 22
+#line 9
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -222,37 +183,34 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 23
+#line 10
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 24
-        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line 11
+        await testRunner.WhenAsync("I attach the debugger to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 25
-        await testRunner.WhenAsync("I list all modules including system modules", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line 12
+        await testRunner.ThenAsync("the session state should be \"Running\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 26
-        await testRunner.ThenAsync("the module list should contain \"System.Private.CoreLib\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 27
-        await testRunner.AndAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line 13
+        await testRunner.AndAsync("the process ID should be positive", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Module count is greater with system modules included")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Module count is greater with system modules included")]
-        public async global::System.Threading.Tasks.Task ModuleCountIsGreaterWithSystemModulesIncluded()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Continue on running process returns error")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Session Edge Cases")]
+        [global::Xunit.TraitAttribute("Description", "Continue on running process returns error")]
+        public async global::System.Threading.Tasks.Task ContinueOnRunningProcessReturnsError()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "2";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Module count is greater with system modules included", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Continue on running process returns error", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 29
+#line 15
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -262,40 +220,31 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 30
+#line 16
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 31
+#line 17
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 32
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 33
-        await testRunner.ThenAsync("the module count should be at least 11", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 34
-        await testRunner.WhenAsync("I list all modules including system modules", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 35
-        await testRunner.ThenAsync("the module count should be greater than 11", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line 18
+        await testRunner.ThenAsync("continuing execution should fail with \"not paused\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Modules have path information")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Modules have path information")]
-        public async global::System.Threading.Tasks.Task ModulesHavePathInformation()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Pause running process changes state to paused")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Session Edge Cases")]
+        [global::Xunit.TraitAttribute("Description", "Pause running process changes state to paused")]
+        public async global::System.Threading.Tasks.Task PauseRunningProcessChangesStateToPaused()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "3";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Modules have path information", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Pause running process changes state to paused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 37
+#line 20
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -305,34 +254,37 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 38
+#line 21
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 39
+#line 22
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 40
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line 23
+        await testRunner.WhenAsync("I pause execution", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 41
-        await testRunner.ThenAsync("the module \"TestTargetApp\" should have a non-empty path", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line 24
+        await testRunner.ThenAsync("the session state should be \"Paused\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 25
+        await testRunner.AndAsync("the session pause reason should be \"Pause\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Modules after launch show same assemblies")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Modules after launch show same assemblies")]
-        public async global::System.Threading.Tasks.Task ModulesAfterLaunchShowSameAssemblies()
+        [global::Xunit.SkippableFactAttribute(DisplayName="Detach twice does not throw")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Session Edge Cases")]
+        [global::Xunit.TraitAttribute("Description", "Detach twice does not throw")]
+        public async global::System.Threading.Tasks.Task DetachTwiceDoesNotThrow()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "4";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Modules after launch show same assemblies", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Detach twice does not throw", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 43
+#line 27
     this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -342,51 +294,23 @@ namespace DebugMcp.E2E.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 44
-        await testRunner.GivenAsync("a launched process paused at entry", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 45
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 46
-        await testRunner.ThenAsync("the module list should contain \"TestTargetApp\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::Xunit.SkippableFactAttribute(DisplayName="Module has base address")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "Module Enumeration")]
-        [global::Xunit.TraitAttribute("Description", "Module has base address")]
-        public async global::System.Threading.Tasks.Task ModuleHasBaseAddress()
-        {
-            string[] tagsOfScenario = ((string[])(null));
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "5";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Module has base address", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 48
-    this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 49
+#line 28
         await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 50
+#line 29
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 51
-        await testRunner.WhenAsync("I list all modules without system filter", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line 30
+        await testRunner.WhenAsync("I detach the debugger", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 52
-        await testRunner.ThenAsync("all modules should have non-null base addresses", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line 31
+        await testRunner.ThenAsync("the session state should be \"Disconnected\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 32
+        await testRunner.WhenAsync("I detach the debugger", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 33
+        await testRunner.ThenAsync("the session state should be \"Disconnected\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -399,12 +323,12 @@ namespace DebugMcp.E2E.Features
             
             async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
             {
-                await ModuleEnumerationFeature.FeatureSetupAsync();
+                await SessionEdgeCasesFeature.FeatureSetupAsync();
             }
             
             async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.DisposeAsync()
             {
-                await ModuleEnumerationFeature.FeatureTearDownAsync();
+                await SessionEdgeCasesFeature.FeatureTearDownAsync();
             }
         }
     }

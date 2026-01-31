@@ -38,6 +38,7 @@ public sealed class SessionSteps
     {
         var testDll = TestTargetProcess.TestTargetDllPath;
         await _ctx.SessionManager.LaunchAsync(testDll, stopAtEntry: true, timeout: TimeSpan.FromSeconds(30));
+        await _ctx.SessionManager.WaitForModulesAsync("TestTargetApp", timeout: TimeSpan.FromSeconds(10));
     }
 
     [When("I attach the debugger to the test target")]
@@ -114,5 +115,20 @@ public sealed class SessionSteps
         var act = () => _ctx.SessionManager.GetStackFrames();
         act.Should().Throw<InvalidOperationException>()
             .WithMessage($"*{expectedMessage}*");
+    }
+
+    [Then(@"setting a breakpoint should fail with ""(.*)""")]
+    public async Task ThenSettingABreakpointShouldFailWith(string expectedMessage)
+    {
+        var act = async () => await _ctx.BreakpointManager.SetBreakpointAsync(
+            "/nonexistent/file.cs", 1, column: null, condition: null, CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{expectedMessage}*");
+    }
+
+    [When("I pause execution")]
+    public async Task WhenIPauseExecution()
+    {
+        await _ctx.SessionManager.PauseAsync();
     }
 }
