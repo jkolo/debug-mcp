@@ -53,6 +53,46 @@ Feature: Complex Type Inspection
         Then the variables should not be empty
         And all variables should have a type
 
+    Scenario: Enum breakpoint has TestEnum typed variable
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "Program.cs" line 112
+        When the test target executes the "enums" command
+        And I wait for a breakpoint hit
+        And I inspect local variables
+        Then the variables should not be empty
+        And a variable with type containing "TestEnum" should exist
+
+    Scenario: Enum breakpoint has NullableHolder typed variable
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "Program.cs" line 112
+        When the test target executes the "enums" command
+        And I wait for a breakpoint hit
+        And I inspect local variables
+        Then the variables should not be empty
+        And a variable with type containing "NullableHolder" should exist
+
+    Scenario: Collections breakpoint has CollectionHolder typed variable
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "Program.cs" line 88
+        When the test target executes the "collections" command
+        And I wait for a breakpoint hit
+        And I inspect local variables
+        Then the variables should not be empty
+        And a variable with type containing "CollectionHolder" should exist
+
+    Scenario: Structs breakpoint has LayoutStruct typed variable
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "Program.cs" line 104
+        When the test target executes the "structs" command
+        And I wait for a breakpoint hit
+        And I inspect local variables
+        Then the variables should not be empty
+        And a variable with type containing "LayoutStruct" should exist
+
     Scenario: Inspect struct type layout
         Given a running test target process
         And the debugger is attached to the test target
