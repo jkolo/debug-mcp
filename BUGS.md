@@ -68,3 +68,44 @@ All bugs listed below have been **RESOLVED** as of 2026-01-26.
 | Reattachment fails | ✅ FIXED | `ProcessDebugger.cs:DetachAsync` |
 
 All 14 integration tests pass confirming the fixes.
+
+---
+
+## 4. ~~Test host FailFast crash (`ProcessWaitState.TryReapChild`)~~ ✅ FIXED
+
+**Symptom:** Unit test suite crashes with `FailFast(errno=ECHILD)` after `TerminateLaunchedProcessTests` run — kills the test host process.
+
+**Root cause:** `DbgShim.CreateProcessForLaunch` uses `fork()`, making the debuggee a direct child. When ICorDebug terminates it, ptrace reaps the child first. Then .NET's SIGCHLD handler calls `waitpid()` → ECHILD → `ProcessWaitState.TryReapChild` calls `Environment.FailFast`.
+
+**Resolution:** Added `waitpid()` P/Invoke in `ProcessDebugger.ReapLaunchedChild()` — reaps the child immediately after ICorDebug.Terminate/Detach before .NET's handler fires.
+
+**Tests:** 3 consecutive `dotnet test` runs complete with 0 FailFast crashes (737/817/817 pass).
+
+---
+
+## 5. ICorDebug native state hang after many attach/detach cycles — ⚠️ KNOWN / MITIGATED
+
+**Symptom:** After hundreds of attach/detach cycles in the same process, `RegisterForRuntimeStartup` (DbgShim) hangs indefinitely due to process-wide ptrace state corruption.
+
+**Root cause:** ICorDebug/DbgShim native state accumulates across cycles. Not fixable from managed code.
+
+**Mitigation:** `tests/DebugMcp.Tests/test.runsettings` with `blame-hang-timeout 30s` prevents the test suite from hanging indefinitely.
+
+---
+
+## 6. `TypeBrowsingTests.GetTypesAsync_TypeInfo_HasRequiredFields` — ⚠️ KNOWN / FLAKY
+
+**Symptom:** Occasionally fails due to timing in ICorDebug metadata enumeration. Pre-existing, not related to 013 changes.
+
+---
+
+## Summary
+
+| Bug | Status | Fix Location |
+|-----|--------|--------------|
+| Nested property access in `object_inspect` | ✅ FIXED | `ProcessDebugger.cs:ResolveExpressionToValue` |
+| Expression evaluation limited | ✅ FIXED | `ProcessDebugger.cs:TryGetFieldValue, FindPropertyGetter` |
+| Reattachment fails | ✅ FIXED | `ProcessDebugger.cs:DetachAsync` |
+| Test host FailFast crash | ✅ FIXED | `ProcessDebugger.cs:ReapLaunchedChild` |
+| ICorDebug native state hang | ⚠️ MITIGATED | `test.runsettings` blame-hang-timeout |
+| TypeBrowsing flaky test | ⚠️ KNOWN | Pre-existing timing issue |

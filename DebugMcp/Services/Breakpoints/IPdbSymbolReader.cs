@@ -67,6 +67,21 @@ public interface IPdbSymbolReader
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets local variable names for a method at a given IL offset.
+    /// Returns a dictionary mapping slot index to variable name.
+    /// </summary>
+    /// <param name="assemblyPath">Path to the assembly (DLL or EXE).</param>
+    /// <param name="methodToken">Metadata token of the method.</param>
+    /// <param name="ilOffset">IL offset within the method (determines which scope is active).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Dictionary of slot index to variable name, empty if no PDB or no locals.</returns>
+    Task<IReadOnlyDictionary<int, string>> GetLocalVariableNamesAsync(
+        string assemblyPath,
+        int methodToken,
+        int ilOffset,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Checks if a source file is contained in the module's PDB.
     /// </summary>
     /// <param name="assemblyPath">Path to the assembly (DLL or EXE).</param>

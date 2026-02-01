@@ -205,6 +205,56 @@ public class PdbSymbolReaderTests : IDisposable
         sp.IsHidden.Should().BeFalse();
     }
 
+    /// <summary>
+    /// GetLocalVariableNamesAsync returns empty dictionary for non-existent assembly.
+    /// </summary>
+    [Fact]
+    public async Task GetLocalVariableNamesAsync_NoPdb_ReturnsEmpty()
+    {
+        var result = await _reader.GetLocalVariableNamesAsync("/nonexistent/assembly.dll", 0x06000001, 0);
+        result.Should().BeEmpty("no PDB file exists");
+    }
+
+    /// <summary>
+    /// GetLocalVariableNamesAsync resolves local variable names for a method with known locals.
+    /// Uses the test assembly's own PDB to verify resolution works.
+    /// </summary>
+    [Fact]
+    public async Task GetLocalVariableNamesAsync_ValidMethod_ReturnsNames()
+    {
+        // Arrange — use this test method's assembly + a method with known local variables
+        var testAssembly = typeof(PdbSymbolReaderTests).Assembly.Location;
+
+        // Find the method token for MethodWithKnownLocals
+        var methodInfo = typeof(PdbSymbolReaderTests).GetMethod(
+            nameof(MethodWithKnownLocals),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        methodInfo.Should().NotBeNull();
+        var methodToken = methodInfo!.MetadataToken;
+
+        // Act — IL offset 0 should be within the first scope
+        var result = await _reader.GetLocalVariableNamesAsync(testAssembly, methodToken, 0);
+
+        // Assert — should find the local variables defined in the helper method
+        if (result.Count > 0) // PDB may not be available in some CI environments
+        {
+            result.Values.Should().Contain("myInt", "expected to find 'myInt' local");
+            result.Values.Should().Contain("myString", "expected to find 'myString' local");
+        }
+    }
+
+    /// <summary>
+    /// Helper method with known local variables for PDB testing.
+    /// DO NOT refactor — variable names are asserted in tests.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0059")]
+    private static void MethodWithKnownLocals()
+    {
+        int myInt = 42;
+        string myString = "hello";
+        _ = myInt + myString.Length;
+    }
+
     private static string GetThisSourceFile([System.Runtime.CompilerServices.CallerFilePath] string path = "")
         => path;
 

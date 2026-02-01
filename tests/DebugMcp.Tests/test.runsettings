@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Abort tests that hang due to ICorDebug native state corruption -->
+    <!-- When many attach/detach cycles run in the same process, DbgShim's -->
+    <!-- RegisterForRuntimeStartup can hang because ptrace state is corrupted. -->
+    <TestSessionTimeout>300000</TestSessionTimeout>
+  </RunConfiguration>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="blame" enabled="True">
+        <Configuration>
+          <CollectDumpOnTestSessionHang TestTimeout="30000" DumpType="None" />
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

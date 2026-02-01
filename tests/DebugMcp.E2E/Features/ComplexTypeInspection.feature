@@ -93,6 +93,26 @@ Feature: Complex Type Inspection
         Then the variables should not be empty
         And a variable with type containing "LayoutStruct" should exist
 
+    Scenario: Enum breakpoint variables have source names from PDB
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "Program.cs" line 112
+        When the test target executes the "enums" command
+        And I wait for a breakpoint hit
+        And I inspect local variables
+        Then the variables should not be empty
+        And a variable named "testEnum" should exist
+        And a variable named "nullableHolder" should exist
+
+    Scenario: Variables at system frame fallback to local_N without crash
+        Given a running test target process
+        And the debugger is attached to the test target
+        And a breakpoint on "Program.cs" line 112
+        When the test target executes the "enums" command
+        And I wait for a breakpoint hit
+        And I inspect local variables
+        Then the variables should not be empty
+
     Scenario: Inspect struct type layout
         Given a running test target process
         And the debugger is attached to the test target

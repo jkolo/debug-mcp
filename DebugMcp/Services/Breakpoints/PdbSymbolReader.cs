@@ -380,6 +380,57 @@ public sealed class PdbSymbolReader : IPdbSymbolReader
         return Task.FromResult(!documentHandle.IsNil);
     }
 
+    /// <inheritdoc />
+    public Task<IReadOnlyDictionary<int, string>> GetLocalVariableNamesAsync(
+        string assemblyPath,
+        int methodToken,
+        int ilOffset,
+        CancellationToken cancellationToken = default)
+    {
+        var reader = _cache.GetOrCreateReader(assemblyPath);
+        if (reader == null)
+        {
+            _logger.LogDebug("No PDB reader for assembly: {AssemblyPath}", assemblyPath);
+            return Task.FromResult<IReadOnlyDictionary<int, string>>(
+                new Dictionary<int, string>());
+        }
+
+        var result = new Dictionary<int, string>();
+        var methodHandle = MetadataTokens.MethodDefinitionHandle(methodToken & 0x00FFFFFF);
+
+        try
+        {
+            var localScopes = reader.GetLocalScopes(methodHandle);
+
+            foreach (var scopeHandle in localScopes)
+            {
+                var scope = reader.GetLocalScope(scopeHandle);
+
+                // Check if IL offset falls within this scope
+                if (ilOffset < scope.StartOffset || ilOffset >= scope.StartOffset + scope.Length)
+                    continue;
+
+                foreach (var varHandle in scope.GetLocalVariables())
+                {
+                    var localVar = reader.GetLocalVariable(varHandle);
+                    var name = reader.GetString(localVar.Name);
+
+                    // Skip compiler-generated variables
+                    if (name.StartsWith("CS$") || name.StartsWith("<"))
+                        continue;
+
+                    result.TryAdd(localVar.Index, name);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error reading local variable names for method token 0x{Token:X8}", methodToken);
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<int, string>>(result);
+    }
+
     private static string NormalizePath(string path)
     {
         // Normalize path separators and resolve relative paths

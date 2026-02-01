@@ -53,6 +53,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private bool _isLaunched;
     private bool _stopAtEntry;
     private int _launchPid;
+    private bool _launchPidReaped;
     private TaskCompletionSource<bool>? _launchCompletionSource;
     private RuntimeStartupCallback? _startupCallbackDelegate; // prevent GC
 
@@ -272,6 +273,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
         var pid = (int)launchResult.ProcessId;
         _launchPid = pid;
+        _launchPidReaped = false;
         var resumeHandle = launchResult.ResumeHandle;
         _logger.LogDebug("Process created suspended, PID: {Pid}", pid);
 
@@ -307,7 +309,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             }
             catch (OperationCanceledException)
             {
-                // Clean up the launched process on timeout
+                // Clean up the launched process on timeout.
+                // Must unregister the startup callback first — it holds a reference
+                // to the process via ptrace, which can block Kill().
+                CleanupLaunchState();
                 try { Process.GetProcessById(pid).Kill(); } catch { /* ignore */ }
                 throw new OperationCanceledException(
                     $"Launch timed out after {effectiveTimeout.TotalSeconds}s waiting for CLR startup");
@@ -503,6 +508,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     _logger.LogDebug("ICorDebug instance released, ready for new attachment");
                 }
 
+                ReapLaunchedChild();
+
                 UpdateState(SessionState.Disconnected);
             }
         }, cancellationToken);
@@ -558,6 +565,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     }
                     _corDebug = null;
                 }
+
+                // BUGFIX: Reap the launched child process to prevent .NET's SIGCHLD handler
+                // from calling FailFast with ECHILD. Must happen after ICorDebug.Terminate()
+                // releases ptrace, but before the runtime's handler fires.
+                ReapLaunchedChild();
 
                 UpdateState(SessionState.Disconnected);
             }
@@ -1551,10 +1563,14 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             var localValues = ilFrame.EnumerateLocalVariables().ToList();
 
+            // Resolve local variable names from PDB (falls back to local_N)
+            var localNames = ResolveLocalVariableNames(ilFrame);
+
             for (int i = 0; i < localValues.Count; i++)
             {
                 var value = localValues[i];
-                var variable = CreateVariable($"local_{i}", value, VariableScope.Local);
+                var name = localNames.TryGetValue(i, out var pdbName) ? pdbName : $"local_{i}";
+                var variable = CreateVariable(name, value, VariableScope.Local);
                 if (variable != null)
                 {
                     locals.Add(variable);
@@ -1567,6 +1583,29 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         }
 
         return locals;
+    }
+
+    private IReadOnlyDictionary<int, string> ResolveLocalVariableNames(CorDebugILFrame ilFrame)
+    {
+        try
+        {
+            var function = ilFrame.Function;
+            var module = function.Module;
+            var methodToken = (int)function.Token;
+            var ilOffset = (int)ilFrame.IP.pnOffset;
+            var modulePath = module.Name;
+
+            if (string.IsNullOrEmpty(modulePath))
+                return new Dictionary<int, string>();
+
+            return _pdbSymbolReader.GetLocalVariableNamesAsync(modulePath, methodToken, ilOffset)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error resolving local variable names from PDB");
+            return new Dictionary<int, string>();
+        }
     }
 
     private List<Variable> GetArguments(CorDebugILFrame ilFrame)
@@ -2106,6 +2145,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 }
                 _corDebug = null;
             }
+
+            ReapLaunchedChild();
         }
     }
 
@@ -2115,6 +2156,43 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     /// </summary>
     private bool ShouldAutoContinue()
         => !(_isLaunched && _stopAtEntry);
+
+    // P/Invoke for waitpid — used to reap launched child processes before the .NET
+    // runtime's SIGCHLD handler fires, preventing FailFast in ProcessWaitState.TryReapChild.
+    [DllImport("libc", SetLastError = true)]
+    private static extern int waitpid(int pid, out int status, int options);
+
+    private const int WNOHANG = 1;
+
+    /// <summary>
+    /// Reap a launched child process to prevent .NET's ProcessWaitState.TryReapChild from
+    /// calling FailFast with errno=ECHILD. On Linux, DbgShim's CreateProcessForLaunch uses
+    /// fork()+ptrace, making the child a direct child of this process. When ICorDebug terminates
+    /// the child, SIGCHLD fires. The .NET runtime's handler tries waitpid() but ptrace already
+    /// consumed the wait status, causing ECHILD and FailFast. By calling waitpid() ourselves
+    /// first (with retries), we consume the status and prevent the crash.
+    /// </summary>
+    private void ReapLaunchedChild()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || _launchPid <= 0 || _launchPidReaped)
+            return;
+
+        _launchPidReaped = true;
+
+        // Retry a few times — the child may not have exited yet
+        for (var i = 0; i < 10; i++)
+        {
+            var result = waitpid(_launchPid, out _, WNOHANG);
+            if (result == _launchPid || result == -1)
+            {
+                _logger.LogDebug("Reaped launched child PID {Pid} (waitpid returned {Result})", _launchPid, result);
+                return;
+            }
+            Thread.Sleep(50);
+        }
+
+        _logger.LogDebug("Could not reap launched child PID {Pid} after retries", _launchPid);
+    }
 
     private CorDebugManagedCallback CreateManagedCallback()
     {

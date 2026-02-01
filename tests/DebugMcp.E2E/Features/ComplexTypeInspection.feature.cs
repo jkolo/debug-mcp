@@ -107,7 +107,7 @@ namespace DebugMcp.E2E.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/ComplexTypeInspection.feature.ndjson", 12);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/ComplexTypeInspection.feature.ndjson", 14);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -576,15 +576,15 @@ namespace DebugMcp.E2E.Features
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Inspect struct type layout")]
+        [global::Xunit.SkippableFactAttribute(DisplayName="Enum breakpoint variables have source names from PDB")]
         [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
-        [global::Xunit.TraitAttribute("Description", "Inspect struct type layout")]
-        public async global::System.Threading.Tasks.Task InspectStructTypeLayout()
+        [global::Xunit.TraitAttribute("Description", "Enum breakpoint variables have source names from PDB")]
+        public async global::System.Threading.Tasks.Task EnumBreakpointVariablesHaveSourceNamesFromPDB()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "9";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Inspect struct type layout", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Enum breakpoint variables have source names from PDB", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 96
@@ -604,24 +604,122 @@ namespace DebugMcp.E2E.Features
         await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 99
-        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 104", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 112", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 100
-        await testRunner.WhenAsync("the test target executes the \"structs\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+        await testRunner.WhenAsync("the test target executes the \"enums\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 101
         await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 102
-        await testRunner.WhenAsync("I get the type layout for \"MemoryStructs.LayoutStruct\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 103
-        await testRunner.ThenAsync("the type layout should have name containing \"LayoutStruct\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 104
-        await testRunner.AndAsync("the type total size should be greater than 0", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+        await testRunner.AndAsync("a variable named \"testEnum\" should exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 105
+        await testRunner.AndAsync("a variable named \"nullableHolder\" should exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Variables at system frame fallback to local_N without crash")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Variables at system frame fallback to local_N without crash")]
+        public async global::System.Threading.Tasks.Task VariablesAtSystemFrameFallbackToLocal_NWithoutCrash()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "10";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Variables at system frame fallback to local_N without crash", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 107
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 108
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 109
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 110
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 112", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 111
+        await testRunner.WhenAsync("the test target executes the \"enums\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 112
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 113
+        await testRunner.AndAsync("I inspect local variables", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 114
+        await testRunner.ThenAsync("the variables should not be empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Inspect struct type layout")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "Complex Type Inspection")]
+        [global::Xunit.TraitAttribute("Description", "Inspect struct type layout")]
+        public async global::System.Threading.Tasks.Task InspectStructTypeLayout()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "11";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Inspect struct type layout", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 116
+    this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 117
+        await testRunner.GivenAsync("a running test target process", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 118
+        await testRunner.AndAsync("the debugger is attached to the test target", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 119
+        await testRunner.AndAsync("a breakpoint on \"Program.cs\" line 104", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 120
+        await testRunner.WhenAsync("the test target executes the \"structs\" command", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 121
+        await testRunner.AndAsync("I wait for a breakpoint hit", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 122
+        await testRunner.WhenAsync("I get the type layout for \"MemoryStructs.LayoutStruct\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 123
+        await testRunner.ThenAsync("the type layout should have name containing \"LayoutStruct\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 124
+        await testRunner.AndAsync("the type total size should be greater than 0", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 125
         await testRunner.AndAsync("the type should be a value type", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }

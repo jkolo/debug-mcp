@@ -28,7 +28,11 @@ rootCommand.SetAction(async _ =>
     builder.Services.AddSingleton<PdbSymbolCache>();
     builder.Services.AddSingleton<IPdbSymbolReader, PdbSymbolReader>();
     builder.Services.AddSingleton<BreakpointRegistry>();
-    builder.Services.AddSingleton<IConditionEvaluator, SimpleConditionEvaluator>();
+    builder.Services.AddSingleton<SimpleConditionEvaluator>();
+    builder.Services.AddSingleton<IConditionEvaluator>(sp =>
+        new DebuggerConditionEvaluator(
+            sp.GetRequiredService<SimpleConditionEvaluator>(),
+            sp.GetRequiredService<ILogger<DebuggerConditionEvaluator>>()));
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
 
     // Configure MCP server with stdio transport
