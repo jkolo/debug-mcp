@@ -86,14 +86,14 @@
 
 - [x] T025 ⚠️ MANUAL [US2] Record `website/static/casts/getting-started.cast` following scenario from T021. Use `asciinema rec --idle-time-limit 2`.
 - [x] T026 ⚠️ MANUAL [US2] Record `website/static/casts/breakpoint-workflow.cast` following scenario from T022.
-- [ ] T027 ⚠️ MANUAL [US2] Record `website/static/casts/variable-inspection.cast` following scenario from T023. *(blocked — requires debug-mcp bug fixes)*
-- [ ] T028 ⚠️ MANUAL [US2] Record `website/static/casts/full-debug-session.cast` following scenario from T024. *(blocked — requires debug-mcp bug fixes)*
+- [x] T027 ⚠️ MANUAL [US2] Record `website/static/casts/variable-inspection.cast` — moved to 013-cleanup-and-bugfixes/T009 (bugs now fixed, no longer blocked)
+- [x] T028 ⚠️ MANUAL [US2] Record `website/static/casts/full-debug-session.cast` — moved to 013-cleanup-and-bugfixes/T010 (bugs now fixed, no longer blocked)
 
 ### Embed Recordings
 
 - [x] T029 [US2] Embed asciinema player in `website/docs/getting-started.md` — show getting-started.cast recording
 - [x] T030 [P] [US2] Embed asciinema player in `website/docs/tools/breakpoints.md` — show breakpoint-workflow.cast
-- [ ] T031 [P] [US2] Embed asciinema player in `website/docs/tools/inspection.md` — show variable-inspection.cast *(blocked — T027 not recorded)*
+- [x] T031 [P] [US2] Embed asciinema player in `website/docs/tools/inspection.md` — moved to 013-cleanup-and-bugfixes/T011 (depends on T027 recording)
 - [x] T032 [US2] Embed asciinema player on landing page `website/src/pages/index.tsx` — show setup-mcp.cast (replaced terminal widget)
 - [x] T033 [US2] Verify build and player behavior: `cd website && npm run build` — all players embedded, cast files served. Verify `poster` prop renders preview frame before playback, player loads lazily (non-blocking)
 

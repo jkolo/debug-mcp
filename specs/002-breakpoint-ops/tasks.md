@@ -184,7 +184,7 @@
 
 - [x] T061 [US5] Create IConditionEvaluator interface in DotnetMcp/Services/Breakpoints/IConditionEvaluator.cs
 - [x] T062 [US5] Implement simple condition parsing (hit count, literals) in DotnetMcp/Services/Breakpoints/SimpleConditionEvaluator.cs
-- [ ] T063 [US5] Implement ICorDebugEval-based condition evaluation in DotnetMcp/Services/Breakpoints/DebuggerConditionEvaluator.cs - DEFERRED: Requires thread at GC/FuncEval safe point; SimpleConditionEvaluator covers hitCount-based conditions
+- [x] T063 [US5] Implement ICorDebugEval-based condition evaluation in DotnetMcp/Services/Breakpoints/DebuggerConditionEvaluator.cs - DEFERRED → moved to 013-cleanup-and-bugfixes/T008
 - [x] T064 [US5] Integrate condition evaluation in OnBreakpoint callback (silent continue if false)
 - [x] T065 [US5] Add condition parameter to breakpoint_set tool
 - [x] T066 [US5] Add INVALID_CONDITION error handling with syntax error position
