@@ -439,4 +439,52 @@ public class TerminateLaunchedProcessTests : IDisposable
             "terminating a running launched process should succeed");
         _sessionManager.GetCurrentState().Should().Be(SessionState.Disconnected);
     }
+
+    [Fact]
+    [Trait("Category", "LaunchProcess")]
+    public async Task GetLoadedModules_OnRunningLaunchedProcess_ShouldNotHang()
+    {
+        // Arrange - launch process paused at entry, continue it, then call GetLoadedModules.
+        // This verifies that Stop(0) outside lock doesn't deadlock on a running process.
+        var dllPath = Helpers.TestTargetProcess.TestTargetDllPath;
+        if (!File.Exists(dllPath))
+            return;
+
+        await _sessionManager.LaunchAsync(dllPath, stopAtEntry: true,
+            timeout: TimeSpan.FromSeconds(15));
+
+        // Get modules while paused — should work (baseline)
+        var pausedModules = _processDebugger.GetLoadedModules();
+        pausedModules.Count.Should().BeGreaterThan(0, "paused process should have loaded modules");
+
+        // Continue to running state
+        try { await _processDebugger.ContinueAsync(); }
+        catch (ClrDebug.DebugException) { /* may already be running */ }
+        await Task.Delay(200);
+
+        // Act - GetLoadedModules on running process should complete within 5s
+        IReadOnlyList<DebugMcp.Services.LoadedModuleInfo>? modules = null;
+        var completed = false;
+        try
+        {
+            var task = Task.Run(() => _processDebugger.GetLoadedModules());
+            modules = await task.WaitAsync(TimeSpan.FromSeconds(5));
+            completed = true;
+        }
+        catch (TimeoutException)
+        {
+            // GetLoadedModules hung — this is the deadlock bug
+        }
+        catch (Exception)
+        {
+            // Process may have exited — that's OK, it means Stop didn't deadlock
+            completed = true;
+        }
+
+        // Assert
+        completed.Should().BeTrue("GetLoadedModules should not hang on a running launched process");
+
+        // Cleanup
+        try { await _sessionManager.DisconnectAsync(terminateProcess: true); } catch { }
+    }
 }

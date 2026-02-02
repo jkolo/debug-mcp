@@ -151,21 +151,27 @@ public sealed class DebugSessionManager : IDebugSessionManager
 
         _logger.DisconnectingFromProcess(session.ProcessId, terminateProcess);
 
-        if (terminateProcess && session.LaunchMode == LaunchMode.Launch)
+        try
         {
-            await _processDebugger.TerminateAsync(cancellationToken);
+            if (terminateProcess && session.LaunchMode == LaunchMode.Launch)
+            {
+                await _processDebugger.TerminateAsync(cancellationToken);
+            }
+            else
+            {
+                await _processDebugger.DetachAsync(cancellationToken);
+            }
         }
-        else
+        finally
         {
-            await _processDebugger.DetachAsync(cancellationToken);
-        }
+            // Always clear session even if terminate/detach fails
+            lock (_lock)
+            {
+                _currentSession = null;
+            }
 
-        lock (_lock)
-        {
-            _currentSession = null;
+            _logger.DisconnectedFromProcess(session.ProcessId);
         }
-
-        _logger.DisconnectedFromProcess(session.ProcessId);
     }
 
     /// <inheritdoc />

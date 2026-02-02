@@ -161,72 +161,73 @@ public sealed class BreakpointManager : IBreakpointManager
 
         if (_processDebugger.IsAttached)
         {
-            // Try to bind to already loaded modules
-            var loadedModules = _processDebugger.GetLoadedModules();
-            _logger.LogDebug("Searching for source file in {Count} loaded modules", loadedModules.Count);
-
-            foreach (var moduleInfo in loadedModules)
+            // BUGFIX: Stop the process for the entire bind operation. ICorDebug COM calls
+            // (GetLoadedModules enumeration, GetFunctionFromToken, CreateBreakpoint, Activate)
+            // all require the process to be stopped. We stop once and pass processStopped=true
+            // to GetLoadedModules so it skips its own Stop/Continue.
+            var wasStopped = _processDebugger.StopForInspection();
+            try
             {
-                // Skip dynamic and in-memory modules
-                if (moduleInfo.IsDynamic || moduleInfo.IsInMemory)
-                {
-                    continue;
-                }
+                var loadedModules = _processDebugger.GetLoadedModules(processStopped: true);
+                _logger.LogDebug("Searching for source file in {Count} loaded modules", loadedModules.Count);
 
-                try
+                foreach (var moduleInfo in loadedModules)
                 {
-                    // Check if this module contains the source file
-                    var containsFile = await _pdbReader.ContainsSourceFileAsync(
-                        moduleInfo.ModulePath,
-                        file,
-                        cancellationToken);
-
-                    if (!containsFile)
-                    {
+                    if (moduleInfo.IsDynamic || moduleInfo.IsInMemory)
                         continue;
-                    }
 
-                    _logger.LogDebug("Found source file {File} in module {Module}",
-                        file, moduleInfo.ModulePath);
-
-                    // Try to bind the breakpoint
-                    var bindResult = await TryBindBreakpointInModuleAsync(
-                        moduleInfo.NativeModule as CorDebugModule,
-                        moduleInfo.ModulePath,
-                        file,
-                        line,
-                        column,
-                        cancellationToken);
-
-                    if (bindResult.Success)
+                    try
                     {
-                        state = BreakpointState.Bound;
-                        verified = true;
-                        resolvedLocation = bindResult.ResolvedLocation ?? location;
-                        boundModulePath = moduleInfo.ModulePath;
-                        nativeBreakpoint = bindResult.NativeBreakpoint;
-                        _logger.LogDebug("Breakpoint {Id} bound at IL offset {Offset}",
-                            id, bindResult.ILOffset);
-                        break;
+                        var containsFile = await _pdbReader.ContainsSourceFileAsync(
+                            moduleInfo.ModulePath, file, cancellationToken);
+                        if (!containsFile)
+                            continue;
+
+                        _logger.LogDebug("Found source file {File} in module {Module}",
+                            file, moduleInfo.ModulePath);
+
+                        var bindResult = await TryBindBreakpointInModuleAsync(
+                            moduleInfo.NativeModule as CorDebugModule,
+                            moduleInfo.ModulePath,
+                            file,
+                            line,
+                            column,
+                            cancellationToken);
+
+                        if (bindResult.Success)
+                        {
+                            state = BreakpointState.Bound;
+                            verified = true;
+                            resolvedLocation = bindResult.ResolvedLocation ?? location;
+                            boundModulePath = moduleInfo.ModulePath;
+                            nativeBreakpoint = bindResult.NativeBreakpoint;
+                            _logger.LogDebug("Breakpoint {Id} bound at IL offset {Offset}",
+                                id, bindResult.ILOffset);
+                            break;
+                        }
+                        else
+                        {
+                            message = bindResult.ErrorMessage;
+                            _logger.LogDebug("Failed to bind in module {Module}: {Error}",
+                                moduleInfo.ModulePath, bindResult.ErrorMessage);
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        message = bindResult.ErrorMessage;
-                        _logger.LogDebug("Failed to bind in module {Module}: {Error}",
-                            moduleInfo.ModulePath, bindResult.ErrorMessage);
+                        _logger.LogDebug(ex, "Error checking module {Module} for source file",
+                            moduleInfo.ModulePath);
                     }
                 }
-                catch (Exception ex)
+
+                if (state == BreakpointState.Pending)
                 {
-                    _logger.LogDebug(ex, "Error checking module {Module} for source file",
-                        moduleInfo.ModulePath);
+                    message = message ?? "Module not loaded; breakpoint will bind when module loads";
+                    _logger.LogDebug("Breakpoint {Id} pending: {Message}", id, message);
                 }
             }
-
-            if (state == BreakpointState.Pending)
+            finally
             {
-                message = message ?? "Module not loaded; breakpoint will bind when module loads";
-                _logger.LogDebug("Breakpoint {Id} pending: {Message}", id, message);
+                _processDebugger.ResumeFromInspection(wasStopped);
             }
         }
         else

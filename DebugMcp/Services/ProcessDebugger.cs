@@ -37,7 +37,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private CorDebugProcess? _process;
     private readonly object _lock = new();
 
-    private SessionState _currentState = SessionState.Disconnected;
+    private volatile SessionState _currentState = SessionState.Disconnected;
     private PauseReason? _currentPauseReason;
     private SourceLocation? _currentLocation;
     private int? _activeThreadId;
@@ -60,6 +60,13 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     // WaitForModulesAsync state
     private string? _waitForModuleTarget;
     private TaskCompletionSource<bool>? _moduleLoadedTcs;
+
+    // Module cache — populated from OnLoadModule/OnUnloadModule callbacks to avoid
+    // needing _process.Stop() for module enumeration (which deadlocks with _lock).
+    // Uses its own lock to avoid deadlock with _lock (ICorDebug callbacks use _moduleCacheLock,
+    // while GetLoadedModules and other methods use _lock).
+    private readonly object _moduleCacheLock = new();
+    private readonly List<LoadedModuleInfo> _cachedModules = new();
 
     public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader)
     {
@@ -86,28 +93,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     public event EventHandler<ExceptionHitEventArgs>? ExceptionHit;
 
     /// <inheritdoc />
-    public bool IsAttached
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _process != null;
-            }
-        }
-    }
+    public bool IsAttached => _process != null;
 
     /// <inheritdoc />
-    public SessionState CurrentState
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _currentState;
-            }
-        }
-    }
+    public SessionState CurrentState => _currentState;
 
     /// <inheritdoc />
     public PauseReason? CurrentPauseReason
@@ -449,6 +438,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         _startupCallbackDelegate = null;
         _isLaunched = false;
         _launchCompletionSource = null;
+
+        lock (_moduleCacheLock)
+        {
+            _cachedModules.Clear();
+        }
     }
 
     /// <inheritdoc />
@@ -456,23 +450,31 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         await Task.Run(() =>
         {
+            // Continue OUTSIDE lock — ICorDebug requires process running for detach,
+            // and Continue may trigger callbacks that need _lock.
+            CorDebugProcess? process;
+            lock (_lock)
+            {
+                process = _process;
+            }
+
+            if (process != null)
+            {
+                try
+                {
+                    _logger.LogDebug("Continuing process before detach (outside lock)");
+                    process.Continue(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Continue before detach failed (process may have exited)");
+                }
+            }
+
             lock (_lock)
             {
                 if (_process != null)
                 {
-                    try
-                    {
-                        // BUGFIX: Must continue the process before detaching.
-                        // ICorDebug cannot detach from a stopped/paused process.
-                        // The process will continue running after we detach.
-                        _logger.LogDebug("Continuing process before detach");
-                        _process.Continue(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Continue before detach failed (process may have exited)");
-                    }
-
                     try
                     {
                         _process.Detach();
@@ -520,58 +522,83 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         await Task.Run(() =>
         {
+            // BUGFIX: Stop OUTSIDE lock to avoid deadlock with ICorDebug callbacks.
+            // We stop first, then acquire lock and terminate immediately (no Continue
+            // in between, so no FailFast race from callbacks calling Continue).
+            CorDebugProcess? processToStop;
+            bool needsStop;
             lock (_lock)
             {
-                if (_process != null)
+                processToStop = _process;
+                needsStop = _process != null && _currentState == SessionState.Running;
+            }
+
+            if (needsStop && processToStop != null)
+            {
+                try
                 {
-                    try
-                    {
-                        // BUGFIX: Must stop the process before terminating.
-                        // ICorDebug requires the process to be stopped before Terminate().
-                        _logger.LogDebug("Stopping process before terminate");
-                        _process.Stop(0);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Stop before terminate failed (process may have exited)");
-                    }
-
-                    try
-                    {
-                        _process.Terminate(exitCode: 0);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Terminate failed, process may have already exited");
-                    }
-                    _process = null;
+                    _logger.LogDebug("Stopping process before terminate (outside lock)");
+                    processToStop.Stop(5000);
                 }
-
-                // Clean up launch-specific state
-                CleanupLaunchState();
-
-                // BUGFIX: Terminate ICorDebug instance after process termination.
-                // Must happen after _process.Terminate() to respect ICorDebug shutdown order.
-                if (_corDebug != null)
+                catch (Exception ex)
                 {
-                    try
-                    {
-                        _logger.LogDebug("Terminating ICorDebug instance after process terminate");
-                        _corDebug.Terminate();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "ICorDebug.Terminate() after terminate (safe to ignore)");
-                    }
-                    _corDebug = null;
+                    _logger.LogDebug(ex, "Stop before terminate failed (process may have exited)");
                 }
+            }
 
-                // BUGFIX: Reap the launched child process to prevent .NET's SIGCHLD handler
-                // from calling FailFast with ECHILD. Must happen after ICorDebug.Terminate()
-                // releases ptrace, but before the runtime's handler fires.
-                ReapLaunchedChild();
+            lock (_lock)
+            {
+                try
+                {
+                    if (_process != null)
+                    {
+                        try
+                        {
+                            _process.Terminate(exitCode: 0);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Terminate failed, trying OS kill");
+                            try
+                            {
+                                var pid = _process.Id;
+                                System.Diagnostics.Process.GetProcessById(pid)?.Kill();
+                            }
+                            catch (Exception killEx)
+                            {
+                                _logger.LogDebug(killEx, "OS kill also failed (process may have exited)");
+                            }
+                        }
+                        _process = null;
+                    }
 
-                UpdateState(SessionState.Disconnected);
+                    // Clean up launch-specific state
+                    CleanupLaunchState();
+
+                    // BUGFIX: Terminate ICorDebug instance after process termination.
+                    if (_corDebug != null)
+                    {
+                        try
+                        {
+                            _logger.LogDebug("Terminating ICorDebug instance after process terminate");
+                            _corDebug.Terminate();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "ICorDebug.Terminate() after terminate (safe to ignore)");
+                        }
+                        _corDebug = null;
+                    }
+
+                    // BUGFIX: Reap the launched child process to prevent .NET's SIGCHLD handler
+                    // from calling FailFast with ECHILD.
+                    ReapLaunchedChild();
+                }
+                finally
+                {
+                    // Always transition to disconnected, even if cleanup partially failed
+                    UpdateState(SessionState.Disconnected);
+                }
             }
         }, cancellationToken);
     }
@@ -781,8 +808,63 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<LoadedModuleInfo> GetLoadedModules()
+    public bool StopForInspection()
     {
+        CorDebugProcess? process;
+        bool wasRunning;
+
+        lock (_lock)
+        {
+            if (_process == null) return false;
+            process = _process;
+            wasRunning = _currentState == SessionState.Running;
+        }
+
+        // Stop OUTSIDE lock to avoid deadlock with ICorDebug callbacks.
+        // Wrap in Task with short timeout — Stop can hang indefinitely if process is
+        // in native code, exited, or if a callback (e.g. OnExitProcess) holds _lock
+        // and is executing ICorDebug calls concurrently.
+        if (wasRunning)
+        {
+            try
+            {
+                var stopTask = Task.Run(() => process.Stop(0));
+                if (!stopTask.Wait(TimeSpan.FromSeconds(3)))
+                {
+                    _logger.LogWarning("StopForInspection timed out after 3s, process may be unresponsive");
+                    return false; // Couldn't stop — caller should leave breakpoint as pending
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "StopForInspection failed (process may have exited)");
+                return false;
+            }
+        }
+
+        return wasRunning;
+    }
+
+    /// <inheritdoc />
+    public void ResumeFromInspection(bool wasStopped)
+    {
+        if (!wasStopped) return;
+
+        CorDebugProcess? process;
+        lock (_lock)
+        {
+            process = _process;
+        }
+
+        process?.Continue(false);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<LoadedModuleInfo> GetLoadedModules(bool processStopped = false)
+    {
+        CorDebugProcess? process;
+        bool needsOwnStop;
+
         lock (_lock)
         {
             if (_process == null)
@@ -790,51 +872,49 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 return Array.Empty<LoadedModuleInfo>();
             }
 
-            // ICorDebug requires the process to be stopped for reliable enumeration.
-            bool wasRunning = _currentState == SessionState.Running;
-            if (wasRunning)
-                _process.Stop(0);
+            process = _process;
+            needsOwnStop = !processStopped && _currentState == SessionState.Running;
+        }
 
-            var modules = new List<LoadedModuleInfo>();
+        if (needsOwnStop)
+            process.Stop(5000);
 
-            try
+        var modules = new List<LoadedModuleInfo>();
+
+        try
+        {
+            foreach (var appDomain in process.AppDomains)
             {
-                // Enumerate all app domains
-                foreach (var appDomain in _process.AppDomains)
+                foreach (var assembly in appDomain.Assemblies)
                 {
-                    // Enumerate all assemblies in the app domain
-                    foreach (var assembly in appDomain.Assemblies)
+                    foreach (var module in assembly.Modules)
                     {
-                        // Enumerate all modules in the assembly
-                        foreach (var module in assembly.Modules)
-                        {
-                            var moduleName = module.Name ?? string.Empty;
-                            var isDynamic = module.IsDynamic;
-                            var isInMemory = module.IsInMemory;
+                        var moduleName = module.Name ?? string.Empty;
+                        var isDynamic = module.IsDynamic;
+                        var isInMemory = module.IsInMemory;
 
-                            modules.Add(new LoadedModuleInfo
-                            {
-                                ModulePath = moduleName,
-                                IsDynamic = isDynamic,
-                                IsInMemory = isInMemory,
-                                NativeModule = module
-                            });
-                        }
+                        modules.Add(new LoadedModuleInfo
+                        {
+                            ModulePath = moduleName,
+                            IsDynamic = isDynamic,
+                            IsInMemory = isInMemory,
+                            NativeModule = module
+                        });
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error enumerating loaded modules");
-            }
-            finally
-            {
-                if (wasRunning)
-                    _process.Continue(false);
-            }
-
-            return modules;
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error enumerating loaded modules");
+        }
+        finally
+        {
+            if (needsOwnStop)
+                process.Continue(false);
+        }
+
+        return modules;
     }
 
     /// <inheritdoc />
@@ -924,14 +1004,31 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             _waitForModuleTarget = null;
             _moduleLoadedTcs = null;
 
-            // Re-pause the process
+            // Re-pause the process — Stop OUTSIDE lock to avoid deadlock
+            CorDebugProcess? processToStop;
+            lock (_lock)
+            {
+                processToStop = _process;
+            }
+
+            if (processToStop != null)
+            {
+                try
+                {
+                    processToStop.Stop(5000);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Stop after module wait failed");
+                }
+            }
+
             lock (_lock)
             {
                 if (_process != null)
                 {
                     try
                     {
-                        _process.Stop(0);
                         UpdateState(SessionState.Paused, PauseReason.Entry);
                     }
                     catch
@@ -1043,6 +1140,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         return await Task.Run(() =>
         {
+            CorDebugProcess process;
+
             lock (_lock)
             {
                 if (_process == null)
@@ -1057,14 +1156,20 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     return GetThreads();
                 }
 
-                _logger.LogDebug("Pausing execution...");
+                process = _process;
+            }
 
-                // Stop all threads
-                _process.Stop(0); // 0 = infinite wait
+            _logger.LogDebug("Pausing execution...");
 
+            // Stop OUTSIDE lock to avoid deadlock with ICorDebug callbacks
+            // that also acquire _lock.
+            process.Stop(5000);
+
+            lock (_lock)
+            {
                 // Select current thread (first stopped thread or main thread)
                 int? selectedThreadId = null;
-                foreach (var thread in _process.Threads)
+                foreach (var thread in _process!.Threads)
                 {
                     var threadId = (int)thread.Id;
                     if (selectedThreadId == null)
@@ -2370,6 +2475,20 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
                 _logger.LogDebug("Module loaded: {ModuleName} (dynamic={IsDynamic}, inMemory={IsInMemory})",
                     moduleName, isDynamic, isInMemory);
+
+                // Cache the module info for GetLoadedModules (uses separate lock
+                // to avoid deadlock — ICorDebug callbacks must not acquire _lock
+                // because other code holds _lock while calling _process.Stop()).
+                lock (_moduleCacheLock)
+                {
+                    _cachedModules.Add(new LoadedModuleInfo
+                    {
+                        ModulePath = moduleName,
+                        IsDynamic = isDynamic,
+                        IsInMemory = isInMemory,
+                        NativeModule = module
+                    });
+                }
 
                 // Fire module loaded event for breakpoint binding
                 ModuleLoaded?.Invoke(this, new ModuleLoadedEventArgs
@@ -4678,6 +4797,9 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         return Task.Run(() =>
         {
+            CorDebugProcess? process;
+            bool wasRunning;
+
             lock (_lock)
             {
                 if (_process == null)
@@ -4685,69 +4807,71 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     throw new InvalidOperationException("Cannot get modules: debugger is not attached to any process");
                 }
 
-                _logger.LogDebug("Getting modules (includeSystem={IncludeSystem}, nameFilter={NameFilter})",
-                    includeSystem, nameFilter);
+                process = _process;
+                wasRunning = _currentState == SessionState.Running;
+            }
 
-                // ICorDebug requires the process to be stopped for reliable
-                // enumeration of AppDomains/Assemblies/Modules.
-                bool wasRunning = _currentState == SessionState.Running;
-                if (wasRunning)
-                    _process.Stop(0);
+            _logger.LogDebug("Getting modules (includeSystem={IncludeSystem}, nameFilter={NameFilter})",
+                includeSystem, nameFilter);
 
-                var modules = new List<Models.Modules.ModuleInfo>();
-                var moduleIdCounter = 0;
+            // Stop/Continue OUTSIDE lock to avoid deadlock with ICorDebug callbacks.
+            // Skip if already stopped by StopForInspection.
+            if (wasRunning)
+                process.Stop(5000);
 
-                try
+            var modules = new List<Models.Modules.ModuleInfo>();
+            var moduleIdCounter = 0;
+
+            try
+            {
+                // Enumerate all app domains
+                foreach (var appDomain in process.AppDomains)
                 {
-                    // Enumerate all app domains
-                    foreach (var appDomain in _process.AppDomains)
+                    // Enumerate all assemblies in the app domain
+                    foreach (var assembly in appDomain.Assemblies)
                     {
-                        // Enumerate all assemblies in the app domain
-                        foreach (var assembly in appDomain.Assemblies)
+                        // Enumerate all modules in the assembly
+                        foreach (var module in assembly.Modules)
                         {
-                            // Enumerate all modules in the assembly
-                            foreach (var module in assembly.Modules)
+                            try
                             {
-                                try
+                                var moduleInfo = ExtractModuleInfo(module, ref moduleIdCounter);
+
+                                // Apply system filter
+                                if (!includeSystem && IsSystemModule(moduleInfo.Name))
                                 {
-                                    var moduleInfo = ExtractModuleInfo(module, ref moduleIdCounter);
-
-                                    // Apply system filter
-                                    if (!includeSystem && IsSystemModule(moduleInfo.Name))
-                                    {
-                                        continue;
-                                    }
-
-                                    // Apply name filter (supports wildcards)
-                                    if (!string.IsNullOrEmpty(nameFilter) && !MatchesWildcardPattern(moduleInfo.Name, nameFilter))
-                                    {
-                                        continue;
-                                    }
-
-                                    modules.Add(moduleInfo);
+                                    continue;
                                 }
-                                catch (Exception ex)
+
+                                // Apply name filter (supports wildcards)
+                                if (!string.IsNullOrEmpty(nameFilter) && !MatchesWildcardPattern(moduleInfo.Name, nameFilter))
                                 {
-                                    _logger.LogWarning(ex, "Error extracting info for module");
+                                    continue;
                                 }
+
+                                modules.Add(moduleInfo);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Error extracting info for module");
                             }
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error enumerating modules");
-                    throw new InvalidOperationException($"Failed to enumerate modules: {ex.Message}", ex);
-                }
-                finally
-                {
-                    if (wasRunning)
-                        _process.Continue(false);
-                }
-
-                _logger.LogInformation("Retrieved {Count} modules", modules.Count);
-                return (IReadOnlyList<Models.Modules.ModuleInfo>)modules;
             }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error enumerating modules");
+                throw new InvalidOperationException($"Failed to enumerate modules: {ex.Message}", ex);
+            }
+            finally
+            {
+                if (wasRunning)
+                    process.Continue(false);
+            }
+
+            _logger.LogInformation("Retrieved {Count} modules", modules.Count);
+            return (IReadOnlyList<Models.Modules.ModuleInfo>)modules;
         }, cancellationToken);
     }
 

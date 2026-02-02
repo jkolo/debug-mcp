@@ -121,10 +121,25 @@ public interface IProcessDebugger
     Task TerminateAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Stops the process for inspection if it is running.
+    /// Must be paired with <see cref="ResumeFromInspection"/>.
+    /// Safe to call when already paused (no-op).
+    /// </summary>
+    /// <returns>True if the process was running and was stopped; false if already paused.</returns>
+    bool StopForInspection();
+
+    /// <summary>
+    /// Resumes the process after inspection if it was stopped by <see cref="StopForInspection"/>.
+    /// </summary>
+    /// <param name="wasStopped">The value returned by <see cref="StopForInspection"/>.</param>
+    void ResumeFromInspection(bool wasStopped);
+
+    /// <summary>
     /// Enumerates all currently loaded modules in the debuggee.
     /// </summary>
+    /// <param name="processStopped">True if caller has already stopped the process (e.g. via StopForInspection).</param>
     /// <returns>List of loaded modules.</returns>
-    IReadOnlyList<LoadedModuleInfo> GetLoadedModules();
+    IReadOnlyList<LoadedModuleInfo> GetLoadedModules(bool processStopped = false);
 
     /// <summary>
     /// Continues execution of the paused debuggee.
