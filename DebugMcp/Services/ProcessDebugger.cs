@@ -881,6 +881,20 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     /// <inheritdoc />
     public IReadOnlyList<LoadedModuleInfo> GetLoadedModules(bool processStopped = false)
     {
+        // First, check the cache populated from OnLoadModule callbacks.
+        // This avoids race conditions at stopAtEntry where ICorDebug enumeration
+        // may return empty results before OnLoadModule callbacks have fired.
+        lock (_moduleCacheLock)
+        {
+            if (_cachedModules.Count > 0)
+            {
+                return _cachedModules.ToList();
+            }
+        }
+
+        // Cache is empty — fall back to ICorDebug enumeration.
+        // This handles attach scenarios where OnLoadModule callbacks don't fire
+        // for modules that were already loaded before attaching.
         CorDebugProcess? process;
         bool needsOwnStop;
 
@@ -920,6 +934,15 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                             NativeModule = module
                         });
                     }
+                }
+            }
+
+            // Populate cache for future calls
+            lock (_moduleCacheLock)
+            {
+                if (_cachedModules.Count == 0)
+                {
+                    _cachedModules.AddRange(modules);
                 }
             }
         }

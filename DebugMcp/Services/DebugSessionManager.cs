@@ -336,6 +336,13 @@ public sealed class DebugSessionManager : IDebugSessionManager
                     e.ThreadId ?? 0);
             }
 
+            // Clean up session when process exits unexpectedly (crash, unhandled exception)
+            if (e.NewState == SessionState.Disconnected)
+            {
+                _logger.LogInformation("Process exited, clearing session");
+                _currentSession = null;
+            }
+
             // Signal state waiters if target state reached
             if (_awaitedState.HasValue && e.NewState == _awaitedState.Value)
             {
