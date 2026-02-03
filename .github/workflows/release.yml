@@ -31,7 +31,7 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: dotnet build -c Release --no-restore -p:Version=${{ steps.version.outputs.VERSION }}
 
       - name: Test
         run: dotnet test -c Release --no-build --filter "FullyQualifiedName~Unit"
