@@ -690,7 +690,26 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             return null;
         }
 
-        // Search through all potential NuGet package locations
+        // 1. Check next to our own assembly (dotnet tool deployment puts native libs here)
+        var assemblyDir = Path.GetDirectoryName(typeof(ProcessDebugger).Assembly.Location);
+        if (assemblyDir != null)
+        {
+            var flatPath = Path.Combine(assemblyDir, libraryName);
+            if (File.Exists(flatPath))
+            {
+                _logger.LogDebug("Found dbgshim next to assembly at: {Path}", flatPath);
+                return flatPath;
+            }
+
+            var runtimeLocalPath = Path.Combine(assemblyDir, runtimePath, libraryName);
+            if (File.Exists(runtimeLocalPath))
+            {
+                _logger.LogDebug("Found dbgshim in runtimes dir next to assembly at: {Path}", runtimeLocalPath);
+                return runtimeLocalPath;
+            }
+        }
+
+        // 2. Search through NuGet package cache locations (fallback)
         foreach (var nugetPath in GetNuGetPackagesPaths())
         {
             var packagePath = Path.Combine(nugetPath, packageName);
