@@ -1,4 +1,5 @@
 using System.CommandLine;
+using DebugMcp.Infrastructure;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,16 +9,36 @@ using ModelContextProtocol.Server;
 
 var rootCommand = new RootCommand("MCP server for debugging .NET applications");
 
-rootCommand.SetAction(async _ =>
+var stderrOption = new Option<bool>("--stderr-logging", "-s")
 {
+    Description = "Also write logs to stderr alongside MCP notifications"
+};
+rootCommand.Options.Add(stderrOption);
+
+rootCommand.SetAction(async parseResult =>
+{
+    var enableStderr = parseResult.GetValue(stderrOption);
+
     var builder = Host.CreateApplicationBuilder([]);
 
-    // Configure logging - log to stderr to keep stdout clean for MCP
-    builder.Logging.ClearProviders();
-    builder.Logging.AddConsole(options =>
+    // Configure logging options
+    var loggingOptions = new LoggingOptions
     {
-        options.LogToStandardErrorThreshold = LogLevel.Trace;
-    });
+        EnableStderr = enableStderr,
+        DefaultMinLevel = McpLogLevel.Info,
+        MaxPayloadBytes = 64 * 1024
+    };
+    builder.Services.AddSingleton(loggingOptions);
+
+    // Configure logging - use MCP logger, optionally with stderr
+    builder.Logging.ClearProviders();
+    if (enableStderr)
+    {
+        builder.Logging.AddConsole(options =>
+        {
+            options.LogToStandardErrorThreshold = LogLevel.Trace;
+        });
+    }
     builder.Logging.SetMinimumLevel(LogLevel.Information);
 
     // Register debug services
@@ -35,11 +56,18 @@ rootCommand.SetAction(async _ =>
             sp.GetRequiredService<ILogger<DebuggerConditionEvaluator>>()));
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
 
-    // Configure MCP server with stdio transport
+    // Configure MCP server with stdio transport and logging capability
     builder.Services
-        .AddMcpServer()
+        .AddMcpServer(options =>
+        {
+            options.Capabilities ??= new();
+            options.Capabilities.Logging = new();
+        })
         .WithStdioServerTransport()
         .WithToolsFromAssembly();
+
+    // Add MCP logger provider (must be after AddMcpServer)
+    builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();
 
     var host = builder.Build();
     await host.RunAsync();

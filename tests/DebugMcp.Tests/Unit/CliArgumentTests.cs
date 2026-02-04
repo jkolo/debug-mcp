@@ -60,6 +60,49 @@ public class CliArgumentTests
     }
 
     [Fact]
+    public async Task Stderr_Logging_Flag_Is_Recognized()
+    {
+        var (exitCode, stdout, _) = await RunToolAsync("--help");
+
+        exitCode.Should().Be(0);
+        stdout.Should().Contain("--stderr-logging");
+        stdout.Should().Contain("-s");
+        stdout.Should().Contain("stderr");
+    }
+
+    [Theory]
+    [InlineData("--stderr-logging")]
+    [InlineData("-s")]
+    public async Task Stderr_Logging_Flag_Does_Not_Cause_Error(string flag)
+    {
+        var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build", "-c", Configuration, "--", flag])
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+
+        using var process = Process.Start(psi)!;
+
+        // Give it a moment to start
+        await Task.Delay(2000);
+
+        if (!process.HasExited)
+        {
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync();
+            // Process was still running = flag accepted and server started
+            return;
+        }
+
+        // If it exited, it should not be due to an argument error
+        var stderr = await process.StandardError.ReadToEndAsync();
+        stderr.Should().NotContain("Unrecognized")
+            .And.NotContain("Unknown")
+            .And.NotContain("Invalid");
+    }
+
+    [Fact]
     public async Task No_Arguments_Starts_MCP_Server()
     {
         var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build", "-c", Configuration])
@@ -82,8 +125,9 @@ public class CliArgumentTests
             return;
         }
 
-        // If it exited, check stderr for MCP transport messages (normal EOF exit when stdin closes)
-        var stderr = await process.StandardError.ReadToEndAsync();
-        stderr.Should().Contain("transport");
+        // If it exited early, it should be due to stdin EOF (expected behavior for MCP server)
+        // With MCP logging enabled, stderr is empty unless --stderr-logging is used
+        // Exit code 0 indicates normal shutdown
+        process.ExitCode.Should().Be(0, "MCP server should exit cleanly when stdin closes");
     }
 }
