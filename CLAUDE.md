@@ -22,6 +22,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-17
 - TypeScript (Docusaurus 3), Markdown/MDX + Docusaurus 3, @docusaurus/theme-mermaid, asciinema-player (npm), asciinema CLI (for recording) (012-docs-improvement)
 - Static files (cast files, markdown) in repository (012-docs-improvement)
 - C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), System.Reflection.Metadata (PDB reading), ModelContextProtocol SDK 0.1.0-preview.13 (013-cleanup-and-bugfixes)
+- C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Extensions.Logging, System.CommandLine (014-mcp-logging)
+- N/A (in-memory log level state) (014-mcp-logging)
 
 - C# / .NET 10.0 + Microsoft.Diagnostics.Runtime (ClrMD), System.Text.Json, (001-debug-session)
 
@@ -41,9 +43,9 @@ tests/
 C# / .NET 10.0: Follow standard conventions
 
 ## Recent Changes
+- 014-mcp-logging: Added C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Extensions.Logging, System.CommandLine
 - 013-cleanup-and-bugfixes: Added C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), System.Reflection.Metadata (PDB reading), ModelContextProtocol SDK 0.1.0-preview.13
 - 012-docs-improvement: Added TypeScript (Docusaurus 3), Markdown/MDX + Docusaurus 3, @docusaurus/theme-mermaid, asciinema-player (npm), asciinema CLI (for recording)
-- 011-ci-cd-pipeline: Added C# / .NET 10.0 (pinned via `global.json`) + GitHub Actions, `dotnet` CLI, NuGet.org, GitHub Packages
 
 
 <!-- MANUAL ADDITIONS START -->
