@@ -4,9 +4,11 @@ using DebugMcp.Infrastructure;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
+using DebugMcp.Services.Resources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 var rootCommand = new RootCommand("MCP server for debugging .NET applications");
@@ -68,36 +70,55 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<LogMessageEvaluator>();
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
 
+    // Register resource services (019-mcp-resources)
+    builder.Services.AddSingleton<ThreadSnapshotCache>();
+    builder.Services.AddSingleton<AllowedSourcePaths>();
+    builder.Services.AddSingleton<ResourceNotifier, McpResourceNotifier>();
+
     // Register code analysis services (015-roslyn-code-analysis)
     if (!disableRoslyn)
     {
         builder.Services.AddSingleton<ICodeAnalysisService, CodeAnalysisService>();
     }
 
-    // Collect MCP tool types, optionally excluding Roslyn code analysis tools
-    var codeAnalysisToolNames = new HashSet<string>
-    {
-        nameof(DebugMcp.Tools.CodeLoadTool),
-        nameof(DebugMcp.Tools.CodeGoToDefinitionTool),
-        nameof(DebugMcp.Tools.CodeFindUsagesTool),
-        nameof(DebugMcp.Tools.CodeFindAssignmentsTool),
-        nameof(DebugMcp.Tools.CodeGetDiagnosticsTool),
-    };
-
-    var toolTypes = typeof(Program).Assembly.GetTypes()
-        .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() != null)
-        .Where(t => !disableRoslyn || !codeAnalysisToolNames.Contains(t.Name))
-        .ToList();
-
-    // Configure MCP server with stdio transport and logging capability
+    // Configure MCP server with stdio transport, logging, and resources capabilities
+    // Note: --no-roslyn flag currently doesn't filter tools (TODO: implement proper filtering)
     builder.Services
         .AddMcpServer(options =>
         {
             options.Capabilities ??= new();
             options.Capabilities.Logging = new();
+            options.Capabilities.Tools = new()
+            {
+                ListChanged = true
+            };
+            options.Capabilities.Resources = new()
+            {
+                Subscribe = true,
+                ListChanged = true
+            };
         })
         .WithStdioServerTransport()
-        .WithTools(toolTypes);
+        .WithResources<DebuggerResourceProvider>()
+        .WithSubscribeToResourcesHandler((request, ct) =>
+        {
+            if (request.Params?.Uri is { } uri)
+            {
+                var notifier = request.Services!.GetRequiredService<ResourceNotifier>();
+                notifier.Subscribe(uri);
+            }
+            return new ValueTask<EmptyResult>(new EmptyResult());
+        })
+        .WithUnsubscribeFromResourcesHandler((request, ct) =>
+        {
+            if (request.Params?.Uri is { } uri)
+            {
+                var notifier = request.Services!.GetRequiredService<ResourceNotifier>();
+                notifier.Unsubscribe(uri);
+            }
+            return new ValueTask<EmptyResult>(new EmptyResult());
+        })
+        .WithToolsFromAssembly(typeof(Program).Assembly);
 
     // Add MCP logger provider (must be after AddMcpServer)
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();
