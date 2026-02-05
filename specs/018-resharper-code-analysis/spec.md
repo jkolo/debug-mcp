@@ -2,7 +2,7 @@
 
 **Feature Branch**: `018-resharper-code-analysis`
 **Created**: 2026-02-05
-**Status**: Draft
+**Status**: Rejected
 **Input**: User description: "Dodajmy przełącznik do wyłączania Roslynowych Analizatorów, tak żeby ktoś kto ma JetBrains MCP nie miał zdublowanych funkcjonalności"
 
 ## Summary
