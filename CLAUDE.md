@@ -26,6 +26,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-17
 - N/A (in-memory log level state) (014-mcp-logging)
 - C# / .NET 10.0 + Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.Build.Locator, ModelContextProtocol SDK (015-roslyn-code-analysis)
 - N/A (in-memory workspace per session) (015-roslyn-code-analysis)
+- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers) + ModelContextProtocol SDK 0.1.0-preview.13, ClrDebug 0.3.4 (016-breakpoint-notifications)
+- N/A (in-memory breakpoint/tracepoint registry within session) (016-breakpoint-notifications)
 
 - C# / .NET 10.0 + Microsoft.Diagnostics.Runtime (ClrMD), System.Text.Json, (001-debug-session)
 
@@ -45,9 +47,9 @@ tests/
 C# / .NET 10.0: Follow standard conventions
 
 ## Recent Changes
+- 016-breakpoint-notifications: Added C# / .NET 10.0 + ClrDebug (ICorDebug wrappers) + ModelContextProtocol SDK 0.1.0-preview.13, ClrDebug 0.3.4
 - 015-roslyn-code-analysis: Added C# / .NET 10.0 + Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.Build.Locator, ModelContextProtocol SDK
 - 014-mcp-logging: Added C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Extensions.Logging, System.CommandLine
-- 013-cleanup-and-bugfixes: Added C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), System.Reflection.Metadata (PDB reading), ModelContextProtocol SDK 0.1.0-preview.13
 
 
 <!-- MANUAL ADDITIONS START -->
