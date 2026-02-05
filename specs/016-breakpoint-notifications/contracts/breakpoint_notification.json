@@ -1,0 +1,145 @@
+{
+  "method": "debugger/breakpointHit",
+  "description": "MCP notification sent when a breakpoint or tracepoint is hit. This is a push notification - agents receive it automatically without polling.",
+  "direction": "server-to-client",
+  "paramsSchema": {
+    "type": "object",
+    "properties": {
+      "breakpointId": {
+        "type": "string",
+        "description": "ID of the breakpoint/tracepoint that was hit"
+      },
+      "type": {
+        "type": "string",
+        "enum": ["blocking", "tracepoint"],
+        "description": "Whether this is a blocking breakpoint or non-blocking tracepoint"
+      },
+      "location": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Absolute path to source file"
+          },
+          "line": {
+            "type": "integer",
+            "description": "1-based line number"
+          },
+          "column": {
+            "type": "integer",
+            "description": "1-based column number (if available)"
+          },
+          "functionName": {
+            "type": "string",
+            "description": "Name of the function containing the breakpoint"
+          },
+          "moduleName": {
+            "type": "string",
+            "description": "Name of the module/assembly"
+          }
+        },
+        "required": ["file", "line"]
+      },
+      "threadId": {
+        "type": "integer",
+        "description": "ID of the thread that hit the breakpoint"
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "date-time",
+        "description": "ISO 8601 timestamp when the hit occurred"
+      },
+      "hitCount": {
+        "type": "integer",
+        "description": "Total number of times this breakpoint has been hit"
+      },
+      "logMessage": {
+        "type": "string",
+        "description": "Evaluated log message (for tracepoints with log_message template)"
+      },
+      "exceptionInfo": {
+        "type": "object",
+        "description": "Exception details (for exception breakpoints)",
+        "properties": {
+          "type": { "type": "string" },
+          "message": { "type": "string" },
+          "isFirstChance": { "type": "boolean" },
+          "stackTrace": { "type": "string" }
+        }
+      }
+    },
+    "required": ["breakpointId", "type", "location", "threadId", "timestamp", "hitCount"]
+  },
+  "examples": [
+    {
+      "description": "Blocking breakpoint hit notification",
+      "params": {
+        "breakpointId": "bp-1",
+        "type": "blocking",
+        "location": {
+          "file": "/home/user/project/Program.cs",
+          "line": 42,
+          "column": 5,
+          "functionName": "Main",
+          "moduleName": "MyApp.dll"
+        },
+        "threadId": 12345,
+        "timestamp": "2026-02-05T10:30:00.123Z",
+        "hitCount": 1
+      }
+    },
+    {
+      "description": "Tracepoint notification with evaluated log message",
+      "params": {
+        "breakpointId": "tp-2",
+        "type": "tracepoint",
+        "location": {
+          "file": "/home/user/project/Calculator.cs",
+          "line": 25,
+          "functionName": "Add",
+          "moduleName": "MathLib.dll"
+        },
+        "threadId": 12345,
+        "timestamp": "2026-02-05T10:30:00.456Z",
+        "hitCount": 5,
+        "logMessage": "Add(10, 20) = 30"
+      }
+    },
+    {
+      "description": "Tracepoint with expression evaluation error",
+      "params": {
+        "breakpointId": "tp-3",
+        "type": "tracepoint",
+        "location": {
+          "file": "/home/user/project/Service.cs",
+          "line": 100,
+          "functionName": "ProcessData"
+        },
+        "threadId": 12346,
+        "timestamp": "2026-02-05T10:30:01.789Z",
+        "hitCount": 1,
+        "logMessage": "Processing item: <error: NullReferenceException>"
+      }
+    },
+    {
+      "description": "Exception breakpoint hit",
+      "params": {
+        "breakpointId": "ex-1",
+        "type": "blocking",
+        "location": {
+          "file": "/home/user/project/Parser.cs",
+          "line": 55,
+          "functionName": "Parse"
+        },
+        "threadId": 12345,
+        "timestamp": "2026-02-05T10:31:00.000Z",
+        "hitCount": 1,
+        "exceptionInfo": {
+          "type": "System.FormatException",
+          "message": "Input string was not in a correct format.",
+          "isFirstChance": true
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 using DebugMcp.Models;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Tests.Support;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -21,7 +22,7 @@ public class ProcessDebuggerTests
     {
         _loggerMock = new Mock<ILogger<ProcessDebugger>>();
         _pdbSymbolReaderMock = new Mock<IPdbSymbolReader>();
-        _sut = new ProcessDebugger(_loggerMock.Object, _pdbSymbolReaderMock.Object);
+        _sut = new ProcessDebugger(_loggerMock.Object, _pdbSymbolReaderMock.Object, TestProcessIoManager.Instance);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using DebugMcp.Models.Modules;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Tests.Helpers;
+using DebugMcp.Tests.Support;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -76,7 +77,7 @@ public sealed class DebuggerContext : IDisposable
     {
         PdbCache = new PdbSymbolCache(_pdbCacheLoggerMock.Object);
         PdbReader = new PdbSymbolReader(PdbCache, _pdbLoggerMock.Object);
-        ProcessDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, PdbReader);
+        ProcessDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, PdbReader, TestProcessIoManager.Instance);
         SessionManager = new DebugSessionManager(ProcessDebugger, _managerLoggerMock.Object);
 
         BreakpointRegistry = new BreakpointRegistry(_registryLoggerMock.Object);
@@ -86,6 +87,7 @@ public sealed class DebuggerContext : IDisposable
             PdbReader,
             ProcessDebugger,
             ConditionEvaluator,
+            NullBreakpointNotifier.Instance,
             _bpManagerLoggerMock.Object);
     }
 

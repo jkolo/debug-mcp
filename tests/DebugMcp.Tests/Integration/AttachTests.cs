@@ -2,6 +2,7 @@ using DebugMcp.Models;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Tests.Helpers;
+using DebugMcp.Tests.Support;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -27,7 +28,7 @@ public class AttachTests : IAsyncLifetime
         _debuggerLoggerMock = new Mock<ILogger<ProcessDebugger>>();
         _managerLoggerMock = new Mock<ILogger<DebugSessionManager>>();
         _pdbSymbolReaderMock = new Mock<IPdbSymbolReader>();
-        _processDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, _pdbSymbolReaderMock.Object);
+        _processDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, _pdbSymbolReaderMock.Object, TestProcessIoManager.Instance);
         _sessionManager = new DebugSessionManager(_processDebugger, _managerLoggerMock.Object);
     }
 

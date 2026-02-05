@@ -2,6 +2,7 @@ using DebugMcp.Models;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Tests.Helpers;
+using DebugMcp.Tests.Support;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -44,7 +45,7 @@ public class StackInspectionTests : IAsyncLifetime
 
         _pdbCache = new PdbSymbolCache(_pdbCacheLoggerMock.Object);
         _pdbReader = new PdbSymbolReader(_pdbCache, _pdbLoggerMock.Object);
-        _processDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, _pdbReader);
+        _processDebugger = new ProcessDebugger(_debuggerLoggerMock.Object, _pdbReader, TestProcessIoManager.Instance);
         _sessionManager = new DebugSessionManager(_processDebugger, _managerLoggerMock.Object);
 
         _breakpointRegistry = new BreakpointRegistry(_registryLoggerMock.Object);
@@ -54,6 +55,7 @@ public class StackInspectionTests : IAsyncLifetime
             _pdbReader,
             _processDebugger,
             _conditionEvaluator,
+            NullBreakpointNotifier.Instance,
             _bpManagerLoggerMock.Object);
     }
 
