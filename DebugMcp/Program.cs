@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Reflection;
 using DebugMcp.Infrastructure;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
@@ -16,9 +17,16 @@ var stderrOption = new Option<bool>("--stderr-logging", "-s")
 };
 rootCommand.Options.Add(stderrOption);
 
+var noRoslynOption = new Option<bool>("--no-roslyn", "-r")
+{
+    Description = "Disable Roslyn code analysis tools (use when JetBrains MCP provides equivalent functionality)"
+};
+rootCommand.Options.Add(noRoslynOption);
+
 rootCommand.SetAction(async parseResult =>
 {
     var enableStderr = parseResult.GetValue(stderrOption);
+    var disableRoslyn = parseResult.GetValue(noRoslynOption);
 
     var builder = Host.CreateApplicationBuilder([]);
 
@@ -61,7 +69,25 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
 
     // Register code analysis services (015-roslyn-code-analysis)
-    builder.Services.AddSingleton<ICodeAnalysisService, CodeAnalysisService>();
+    if (!disableRoslyn)
+    {
+        builder.Services.AddSingleton<ICodeAnalysisService, CodeAnalysisService>();
+    }
+
+    // Collect MCP tool types, optionally excluding Roslyn code analysis tools
+    var codeAnalysisToolNames = new HashSet<string>
+    {
+        nameof(DebugMcp.Tools.CodeLoadTool),
+        nameof(DebugMcp.Tools.CodeGoToDefinitionTool),
+        nameof(DebugMcp.Tools.CodeFindUsagesTool),
+        nameof(DebugMcp.Tools.CodeFindAssignmentsTool),
+        nameof(DebugMcp.Tools.CodeGetDiagnosticsTool),
+    };
+
+    var toolTypes = typeof(Program).Assembly.GetTypes()
+        .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() != null)
+        .Where(t => !disableRoslyn || !codeAnalysisToolNames.Contains(t.Name))
+        .ToList();
 
     // Configure MCP server with stdio transport and logging capability
     builder.Services
@@ -71,12 +97,23 @@ rootCommand.SetAction(async parseResult =>
             options.Capabilities.Logging = new();
         })
         .WithStdioServerTransport()
-        .WithToolsFromAssembly();
+        .WithTools(toolTypes);
 
     // Add MCP logger provider (must be after AddMcpServer)
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();
 
     var host = builder.Build();
+
+    var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DebugMcp");
+    if (disableRoslyn)
+    {
+        logger.LogInformation("Roslyn code analysis tools disabled (--no-roslyn)");
+    }
+    else
+    {
+        logger.LogInformation("Roslyn code analysis tools enabled");
+    }
+
     await host.RunAsync();
 });
 
