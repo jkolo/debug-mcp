@@ -139,9 +139,49 @@ The agent calls `debug_continue`, then `breakpoint_wait`.
 }
 ```
 
+## Static Code Analysis
+
+debug-mcp also provides Roslyn-based code analysis tools that work without running the debugger.
+
+### Load a solution
+
+> "Load the solution at /path/to/MyApp.sln for code analysis"
+
+```json
+// code_load
+{
+  "path": "/path/to/MyApp.sln"
+}
+```
+
+### Find all usages
+
+> "Find all usages of the UserService class"
+
+```json
+// code_find_usages
+{
+  "name": "MyApp.Services.UserService",
+  "symbolKind": "Type"
+}
+```
+
+### Check for errors
+
+> "Are there any compilation errors?"
+
+```json
+// code_get_diagnostics
+{
+  "minSeverity": "Error"
+}
+```
+
 ## What's Next?
 
-- **[Tools Reference](/docs/tools/session)** — Full documentation for all 25 MCP tools
+- **[Tools Reference](/docs/tools/session)** — Full documentation for all MCP tools
+- **[Code Analysis](/docs/tools/code-analysis)** — Static analysis: find usages, assignments, and diagnostics
+- **[Analyze a Codebase](/docs/workflows/analyze-codebase)** — Navigate and understand unfamiliar code
 - **[Debug a Crash](/docs/workflows/debug-a-crash)** — Step-by-step guide for finding crash root causes
 - **[Inspect Memory Layout](/docs/workflows/inspect-memory-layout)** — Analyze object layout and memory usage
 - **[Profile Module Loading](/docs/workflows/profile-module-loading)** — Explore loaded assemblies and types

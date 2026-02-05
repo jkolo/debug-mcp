@@ -1,0 +1,115 @@
+{
+  "name": "code_goto_definition",
+  "description": "Navigate to the definition of a symbol. Returns all definition locations for partial types. Symbol can be identified by fully qualified name OR by file location.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Fully qualified symbol name (e.g., 'MyNamespace.MyClass.MyMethod')"
+      },
+      "file": {
+        "type": "string",
+        "description": "Source file path containing a reference to the symbol"
+      },
+      "line": {
+        "type": "integer",
+        "description": "1-based line number of the symbol reference"
+      },
+      "column": {
+        "type": "integer",
+        "description": "1-based column number of the symbol reference"
+      }
+    },
+    "oneOf": [
+      { "required": ["name"] },
+      { "required": ["file", "line", "column"] }
+    ]
+  },
+  "examples": [
+    {
+      "description": "Go to method definition",
+      "input": {
+        "file": "/home/user/MyApp/Controllers/CustomerController.cs",
+        "line": 25,
+        "column": 22
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Services.CustomerService.GetById",
+          "symbol_kind": "Method",
+          "definitions": [
+            {
+              "file": "/home/user/MyApp/Services/CustomerService.cs",
+              "line": 45,
+              "column": 21,
+              "is_from_source": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "Partial class with multiple definitions",
+      "input": {
+        "name": "MyApp.Models.Customer"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Models.Customer",
+          "symbol_kind": "Class",
+          "definitions": [
+            {
+              "file": "/home/user/MyApp/Models/Customer.cs",
+              "line": 5,
+              "column": 22,
+              "is_from_source": true
+            },
+            {
+              "file": "/home/user/MyApp/Models/Customer.Generated.cs",
+              "line": 3,
+              "column": 22,
+              "is_from_source": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "Symbol from external assembly (no source)",
+      "input": {
+        "name": "System.String.IsNullOrEmpty"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "System.String.IsNullOrEmpty",
+          "symbol_kind": "Method",
+          "definitions": [
+            {
+              "is_from_source": false,
+              "assembly_name": "System.Runtime"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "Symbol not found at location",
+      "input": {
+        "file": "/home/user/MyApp/Models/Customer.cs",
+        "line": 1,
+        "column": 1
+      },
+      "output": {
+        "success": false,
+        "error": {
+          "code": "SYMBOL_NOT_FOUND",
+          "message": "No symbol found at Customer.cs:1:1"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "name": "code_load",
+  "description": "Load a .sln or .csproj file into the analysis workspace. Replaces any previously loaded workspace.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Absolute path to .sln or .csproj file"
+      }
+    },
+    "required": ["path"]
+  },
+  "examples": [
+    {
+      "description": "Load a solution",
+      "input": {
+        "path": "/home/user/MyProject/MyProject.sln"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "path": "/home/user/MyProject/MyProject.sln",
+          "type": "Solution",
+          "projects": [
+            {
+              "name": "MyProject",
+              "path": "/home/user/MyProject/src/MyProject/MyProject.csproj",
+              "documents_count": 42,
+              "target_framework": "net10.0"
+            },
+            {
+              "name": "MyProject.Tests",
+              "path": "/home/user/MyProject/tests/MyProject.Tests/MyProject.Tests.csproj",
+              "documents_count": 18,
+              "target_framework": "net10.0"
+            }
+          ],
+          "diagnostics": [],
+          "loaded_at": "2026-02-04T10:30:00Z"
+        }
+      }
+    },
+    {
+      "description": "Load with NuGet warnings",
+      "input": {
+        "path": "/home/user/OldProject/OldProject.sln"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "path": "/home/user/OldProject/OldProject.sln",
+          "type": "Solution",
+          "projects": [
+            {
+              "name": "OldProject",
+              "path": "/home/user/OldProject/OldProject.csproj",
+              "documents_count": 10,
+              "target_framework": "net6.0"
+            }
+          ],
+          "diagnostics": [
+            {
+              "kind": "Warning",
+              "message": "Could not resolve reference to 'SomeOldPackage'",
+              "project": "OldProject"
+            }
+          ],
+          "loaded_at": "2026-02-04T10:31:00Z"
+        }
+      }
+    },
+    {
+      "description": "Invalid path error",
+      "input": {
+        "path": "/nonexistent/path.sln"
+      },
+      "output": {
+        "success": false,
+        "error": {
+          "code": "INVALID_PATH",
+          "message": "File does not exist: /nonexistent/path.sln"
+        }
+      }
+    }
+  ]
+}

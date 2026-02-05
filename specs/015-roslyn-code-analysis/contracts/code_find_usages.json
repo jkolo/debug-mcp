@@ -1,0 +1,123 @@
+{
+  "name": "code_find_usages",
+  "description": "Find all usages (references) of a symbol. Symbol can be identified by fully qualified name OR by file location.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Fully qualified symbol name (e.g., 'MyNamespace.MyClass.MyMethod'). Use backtick notation for generics (List`1)."
+      },
+      "file": {
+        "type": "string",
+        "description": "Source file path containing the symbol"
+      },
+      "line": {
+        "type": "integer",
+        "description": "1-based line number of the symbol"
+      },
+      "column": {
+        "type": "integer",
+        "description": "1-based column number of the symbol"
+      }
+    },
+    "oneOf": [
+      { "required": ["name"] },
+      { "required": ["file", "line", "column"] }
+    ]
+  },
+  "examples": [
+    {
+      "description": "Find usages by fully qualified name",
+      "input": {
+        "name": "MyApp.Models.Customer.Name"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Models.Customer.Name",
+          "symbol_kind": "Property",
+          "usages": [
+            {
+              "file": "/home/user/MyApp/Services/CustomerService.cs",
+              "line": 42,
+              "column": 15,
+              "end_line": 42,
+              "end_column": 19,
+              "context": "CustomerService.GetFullName",
+              "kind": "Read"
+            },
+            {
+              "file": "/home/user/MyApp/Controllers/CustomerController.cs",
+              "line": 28,
+              "column": 30,
+              "end_line": 28,
+              "end_column": 34,
+              "context": "CustomerController.Update",
+              "kind": "Write"
+            }
+          ],
+          "total_count": 2
+        }
+      }
+    },
+    {
+      "description": "Find usages by file location",
+      "input": {
+        "file": "/home/user/MyApp/Models/Customer.cs",
+        "line": 10,
+        "column": 20
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Models.Customer.Name",
+          "symbol_kind": "Property",
+          "usages": [
+            {
+              "file": "/home/user/MyApp/Services/CustomerService.cs",
+              "line": 42,
+              "column": 15,
+              "end_line": 42,
+              "end_column": 19,
+              "context": "CustomerService.GetFullName",
+              "kind": "Read"
+            }
+          ],
+          "total_count": 1
+        }
+      }
+    },
+    {
+      "description": "No usages found",
+      "input": {
+        "name": "MyApp.Models.Customer.UnusedProperty"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Models.Customer.UnusedProperty",
+          "symbol_kind": "Property",
+          "usages": [],
+          "total_count": 0
+        }
+      }
+    },
+    {
+      "description": "Symbol not found error",
+      "input": {
+        "name": "NonExistent.Symbol"
+      },
+      "output": {
+        "success": false,
+        "error": {
+          "code": "SYMBOL_NOT_FOUND",
+          "message": "Could not resolve symbol: NonExistent.Symbol",
+          "details": {
+            "searched_projects": ["MyApp", "MyApp.Tests"]
+          }
+        }
+      }
+    }
+  ]
+}

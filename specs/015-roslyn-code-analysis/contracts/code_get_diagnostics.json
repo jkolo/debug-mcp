@@ -1,0 +1,117 @@
+{
+  "name": "code_get_diagnostics",
+  "description": "Get compilation diagnostics (errors, warnings, info) for loaded project(s).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "description": "Project name to get diagnostics for. If omitted, returns diagnostics for all projects."
+      },
+      "severity": {
+        "type": "string",
+        "enum": ["Error", "Warning", "Info", "All"],
+        "description": "Filter by severity level. Defaults to 'All'."
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of diagnostics to return. Defaults to 100.",
+        "default": 100
+      }
+    }
+  },
+  "examples": [
+    {
+      "description": "Get all errors for a project",
+      "input": {
+        "project": "MyApp",
+        "severity": "Error"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "project": "MyApp",
+          "diagnostics": [
+            {
+              "id": "CS0103",
+              "message": "The name 'undefined' does not exist in the current context",
+              "severity": "Error",
+              "file": "/home/user/MyApp/Services/BrokenService.cs",
+              "line": 25,
+              "column": 13,
+              "end_line": 25,
+              "end_column": 22
+            },
+            {
+              "id": "CS0246",
+              "message": "The type or namespace name 'MissingType' could not be found",
+              "severity": "Error",
+              "file": "/home/user/MyApp/Models/BadModel.cs",
+              "line": 5,
+              "column": 12,
+              "end_line": 5,
+              "end_column": 23
+            }
+          ],
+          "total_count": 2,
+          "truncated": false
+        }
+      }
+    },
+    {
+      "description": "Get all diagnostics for entire solution",
+      "input": {},
+      "output": {
+        "success": true,
+        "data": {
+          "project": null,
+          "diagnostics": [
+            {
+              "id": "CS0168",
+              "message": "The variable 'unused' is declared but never used",
+              "severity": "Warning",
+              "file": "/home/user/MyApp/Services/SomeService.cs",
+              "line": 42,
+              "column": 17,
+              "end_line": 42,
+              "end_column": 23
+            }
+          ],
+          "total_count": 1,
+          "truncated": false
+        }
+      }
+    },
+    {
+      "description": "No diagnostics (clean compile)",
+      "input": {
+        "project": "MyApp.Tests"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "project": "MyApp.Tests",
+          "diagnostics": [],
+          "total_count": 0,
+          "truncated": false
+        }
+      }
+    },
+    {
+      "description": "Project not found",
+      "input": {
+        "project": "NonExistentProject"
+      },
+      "output": {
+        "success": false,
+        "error": {
+          "code": "PROJECT_NOT_FOUND",
+          "message": "Project 'NonExistentProject' not found in workspace",
+          "details": {
+            "available_projects": ["MyApp", "MyApp.Tests"]
+          }
+        }
+      }
+    }
+  ]
+}
