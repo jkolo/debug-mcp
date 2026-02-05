@@ -2,6 +2,7 @@ using System.CommandLine;
 using DebugMcp.Infrastructure;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Services.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -55,6 +56,9 @@ rootCommand.SetAction(async parseResult =>
             sp.GetRequiredService<SimpleConditionEvaluator>(),
             sp.GetRequiredService<ILogger<DebuggerConditionEvaluator>>()));
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
+
+    // Register code analysis services (015-roslyn-code-analysis)
+    builder.Services.AddSingleton<ICodeAnalysisService, CodeAnalysisService>();
 
     // Configure MCP server with stdio transport and logging capability
     builder.Services

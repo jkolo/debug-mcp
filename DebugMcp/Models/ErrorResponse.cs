@@ -142,4 +142,24 @@ public static class ErrorCodes
 
     /// <summary>Search operation failed.</summary>
     public const string SearchFailed = "SEARCH_FAILED";
+
+    // Code analysis error codes (015-roslyn-code-analysis)
+
+    /// <summary>No solution or project loaded for code analysis.</summary>
+    public const string NoWorkspace = "NO_WORKSPACE";
+
+    /// <summary>Workspace loading failed.</summary>
+    public const string LoadFailed = "LOAD_FAILED";
+
+    /// <summary>Symbol could not be resolved at specified location or name.</summary>
+    public const string SymbolNotFound = "SYMBOL_NOT_FOUND";
+
+    /// <summary>File, line, or column out of range.</summary>
+    public const string InvalidLocation = "INVALID_LOCATION";
+
+    /// <summary>Project name not found in loaded workspace.</summary>
+    public const string ProjectNotFound = "PROJECT_NOT_FOUND";
+
+    /// <summary>Code analysis operation failed.</summary>
+    public const string AnalysisFailed = "ANALYSIS_FAILED";
 }

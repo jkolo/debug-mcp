@@ -1,0 +1,116 @@
+{
+  "name": "code_find_assignments",
+  "description": "Find all locations where a variable, field, or property is assigned a value. Symbol can be identified by fully qualified name OR by file location.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Fully qualified symbol name (e.g., 'MyNamespace.MyClass._count')"
+      },
+      "file": {
+        "type": "string",
+        "description": "Source file path containing the symbol"
+      },
+      "line": {
+        "type": "integer",
+        "description": "1-based line number of the symbol"
+      },
+      "column": {
+        "type": "integer",
+        "description": "1-based column number of the symbol"
+      }
+    },
+    "oneOf": [
+      { "required": ["name"] },
+      { "required": ["file", "line", "column"] }
+    ]
+  },
+  "examples": [
+    {
+      "description": "Find field assignments",
+      "input": {
+        "name": "MyApp.Services.Counter._count"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Services.Counter._count",
+          "symbol_kind": "Field",
+          "assignments": [
+            {
+              "file": "/home/user/MyApp/Services/Counter.cs",
+              "line": 15,
+              "column": 9,
+              "assignment_kind": "Simple",
+              "context": "Counter..ctor"
+            },
+            {
+              "file": "/home/user/MyApp/Services/Counter.cs",
+              "line": 22,
+              "column": 9,
+              "assignment_kind": "Increment",
+              "context": "Counter.Increment"
+            },
+            {
+              "file": "/home/user/MyApp/Services/Counter.cs",
+              "line": 28,
+              "column": 9,
+              "assignment_kind": "Compound",
+              "context": "Counter.Add"
+            }
+          ],
+          "total_count": 3
+        }
+      }
+    },
+    {
+      "description": "Find property setter invocations",
+      "input": {
+        "file": "/home/user/MyApp/Models/Customer.cs",
+        "line": 8,
+        "column": 20
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "MyApp.Models.Customer.Name",
+          "symbol_kind": "Property",
+          "assignments": [
+            {
+              "file": "/home/user/MyApp/Controllers/CustomerController.cs",
+              "line": 35,
+              "column": 13,
+              "assignment_kind": "Simple",
+              "context": "CustomerController.Create"
+            }
+          ],
+          "total_count": 1
+        }
+      }
+    },
+    {
+      "description": "Find out parameter assignments",
+      "input": {
+        "name": "MyApp.Services.Parser.TryParse.result"
+      },
+      "output": {
+        "success": true,
+        "data": {
+          "symbol": "result",
+          "symbol_kind": "Parameter",
+          "assignments": [
+            {
+              "file": "/home/user/MyApp/Controllers/DataController.cs",
+              "line": 50,
+              "column": 30,
+              "assignment_kind": "OutParam",
+              "context": "DataController.ProcessInput"
+            }
+          ],
+          "total_count": 1
+        }
+      }
+    }
+  ]
+}

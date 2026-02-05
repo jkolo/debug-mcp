@@ -13,6 +13,7 @@ const sidebars: SidebarsConfig = {
         'tools/inspection',
         'tools/memory',
         'tools/modules',
+        'tools/code-analysis',
       ],
     },
     {
@@ -22,6 +23,7 @@ const sidebars: SidebarsConfig = {
         'workflows/debug-a-crash',
         'workflows/inspect-memory-layout',
         'workflows/profile-module-loading',
+        'workflows/analyze-codebase',
       ],
     },
     'architecture',
