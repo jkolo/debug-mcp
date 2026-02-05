@@ -30,14 +30,14 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Add `event EventHandler? Changed` to `BreakpointRegistry` in `DebugMcp/Services/Breakpoints/BreakpointRegistry.cs` — fire on Add/Remove/Update operations
-- [ ] T004 Write unit tests for `BreakpointRegistry.Changed` event in `tests/DebugMcp.Tests/Unit/Breakpoints/BreakpointRegistryChangedEventTests.cs`
-- [ ] T005 [P] Write unit tests for `ThreadSnapshotCache` in `tests/DebugMcp.Tests/Unit/Resources/ThreadSnapshotCacheTests.cs` — test Update on pause, Stale flag when running, CapturedAt timestamp
-- [ ] T006 [P] Implement `ThreadSnapshotCache` in `DebugMcp/Services/Resources/ThreadSnapshotCache.cs` — stores `IReadOnlyList<ThreadInfo>` + `DateTimeOffset CapturedAt` + `bool Stale` property based on current state
-- [ ] T007 [P] Write unit tests for `AllowedSourcePaths` in `tests/DebugMcp.Tests/Unit/Resources/AllowedSourcePathsTests.cs` — test AddModule/RemoveModule, IsAllowed check, path normalization
-- [ ] T008 [P] Implement `AllowedSourcePaths` in `DebugMcp/Services/Resources/AllowedSourcePaths.cs` — `ConcurrentDictionary<string, string>` of file→module, methods: `AddModule(modulePath, IEnumerable<string> sourcePaths)`, `RemoveModule(modulePath)`, `IsAllowed(filePath) → bool`
-- [ ] T009 [P] Write unit tests for `ResourceNotifier` in `tests/DebugMcp.Tests/Unit/Resources/ResourceNotifierTests.cs` — test subscription tracking, debounce behavior (300ms), notification dispatch for subscribed URIs only, list-changed on session start/end
-- [ ] T010 [P] Implement `ResourceNotifier` in `DebugMcp/Services/Resources/ResourceNotifier.cs` — subscription tracking (`ConcurrentDictionary<string, bool>`), per-resource debounce timers (300ms), methods: `Subscribe(uri)`, `Unsubscribe(uri)`, `NotifyResourceUpdated(uri)`, `NotifyListChanged()`, event subscriptions to `IProcessDebugger` and `BreakpointRegistry`
+- [ ] T003 [P] Write unit tests for `BreakpointRegistry.Changed` event in `tests/DebugMcp.Tests/Unit/Breakpoints/BreakpointRegistryChangedEventTests.cs`
+- [ ] T004 [P] Write unit tests for `ThreadSnapshotCache` in `tests/DebugMcp.Tests/Unit/Resources/ThreadSnapshotCacheTests.cs` — test Update on pause, Stale flag when running, CapturedAt timestamp
+- [ ] T005 [P] Write unit tests for `AllowedSourcePaths` in `tests/DebugMcp.Tests/Unit/Resources/AllowedSourcePathsTests.cs` — test AddModule/RemoveModule, IsAllowed check, path normalization
+- [ ] T006 [P] Write unit tests for `ResourceNotifier` in `tests/DebugMcp.Tests/Unit/Resources/ResourceNotifierTests.cs` — test subscription tracking, debounce behavior (300ms), notification dispatch for subscribed URIs only, list-changed on session start/end
+- [ ] T007 Add `event EventHandler? Changed` to `BreakpointRegistry` in `DebugMcp/Services/Breakpoints/BreakpointRegistry.cs` — fire on Add/Remove/Update operations (makes T003 tests pass)
+- [ ] T008 Implement `ThreadSnapshotCache` in `DebugMcp/Services/Resources/ThreadSnapshotCache.cs` — stores `IReadOnlyList<ThreadInfo>` + `DateTimeOffset CapturedAt` + `bool Stale` property based on current state (makes T004 tests pass)
+- [ ] T009 Implement `AllowedSourcePaths` in `DebugMcp/Services/Resources/AllowedSourcePaths.cs` — `ConcurrentDictionary<string, string>` of file→module, methods: `AddModule(modulePath, IEnumerable<string> sourcePaths)`, `RemoveModule(modulePath)`, `IsAllowed(filePath) → bool` (makes T005 tests pass)
+- [ ] T010 Implement `ResourceNotifier` in `DebugMcp/Services/Resources/ResourceNotifier.cs` — subscription tracking (`ConcurrentDictionary<string, bool>`), per-resource debounce timers (300ms), methods: `Subscribe(uri)`, `Unsubscribe(uri)`, `NotifyResourceUpdated(uri)`, `NotifyListChanged()`, event subscriptions to `IProcessDebugger` and `BreakpointRegistry` (makes T006 tests pass)
 - [ ] T011 Register foundational services in DI: `ThreadSnapshotCache`, `AllowedSourcePaths`, `ResourceNotifier` as singletons in `DebugMcp/Program.cs`
 
 **Checkpoint**: Foundation ready — resource handlers can now use ThreadSnapshotCache, AllowedSourcePaths, ResourceNotifier
@@ -56,7 +56,7 @@
 
 - [ ] T012 [P] [US1] Write unit tests for session resource read in `tests/DebugMcp.Tests/Unit/Resources/SessionResourceTests.cs` — test: returns session JSON when active, returns error when no session, JSON contains all expected fields (processId, processName, state, currentLocation, etc.)
 - [ ] T013 [P] [US2] Write unit tests for breakpoints resource read in `tests/DebugMcp.Tests/Unit/Resources/BreakpointsResourceTests.cs` — test: returns breakpoints+exceptions JSON when active, returns error when no session, JSON contains breakpoint fields (id, type, file, line, hitCount, etc.)
-- [ ] T014 [P] [US1] Write unit tests for resource listing in `tests/DebugMcp.Tests/Unit/Resources/ResourceListTests.cs` — test: lists session+breakpoints+threads resources when session active, empty list when no session, list-changed notification on session start/end
+- [ ] T014 [P] [US1] Write unit tests for resource listing in `tests/DebugMcp.Tests/Unit/Resources/ResourceListTests.cs` — test: lists session+breakpoints resources when session active, empty list when no session, list-changed notification on session start/end
 
 ### Implementation for US1 + US2
 
@@ -83,6 +83,7 @@
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [ ] T022 [P] [US3] Write unit tests for threads resource read in `tests/DebugMcp.Tests/Unit/Resources/ThreadsResourceTests.cs` — test: returns thread list with stale=false when paused, returns cached snapshot with stale=true when running, returns error when no session, JSON contains thread fields (id, name, state, isCurrent, location)
+- [ ] T022b [P] [US3] Add threads listing test to `tests/DebugMcp.Tests/Unit/Resources/ResourceListTests.cs` — test: after US3 implementation, `resources/list` includes `debugger://threads` alongside session+breakpoints
 
 ### Implementation for US3
 
@@ -151,7 +152,9 @@
 ### Parallel Opportunities
 
 **Phase 2 (Foundational)**:
-- T005+T006 (ThreadSnapshotCache) can run in parallel with T007+T008 (AllowedSourcePaths) and T009+T010 (ResourceNotifier)
+- Test tasks T003-T006 can all run in parallel (different files, [P] marker)
+- Implementation tasks T007-T010 run sequentially AFTER their corresponding tests pass (TDD Red→Green)
+- The three test+impl pairs are parallel *across* pairs: (T003→T007), (T004→T008), (T005→T009), (T006→T010)
 
 **Phase 3 (US1+US2)**:
 - T012 (session tests) can run in parallel with T013 (breakpoints tests) and T014 (listing tests)
@@ -164,10 +167,19 @@
 ## Parallel Example: Phase 2 (Foundational)
 
 ```text
-# All these test+implementation pairs can run in parallel:
-T005+T006: ThreadSnapshotCache (tests/DebugMcp.Tests/Unit/Resources/ThreadSnapshotCacheTests.cs → DebugMcp/Services/Resources/ThreadSnapshotCache.cs)
-T007+T008: AllowedSourcePaths (tests/DebugMcp.Tests/Unit/Resources/AllowedSourcePathsTests.cs → DebugMcp/Services/Resources/AllowedSourcePaths.cs)
-T009+T010: ResourceNotifier (tests/DebugMcp.Tests/Unit/Resources/ResourceNotifierTests.cs → DebugMcp/Services/Resources/ResourceNotifier.cs)
+# Step 1: All test tasks run in parallel ([P] marker):
+T003: tests/DebugMcp.Tests/Unit/Breakpoints/BreakpointRegistryChangedEventTests.cs
+T004: tests/DebugMcp.Tests/Unit/Resources/ThreadSnapshotCacheTests.cs
+T005: tests/DebugMcp.Tests/Unit/Resources/AllowedSourcePathsTests.cs
+T006: tests/DebugMcp.Tests/Unit/Resources/ResourceNotifierTests.cs
+
+# Step 2: Implementation tasks (each makes its corresponding tests pass):
+T007: BreakpointRegistry.Changed (makes T003 pass)
+T008: ThreadSnapshotCache (makes T004 pass)
+T009: AllowedSourcePaths (makes T005 pass)
+T010: ResourceNotifier (makes T006 pass)
+# Note: T007-T010 can run in parallel with each other (different files),
+# but each MUST follow its corresponding test (TDD Red→Green).
 ```
 
 ## Parallel Example: Phase 3 (US1+US2 Tests)
