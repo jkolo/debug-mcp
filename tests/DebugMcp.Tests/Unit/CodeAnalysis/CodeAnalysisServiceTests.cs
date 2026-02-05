@@ -39,7 +39,7 @@ public class CodeAnalysisServiceTests : IDisposable
         result.Path.Should().Be(projectPath);
         result.Type.Should().Be(WorkspaceType.Project); // Project type since using .csproj
         result.Projects.Should().NotBeEmpty();
-        result.LoadedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        result.LoadedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]

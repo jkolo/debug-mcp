@@ -66,7 +66,7 @@ public class DebugStepContractTests
             ProcessName = "dotnet",
             ExecutablePath = "/usr/bin/dotnet",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Paused, // After step, paused at new location
             LaunchMode = LaunchMode.Attach,
             CurrentLocation = new SourceLocation("/app/Program.cs", 42, 1, "Main", "MyApp"),

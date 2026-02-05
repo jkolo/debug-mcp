@@ -65,7 +65,7 @@ public sealed class DebugSessionManager : IDebugSessionManager
             ProcessName = processInfo.Name,
             ExecutablePath = processInfo.ExecutablePath,
             RuntimeVersion = processInfo.RuntimeVersion ?? "Unknown",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running,
             LaunchMode = LaunchMode.Attach
         };
@@ -109,7 +109,7 @@ public sealed class DebugSessionManager : IDebugSessionManager
             ProcessName = processInfo.Name,
             ExecutablePath = processInfo.ExecutablePath,
             RuntimeVersion = processInfo.RuntimeVersion ?? "Unknown",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = stopAtEntry ? SessionState.Paused : SessionState.Running,
             LaunchMode = LaunchMode.Launch,
             CommandLineArgs = args,

@@ -266,7 +266,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1);
 
@@ -383,7 +383,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1);
 
@@ -412,7 +412,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 6);
 
@@ -442,7 +442,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 0);
 
@@ -472,7 +472,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1);
 
@@ -502,7 +502,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: threadId,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1);
 
@@ -536,7 +536,7 @@ public class BreakpointManagerTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: testThreadId,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1);
 

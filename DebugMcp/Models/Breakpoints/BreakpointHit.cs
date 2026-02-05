@@ -12,7 +12,7 @@ namespace DebugMcp.Models.Breakpoints;
 public record BreakpointHit(
     string BreakpointId,
     int ThreadId,
-    DateTime Timestamp,
+    DateTimeOffset Timestamp,
     BreakpointLocation Location,
     int HitCount,
     ExceptionInfo? ExceptionInfo = null);

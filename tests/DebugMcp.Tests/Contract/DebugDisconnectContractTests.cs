@@ -59,7 +59,7 @@ public class DebugDisconnectContractTests
             ProcessName = "attached-app",
             ExecutablePath = "/path/to/app",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running,
             LaunchMode = LaunchMode.Attach // Attached, not launched
         };
@@ -80,7 +80,7 @@ public class DebugDisconnectContractTests
             ProcessName = "launched-app",
             ExecutablePath = "/path/to/app",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running,
             LaunchMode = LaunchMode.Launch // Launched, not attached
         };

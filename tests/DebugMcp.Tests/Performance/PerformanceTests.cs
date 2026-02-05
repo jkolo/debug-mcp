@@ -261,7 +261,7 @@ public class PerformanceTests : IDisposable
                 ProcessName = $"process_{i}",
                 ExecutablePath = $"/path/to/process_{i}.dll",
                 RuntimeVersion = ".NET 8.0",
-                AttachedAt = DateTime.UtcNow,
+                AttachedAt = DateTimeOffset.UtcNow,
                 State = SessionState.Running,
                 LaunchMode = LaunchMode.Attach
             });

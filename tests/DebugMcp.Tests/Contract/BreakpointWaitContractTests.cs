@@ -55,7 +55,7 @@ public class BreakpointWaitContractTests
         var hit = new BreakpointHit(
             BreakpointId: "bp-12345",
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: new BreakpointLocation(
                 File: "/app/Program.cs",
                 Line: 42),
@@ -68,7 +68,7 @@ public class BreakpointWaitContractTests
         // Additional fields when hit=true
         hit.BreakpointId.Should().NotBeNullOrEmpty("breakpointId present when hit");
         hit.ThreadId.Should().BePositive("threadId present when hit");
-        hit.Timestamp.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5), "timestamp present when hit");
+        hit.Timestamp.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5), "timestamp present when hit");
         hit.Location.Should().NotBeNull("location present when hit");
         hit.HitCount.Should().BeGreaterThanOrEqualTo(1, "hitCount present when hit");
     }
@@ -109,7 +109,7 @@ public class BreakpointWaitContractTests
         var hit = new BreakpointHit(
             BreakpointId: "ebp-12345",
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: new BreakpointLocation(
                 File: "/app/Program.cs",
                 Line: 15),
@@ -130,7 +130,7 @@ public class BreakpointWaitContractTests
     public void BreakpointHit_Timestamp_IsIso8601Format()
     {
         // Contract: "timestamp": { "type": "string", "format": "date-time" }
-        var timestamp = DateTime.UtcNow;
+        var timestamp = DateTimeOffset.UtcNow;
         var iso8601 = timestamp.ToString("O"); // Round-trip format is ISO 8601
 
         iso8601.Should().MatchRegex(@"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",

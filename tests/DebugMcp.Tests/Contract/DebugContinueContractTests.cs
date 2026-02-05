@@ -40,7 +40,7 @@ public class DebugContinueContractTests
             ProcessName = "dotnet",
             ExecutablePath = "/usr/bin/dotnet",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running, // After continue
             LaunchMode = LaunchMode.Attach
         };

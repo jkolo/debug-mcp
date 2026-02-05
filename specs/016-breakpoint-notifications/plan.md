@@ -58,13 +58,13 @@ DebugMcp/
 │   └── Breakpoints/
 │       ├── Breakpoint.cs              # Extend with Type property
 │       ├── BreakpointType.cs          # NEW: Blocking, Tracepoint
-│       ├── BreakpointNotification.cs  # NEW: MCP notification payload
-│       └── TraceLogMessage.cs         # NEW: Log template + evaluated result
+│       └── BreakpointNotification.cs  # NEW: MCP notification payload
 ├── Services/
 │   └── Breakpoints/
 │       ├── IBreakpointManager.cs      # Extend with tracepoint methods
 │       ├── BreakpointManager.cs       # Add tracepoint + notification logic
-│       └── IBreakpointNotifier.cs     # NEW: Interface for notification delivery
+│       ├── IBreakpointNotifier.cs     # NEW: Interface for notification delivery
+│       └── LogMessageEvaluator.cs     # NEW: Evaluates {expression} in log templates
 ├── Tools/
 │   ├── BreakpointSetTool.cs           # Unchanged (blocking breakpoints)
 │   ├── BreakpointListTool.cs          # Add type field to output
@@ -78,11 +78,8 @@ tests/
 │       └── Breakpoints/
 │           ├── TracepointTests.cs         # NEW: Unit tests
 │           └── NotificationTests.cs       # NEW: Notification unit tests
-└── DebugMcp.E2E/
-    └── Features/
-        └── Breakpoints/
-            ├── BreakpointNotification.feature  # NEW: E2E notification tests
-            └── Tracepoint.feature              # NEW: E2E tracepoint tests
+└── DebugMcp.E2E/                              # E2E notification tests DESCOPED
+                                                # (MCP notifications not capturable in Reqnroll)
 ```
 
 **Structure Decision**: Single project structure maintained. New files added to existing directories following established patterns.

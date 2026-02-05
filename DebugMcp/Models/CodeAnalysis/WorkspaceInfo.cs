@@ -35,5 +35,5 @@ public sealed record WorkspaceInfo
     /// Timestamp when workspace was loaded.
     /// </summary>
     [JsonPropertyName("loaded_at")]
-    public required DateTime LoadedAt { get; init; }
+    public required DateTimeOffset LoadedAt { get; init; }
 }

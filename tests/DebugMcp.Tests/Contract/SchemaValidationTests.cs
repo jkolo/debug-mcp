@@ -32,7 +32,7 @@ public class SchemaValidationTests
             ProcessName = "testapp",
             ExecutablePath = "/path/to/testapp.dll",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+            AttachedAt = new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero),
             State = SessionState.Running,
             LaunchMode = LaunchMode.Attach
         };
@@ -61,7 +61,7 @@ public class SchemaValidationTests
         mode.ValueKind.Should().BeOneOf(JsonValueKind.Number, JsonValueKind.String);
 
         root.TryGetProperty("attachedAt", out var attachedAt).Should().BeTrue();
-        attachedAt.GetDateTime().Should().Be(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+        attachedAt.GetDateTimeOffset().Should().Be(new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero));
     }
 
     /// <summary>
@@ -418,7 +418,7 @@ public class SchemaValidationTests
         var hit = new BreakpointHit(
             BreakpointId: "bp-123",
             ThreadId: 5,
-            Timestamp: new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+            Timestamp: new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero),
             Location: new BreakpointLocation("/path/to/source.cs", 42),
             HitCount: 1,
             ExceptionInfo: null
@@ -435,7 +435,7 @@ public class SchemaValidationTests
         tid.GetInt32().Should().Be(5);
 
         root.TryGetProperty("timestamp", out var ts).Should().BeTrue();
-        ts.GetDateTime().Should().Be(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+        ts.GetDateTimeOffset().Should().Be(new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero));
 
         root.TryGetProperty("location", out var loc).Should().BeTrue();
         loc.TryGetProperty("file", out _).Should().BeTrue();

@@ -53,7 +53,7 @@ public class DebugStateContractTests
             ProcessName = "testapp",
             ExecutablePath = "/path/to/testapp.dll",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running,
             LaunchMode = LaunchMode.Attach
         };
@@ -77,7 +77,7 @@ public class DebugStateContractTests
             ProcessName = "testapp",
             ExecutablePath = "/path/to/testapp.dll",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Paused,
             LaunchMode = LaunchMode.Attach,
             PauseReason = PauseReason.Breakpoint

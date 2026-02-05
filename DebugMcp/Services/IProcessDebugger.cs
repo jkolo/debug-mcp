@@ -418,7 +418,7 @@ public sealed class BreakpointHitEventArgs : EventArgs
     public required SourceLocation? Location { get; init; }
 
     /// <summary>Timestamp of the hit.</summary>
-    public required DateTime Timestamp { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
 
     /// <summary>Metadata token of the method where breakpoint was hit.</summary>
     public int? MethodToken { get; init; }
@@ -488,7 +488,7 @@ public sealed class StepCompleteEventArgs : EventArgs
     public required StepCompleteReason Reason { get; init; }
 
     /// <summary>Timestamp when step completed.</summary>
-    public required DateTime Timestamp { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
 }
 
 /// <summary>
@@ -521,7 +521,7 @@ public sealed class ExceptionHitEventArgs : EventArgs
     public required SourceLocation? Location { get; init; }
 
     /// <summary>Timestamp when exception was thrown.</summary>
-    public required DateTime Timestamp { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
 
     /// <summary>Full type name of the exception (e.g., System.NullReferenceException).</summary>
     public required string ExceptionType { get; init; }

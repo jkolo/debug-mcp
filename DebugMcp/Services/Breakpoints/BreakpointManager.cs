@@ -671,8 +671,11 @@ public sealed class BreakpointManager : IBreakpointManager
             }
         }
 
+        // Re-read from registry to get the updated breakpoint (with correct HitCount)
+        var currentBreakpoint = _registry.Get(hit.BreakpointId) ?? updated;
+
         // Check if tracepoint should send notification based on frequency filtering
-        var shouldNotify = ShouldSendNotification(breakpoint, newHitCount);
+        var shouldNotify = ShouldSendNotification(currentBreakpoint, newHitCount);
 
         if (shouldNotify)
         {
