@@ -14,6 +14,11 @@ public sealed class BreakpointRegistry
     private readonly ConcurrentDictionary<string, ExceptionBreakpointEntry> _exceptionBreakpoints = new();
     private readonly ILogger<BreakpointRegistry> _logger;
 
+    /// <summary>
+    /// Raised when breakpoints are added, updated, removed, or cleared.
+    /// </summary>
+    public event EventHandler? Changed;
+
     public BreakpointRegistry(ILogger<BreakpointRegistry> logger)
     {
         _logger = logger;
@@ -31,6 +36,7 @@ public sealed class BreakpointRegistry
         {
             _logger.LogDebug("Added breakpoint {Id} at {File}:{Line}",
                 breakpoint.Id, breakpoint.Location.File, breakpoint.Location.Line);
+            OnChanged();
             return true;
         }
         return false;
@@ -47,6 +53,7 @@ public sealed class BreakpointRegistry
         {
             entry.Breakpoint = breakpoint;
             _logger.LogDebug("Updated breakpoint {Id}", breakpoint.Id);
+            OnChanged();
             return true;
         }
         return false;
@@ -62,6 +69,7 @@ public sealed class BreakpointRegistry
         if (_breakpoints.TryRemove(breakpointId, out var entry))
         {
             _logger.LogDebug("Removed breakpoint {Id}", breakpointId);
+            OnChanged();
             return entry.Breakpoint;
         }
         return null;
@@ -184,6 +192,7 @@ public sealed class BreakpointRegistry
         {
             _logger.LogDebug("Added exception breakpoint {Id} for {Type}",
                 exceptionBreakpoint.Id, exceptionBreakpoint.ExceptionType);
+            OnChanged();
             return true;
         }
         return false;
@@ -199,6 +208,7 @@ public sealed class BreakpointRegistry
         if (_exceptionBreakpoints.TryRemove(breakpointId, out var entry))
         {
             _logger.LogDebug("Removed exception breakpoint {Id}", breakpointId);
+            OnChanged();
             return entry.Breakpoint;
         }
         return null;
@@ -225,6 +235,7 @@ public sealed class BreakpointRegistry
         {
             entry.Breakpoint = exceptionBreakpoint;
             _logger.LogDebug("Updated exception breakpoint {Id}", exceptionBreakpoint.Id);
+            OnChanged();
             return true;
         }
         return false;
@@ -312,6 +323,7 @@ public sealed class BreakpointRegistry
         _breakpoints.Clear();
         _exceptionBreakpoints.Clear();
         _logger.LogDebug("Cleared all breakpoints from registry");
+        OnChanged();
     }
 
     /// <summary>
@@ -323,6 +335,8 @@ public sealed class BreakpointRegistry
     /// Gets the count of exception breakpoints.
     /// </summary>
     public int ExceptionCount => _exceptionBreakpoints.Count;
+
+    private void OnChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
     private static string NormalizePath(string path)
     {

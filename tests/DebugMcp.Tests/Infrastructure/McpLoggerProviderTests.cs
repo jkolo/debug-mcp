@@ -76,6 +76,6 @@ public class McpLoggerProviderTests
     {
         // Create provider with null server for unit testing
         // Full integration tests verify MCP communication
-        return new McpLoggerProvider((IMcpServer?)null, new LoggingOptions());
+        return new McpLoggerProvider((McpServer?)null, new LoggingOptions());
     }
 }

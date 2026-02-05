@@ -168,7 +168,7 @@ public class NotificationTests
     {
         // Arrange - notifier with null server (no MCP connection)
         var logger = new Mock<ILogger<BreakpointNotifier>>();
-        using var notifier = new BreakpointNotifier((IMcpServer?)null, logger.Object);
+        using var notifier = new BreakpointNotifier((McpServer?)null, logger.Object);
 
         var notification = new BreakpointNotification(
             BreakpointId: "bp-test-1",

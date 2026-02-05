@@ -2,7 +2,6 @@ using System.Threading.Channels;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace DebugMcp.Infrastructure;
@@ -19,7 +18,7 @@ public sealed class BreakpointNotifier : IBreakpointNotifier, IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _processingTask;
 
-    private IMcpServer? _server;
+    private McpServer? _server;
     private bool _serverResolved;
     private readonly Lock _lock = new();
 
@@ -47,7 +46,7 @@ public sealed class BreakpointNotifier : IBreakpointNotifier, IDisposable
     /// <summary>
     /// Constructor for unit testing with explicit server reference.
     /// </summary>
-    internal BreakpointNotifier(IMcpServer? server, ILogger<BreakpointNotifier> logger)
+    internal BreakpointNotifier(McpServer? server, ILogger<BreakpointNotifier> logger)
     {
         _serviceProvider = null!;
         _server = server;
@@ -154,7 +153,7 @@ public sealed class BreakpointNotifier : IBreakpointNotifier, IDisposable
         }
     }
 
-    private IMcpServer? GetServer()
+    private McpServer? GetServer()
     {
         if (_serverResolved)
             return _server;
@@ -166,7 +165,7 @@ public sealed class BreakpointNotifier : IBreakpointNotifier, IDisposable
 
             try
             {
-                _server = _serviceProvider.GetService(typeof(IMcpServer)) as IMcpServer;
+                _server = _serviceProvider.GetService(typeof(McpServer)) as McpServer;
             }
             catch
             {

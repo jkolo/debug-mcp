@@ -80,7 +80,7 @@ public class McpLoggerTests
     private static ILogger CreateTestLogger()
     {
         // Create a provider with null server for unit testing
-        var provider = new McpLoggerProvider((IMcpServer?)null, new LoggingOptions());
+        var provider = new McpLoggerProvider((McpServer?)null, new LoggingOptions());
         return provider.CreateLogger("TestCategory");
     }
 }

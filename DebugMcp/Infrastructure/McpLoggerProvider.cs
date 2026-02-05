@@ -31,7 +31,7 @@ public sealed class McpLoggerProvider : ILoggerProvider
     private readonly IServiceProvider _serviceProvider;
     private readonly LoggingOptions _options;
     private readonly ConcurrentDictionary<string, McpLogger> _loggers = new();
-    private IMcpServer? _server;
+    private McpServer? _server;
     private bool _serverResolved;
     private readonly object _lock = new();
 
@@ -51,7 +51,7 @@ public sealed class McpLoggerProvider : ILoggerProvider
     /// </summary>
     /// <param name="server">The MCP server instance, or null for testing without MCP.</param>
     /// <param name="options">The logging options controlling behavior.</param>
-    internal McpLoggerProvider(IMcpServer? server, LoggingOptions options)
+    internal McpLoggerProvider(McpServer? server, LoggingOptions options)
     {
         _serviceProvider = null!;
         _server = server;
@@ -76,7 +76,7 @@ public sealed class McpLoggerProvider : ILoggerProvider
     /// This method is thread-safe and caches the resolved server instance.
     /// If resolution fails, it will retry on the next call.
     /// </remarks>
-    internal IMcpServer? GetServer()
+    internal McpServer? GetServer()
     {
         if (_serverResolved)
             return _server;
@@ -88,7 +88,7 @@ public sealed class McpLoggerProvider : ILoggerProvider
 
             try
             {
-                _server = _serviceProvider.GetService(typeof(IMcpServer)) as IMcpServer;
+                _server = _serviceProvider.GetService(typeof(McpServer)) as McpServer;
             }
             catch
             {
