@@ -2,7 +2,7 @@
 
 **Feature Branch**: `016-breakpoint-notifications`
 **Created**: 2026-02-05
-**Status**: Draft
+**Status**: Complete
 **Input**: User description: "Breakpoints that hit should not only be returned by breakpoint_wait tool, but also send MCP notification when a breakpoint is hit. Additionally add notify-only breakpoints (tracepoints) that don't block execution but send notification when code passes through, including a custom log message that can contain evaluate expressions."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -41,7 +41,7 @@ As an LLM agent, I want to set "tracepoints" that don't pause execution but send
 
 3. **Given** a tracepoint inside a loop that runs 10 times, **When** the loop executes, **Then** 10 separate notifications are sent (one per iteration).
 
-4. **Given** a tracepoint is set, **When** I want to convert it to a regular breakpoint, **Then** I can update its type to blocking.
+4. ~~**Given** a tracepoint is set, **When** I want to convert it to a regular breakpoint, **Then** I can update its type to blocking.~~ — **Future enhancement**: Type conversion not in scope for 016.
 
 ---
 
@@ -113,7 +113,7 @@ As an LLM agent, I want to optionally limit how often tracepoint notifications a
 
 ### Functional Requirements
 
-- **FR-001**: System MUST send MCP notification when any blocking breakpoint is hit, containing: breakpoint ID, file path, line number, column, thread ID, and timestamp.
+- **FR-001**: System MUST send MCP notification when any blocking breakpoint is hit, containing: breakpoint ID, file path, line number, thread ID, and timestamp.
 - **FR-002**: System MUST support creating tracepoints (notify-only breakpoints) that do not pause execution.
 - **FR-003**: System MUST allow tracepoints to include a log message template with embedded expressions in `{expression}` syntax.
 - **FR-004**: System MUST evaluate expressions in tracepoint log messages in the context of the current stack frame.
@@ -129,7 +129,7 @@ As an LLM agent, I want to optionally limit how often tracepoint notifications a
 
 - **Tracepoint**: A non-blocking observation point at a code location. Contains: ID, file, line, column, log message template, enabled state, hit count filter, max notifications.
 - **BreakpointNotification**: MCP notification payload containing: breakpoint/tracepoint ID, type (blocking/tracepoint), location, thread ID, timestamp, evaluated log message (for tracepoints).
-- **EvaluatedExpression**: Result of expression evaluation containing: original expression, evaluated value or error message.
+- **~~EvaluatedExpression~~**: *(Not materialized as a model — expression results are inlined into the log message string.)*
 
 ## Success Criteria *(mandatory)*
 
