@@ -123,7 +123,7 @@ public sealed class CodeAnalysisService : ICodeAnalysisService, IDisposable
                 Type = isSolution ? WorkspaceType.Solution : WorkspaceType.Project,
                 Projects = projects,
                 Diagnostics = [.. _loadDiagnostics],
-                LoadedAt = DateTime.UtcNow
+                LoadedAt = DateTimeOffset.UtcNow
             };
 
             _logger?.LogInformation(

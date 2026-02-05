@@ -77,7 +77,7 @@ public class DebugSessionManagerTests
         session.RuntimeVersion.Should().Be(".NET 8.0");
         session.LaunchMode.Should().Be(LaunchMode.Attach);
         session.State.Should().Be(SessionState.Running);
-        session.AttachedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        session.AttachedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]

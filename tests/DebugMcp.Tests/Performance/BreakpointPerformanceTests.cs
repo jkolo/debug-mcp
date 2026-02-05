@@ -129,7 +129,7 @@ public class BreakpointPerformanceTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1,
             ExceptionInfo: null);
@@ -178,7 +178,7 @@ public class BreakpointPerformanceTests
         var hit = new BreakpointHit(
             BreakpointId: breakpoint.Id,
             ThreadId: 1,
-            Timestamp: DateTime.UtcNow,
+            Timestamp: DateTimeOffset.UtcNow,
             Location: breakpoint.Location,
             HitCount: 1,
             ExceptionInfo: null);

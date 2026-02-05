@@ -2442,7 +2442,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var locationInfo = GetCurrentLocationInfo(e.Thread);
             var location = locationInfo?.Location;
             var threadId = (int)e.Thread.Id;
-            var timestamp = DateTime.UtcNow;
+            var timestamp = DateTimeOffset.UtcNow;
 
             lock (_lock)
             {
@@ -2488,7 +2488,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             var location = GetCurrentLocation(e.Thread);
             var threadId = (int)e.Thread.Id;
-            var timestamp = DateTime.UtcNow;
+            var timestamp = DateTimeOffset.UtcNow;
 
             // Determine exception type from event
             var isFirstChance = e.EventType == ClrDebug.CorDebugExceptionCallbackType.DEBUG_EXCEPTION_FIRST_CHANCE ||
@@ -2667,7 +2667,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             var location = GetCurrentLocation(e.Thread);
             var threadId = (int)e.Thread.Id;
-            var timestamp = DateTime.UtcNow;
+            var timestamp = DateTimeOffset.UtcNow;
 
             // Get the step mode that was pending
             StepMode stepMode;

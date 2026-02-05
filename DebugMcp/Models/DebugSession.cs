@@ -18,7 +18,7 @@ public sealed class DebugSession
     public required string RuntimeVersion { get; init; }
 
     /// <summary>UTC timestamp when session started.</summary>
-    public required DateTime AttachedAt { get; init; }
+    public required DateTimeOffset AttachedAt { get; init; }
 
     /// <summary>Current execution state.</summary>
     public SessionState State { get; set; } = SessionState.Running;

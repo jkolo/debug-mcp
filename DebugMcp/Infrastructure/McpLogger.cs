@@ -118,7 +118,7 @@ public sealed class McpLogger : ILogger
 
     private void WriteToStderr(LogLevel logLevel, string message)
     {
-        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
         var levelStr = logLevel switch
         {
             LogLevel.Trace => "TRCE",

@@ -114,7 +114,7 @@ public class DebugLaunchContractTests
             ProcessName = "testapp",
             ExecutablePath = "/path/to/testapp.dll",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Paused, // stopAtEntry = true
             LaunchMode = LaunchMode.Launch,
             PauseReason = PauseReason.Entry,
@@ -151,7 +151,7 @@ public class DebugLaunchContractTests
             ProcessName = "testapp",
             ExecutablePath = "/path/to/testapp.dll",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running, // stopAtEntry = false
             LaunchMode = LaunchMode.Launch,
             PauseReason = null // not paused

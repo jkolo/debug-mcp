@@ -63,7 +63,7 @@ public class DebugAttachContractTests
             ProcessName = "dotnet",
             ExecutablePath = "/usr/bin/dotnet",
             RuntimeVersion = ".NET 8.0",
-            AttachedAt = DateTime.UtcNow,
+            AttachedAt = DateTimeOffset.UtcNow,
             State = SessionState.Running,
             LaunchMode = LaunchMode.Attach
         };
@@ -74,7 +74,7 @@ public class DebugAttachContractTests
         session.RuntimeVersion.Should().NotBeNullOrEmpty("runtimeVersion required by contract");
         session.State.Should().BeDefined("state required by contract");
         session.LaunchMode.Should().Be(LaunchMode.Attach, "launchMode must be 'attach' for attach operations");
-        session.AttachedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5), "attachedAt required by contract");
+        session.AttachedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5), "attachedAt required by contract");
     }
 
     /// <summary>
