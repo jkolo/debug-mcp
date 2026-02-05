@@ -32,9 +32,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 {
     private readonly ILogger<ProcessDebugger> _logger;
     private readonly IPdbSymbolReader _pdbSymbolReader;
+    private readonly ProcessIoManager _ioManager;
     private DbgShim? _dbgShim;
     private CorDebug? _corDebug;
     private CorDebugProcess? _process;
+    private Process? _managedProcess; // For I/O redirection
     private readonly object _lock = new();
 
     private volatile SessionState _currentState = SessionState.Disconnected;
@@ -68,10 +70,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private readonly object _moduleCacheLock = new();
     private readonly List<LoadedModuleInfo> _cachedModules = new();
 
-    public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader)
+    public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader, ProcessIoManager ioManager)
     {
         _logger = logger;
         _pdbSymbolReader = pdbSymbolReader;
+        _ioManager = ioManager;
     }
 
     /// <inheritdoc />
@@ -246,25 +249,42 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // Initialize DbgShim
         InitializeDbgShim();
 
-        // Build command line
+        // Build command line for logging
         var commandLine = BuildCommandLine(program, args);
         _logger.LogDebug("Launch command line: {CommandLine}", commandLine);
 
-        // Build environment block
-        var envPtr = BuildEnvironmentBlock(env);
+        // Step 1: Create process with redirected I/O using Process.Start
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = BuildDotnetArguments(program, args),
+            WorkingDirectory = cwd,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
 
-        // Step 1: Create process in suspended state
-        var launchResult = _dbgShim!.CreateProcessForLaunch(
-            commandLine,
-            bSuspendProcess: true,
-            lpEnvironment: envPtr,
-            lpCurrentDirectory: cwd);
+        // Add environment variables
+        if (env != null)
+        {
+            foreach (var (key, value) in env)
+            {
+                startInfo.Environment[key] = value;
+            }
+        }
 
-        var pid = (int)launchResult.ProcessId;
+        _managedProcess = new Process { StartInfo = startInfo };
+        _managedProcess.Start();
+
+        var pid = _managedProcess.Id;
         _launchPid = pid;
         _launchPidReaped = false;
-        var resumeHandle = launchResult.ResumeHandle;
-        _logger.LogDebug("Process created suspended, PID: {Pid}", pid);
+        _logger.LogDebug("Process started with redirected I/O, PID: {Pid}", pid);
+
+        // Attach I/O manager to capture stdout/stderr
+        _ioManager.AttachToProcess(_managedProcess);
 
         try
         {
@@ -274,20 +294,15 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
             // Step 2: Register for runtime startup callback
             _startupCallbackDelegate = OnRuntimeStartup;
-            _unregisterToken = _dbgShim.RegisterForRuntimeStartup(
+            _unregisterToken = _dbgShim!.RegisterForRuntimeStartup(
                 pid,
                 _startupCallbackDelegate,
                 IntPtr.Zero);
 
             _logger.LogDebug("Registered for runtime startup, PID: {Pid}", pid);
 
-            // Step 3: Resume the process so CLR can load
-            _dbgShim.ResumeProcess(resumeHandle);
-            _dbgShim.CloseResumeHandle(resumeHandle);
-            resumeHandle = IntPtr.Zero;
-            _logger.LogDebug("Process resumed, waiting for CLR startup callback");
-
-            // Step 4: Wait for the startup callback to complete
+            // Step 3: Wait for the startup callback to complete
+            // (Process is already running - CLR will load shortly)
             var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(effectiveTimeout);
@@ -302,7 +317,9 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 // Must unregister the startup callback first — it holds a reference
                 // to the process via ptrace, which can block Kill().
                 CleanupLaunchState();
-                try { Process.GetProcessById(pid).Kill(); } catch { /* ignore */ }
+                try { _managedProcess?.Kill(); } catch { /* ignore */ }
+                _ioManager.DetachFromProcess();
+                _managedProcess = null;
                 throw new OperationCanceledException(
                     $"Launch timed out after {effectiveTimeout.TotalSeconds}s waiting for CLR startup");
             }
@@ -323,13 +340,40 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         catch
         {
             // Clean up on failure
-            if (resumeHandle != IntPtr.Zero)
-            {
-                try { _dbgShim.CloseResumeHandle(resumeHandle); } catch { /* ignore */ }
-            }
             CleanupLaunchState();
+            _ioManager.DetachFromProcess();
+            _managedProcess?.Kill();
+            _managedProcess = null;
             throw;
         }
+    }
+
+    /// <summary>
+    /// Builds arguments string for dotnet command.
+    /// </summary>
+    private static string BuildDotnetArguments(string program, string[]? args)
+    {
+        var sb = new StringBuilder();
+        sb.Append('"').Append(program).Append('"');
+
+        if (args != null)
+        {
+            foreach (var arg in args)
+            {
+                sb.Append(' ');
+                // Quote args that contain spaces
+                if (arg.Contains(' '))
+                {
+                    sb.Append('"').Append(arg).Append('"');
+                }
+                else
+                {
+                    sb.Append(arg);
+                }
+            }
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>
@@ -489,6 +533,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 // Clean up launch-specific state
                 CleanupLaunchState();
 
+                // Clean up I/O manager
+                _ioManager.DetachFromProcess();
+                _managedProcess = null;
+
                 // BUGFIX: Terminate ICorDebug instance after detach to allow reattachment.
                 // The previous comment was incorrect - ICorDebug cannot be reused after detach
                 // because the managed callback and internal state are invalidated.
@@ -574,6 +622,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
                     // Clean up launch-specific state
                     CleanupLaunchState();
+
+                    // Clean up I/O manager
+                    _ioManager.DetachFromProcess();
+                    _managedProcess = null;
 
                     // BUGFIX: Terminate ICorDebug instance after process termination.
                     if (_corDebug != null)

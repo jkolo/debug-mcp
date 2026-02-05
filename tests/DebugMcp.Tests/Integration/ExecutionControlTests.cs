@@ -1,6 +1,7 @@
 using DebugMcp.Models;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Tests.Support;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -27,7 +28,7 @@ public class ExecutionControlTests : IAsyncLifetime
 
         var pdbCache = new PdbSymbolCache(pdbCacheLoggerMock.Object);
         var pdbReader = new PdbSymbolReader(pdbCache, pdbLoggerMock.Object);
-        _processDebugger = new ProcessDebugger(debuggerLoggerMock.Object, pdbReader);
+        _processDebugger = new ProcessDebugger(debuggerLoggerMock.Object, pdbReader, TestProcessIoManager.Instance);
         _sessionManager = new DebugSessionManager(_processDebugger, managerLoggerMock.Object);
     }
 
