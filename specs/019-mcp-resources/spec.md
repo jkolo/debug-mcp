@@ -63,7 +63,7 @@ As an LLM client, I want to browse the list of managed threads in the debugged p
 
 2. **Given** the debugger resumes or pauses, **Then** a resource-changed notification is emitted for `debugger://threads`.
 
-3. **Given** the process is running (not paused), **When** an LLM reads `debugger://threads`, **Then** it receives a message indicating thread info is only available when paused, or the last known snapshot.
+3. **Given** the process is running (not paused), **When** an LLM reads `debugger://threads`, **Then** it receives the last-known thread snapshot with a "stale" flag set to true and a timestamp indicating when the snapshot was captured.
 
 ---
 
@@ -77,7 +77,7 @@ As an LLM client, I want to read source code files referenced by the debugged pr
 
 **Acceptance Scenarios**:
 
-1. **Given** a debug session with loaded PDB symbols, **When** an LLM reads `debugger://source/{file}` with a valid source file path, **Then** it receives the file contents as `text/plain`.
+1. **Given** a debug session with loaded PDB symbols, **When** an LLM reads `debugger://source/{file}` with a path found in loaded PDB symbols, **Then** it receives the file contents as `text/plain`.
 
 2. **Given** a source file path from PDB that does not exist on disk, **When** an LLM reads `debugger://source/{file}`, **Then** it receives an error indicating the file is not found.
 
@@ -85,12 +85,14 @@ As an LLM client, I want to read source code files referenced by the debugged pr
 
 4. **Given** a debug session is active, **When** an LLM lists resources, **Then** the resource template `debugger://source/{file}` is listed (as a template, not individual files).
 
+5. **Given** a file path that is NOT referenced in any loaded PDB symbols, **When** an LLM reads `debugger://source/{file}`, **Then** it receives an error indicating the path is not a known source file.
+
 ---
 
 ### Edge Cases
 
 - Resources are requested while the debugger is in the middle of attaching/launching (transitional state) — should return a "session initializing" status or wait until ready.
-- Multiple rapid state changes (e.g., stepping through code quickly) — notifications should be batched or debounced to avoid flooding the client.
+- Multiple rapid state changes (e.g., stepping through code quickly) — notifications are debounced per-resource with a 200-500ms window, coalescing rapid changes into a single notification after activity settles.
 - Very large thread counts (hundreds of threads) — thread resource should still return within a reasonable time.
 - Source file paths containing special characters or spaces — URI encoding must handle them correctly.
 - Breakpoint hit count updates during running — breakpoint resource should reflect the latest hit counts.
@@ -111,6 +113,9 @@ As an LLM client, I want to read source code files referenced by the debugged pr
 - **FR-009**: All resource content MUST be returned as JSON (`application/json`) except source code which MUST be `text/plain`
 - **FR-010**: When no session is active, listing resources MUST return an empty list (no debugger resources)
 - **FR-011**: Resource reads on stale/disconnected sessions MUST return a clear error, not crash
+- **FR-012**: Resource change notifications MUST be debounced per-resource with a 200-500ms window to prevent notification storms during rapid state changes (e.g., stepping)
+- **FR-013**: The `debugger://source/{file}` resource MUST only serve files whose paths appear in loaded PDB symbols — requests for paths not in PDB symbols MUST be rejected
+- **FR-014**: The `debugger://threads` resource MUST return the last-known thread snapshot with a "stale" flag and capture timestamp when the process is running (not paused)
 
 ### Key Entities
 
@@ -129,6 +134,14 @@ As an LLM client, I want to read source code files referenced by the debugged pr
 - **SC-004**: All existing tool-based functionality continues to work unchanged (100% backward compatible)
 - **SC-005**: All existing tests pass unchanged
 - **SC-006**: Resource reads complete within 500ms under normal conditions (< 100 breakpoints, < 200 threads)
+
+## Clarifications
+
+### Session 2026-02-05
+
+- Q: What notification debouncing strategy should be used for rapid state changes? → A: Debounce per-resource with a 200-500ms window — coalesce rapid changes into one notification after activity settles.
+- Q: What should the threads resource return when the process is running (not paused)? → A: Return last-known snapshot with a "stale" flag and timestamp of when it was captured.
+- Q: Should the source resource allow arbitrary file paths or only PDB-referenced ones? → A: Only allow paths found in loaded PDB symbols — reject all others.
 
 ## Dependencies
 
