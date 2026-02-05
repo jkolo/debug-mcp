@@ -1,0 +1,144 @@
+{
+  "name": "tracepoint_set",
+  "description": "Set a tracepoint (non-blocking observation point) at a source location. Unlike breakpoints, tracepoints do not pause execution but send notifications when code passes through.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "file": {
+        "type": "string",
+        "description": "Source file path (absolute or relative to project)"
+      },
+      "line": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "1-based line number"
+      },
+      "column": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "1-based column for targeting lambdas/inline statements (optional)"
+      },
+      "log_message": {
+        "type": "string",
+        "description": "Log message template with {expression} placeholders for variable interpolation, e.g., \"Counter is {i}, sum is {sum}\""
+      },
+      "hit_count_multiple": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0,
+        "description": "Send notification every Nth hit (0 = every hit)"
+      },
+      "max_notifications": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0,
+        "description": "Auto-disable tracepoint after N notifications (0 = unlimited)"
+      }
+    },
+    "required": ["file", "line"]
+  },
+  "outputSchema": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "success": { "const": true },
+          "tracepoint": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "const": "tracepoint" },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string" },
+                  "line": { "type": "integer" },
+                  "column": { "type": "integer" },
+                  "functionName": { "type": "string" },
+                  "moduleName": { "type": "string" }
+                }
+              },
+              "state": { "type": "string", "enum": ["pending", "bound", "disabled"] },
+              "enabled": { "type": "boolean" },
+              "logMessage": { "type": "string" },
+              "hitCountMultiple": { "type": "integer" },
+              "maxNotifications": { "type": "integer" }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "properties": {
+          "success": { "const": false },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "details": { "type": "object" }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "examples": [
+    {
+      "description": "Simple tracepoint without log message",
+      "input": { "file": "Program.cs", "line": 42 },
+      "output": {
+        "success": true,
+        "tracepoint": {
+          "id": "tp-1",
+          "type": "tracepoint",
+          "location": { "file": "/path/to/Program.cs", "line": 42 },
+          "state": "bound",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "description": "Tracepoint with log message containing expressions",
+      "input": {
+        "file": "Calculator.cs",
+        "line": 25,
+        "log_message": "Add({a}, {b}) = {result}"
+      },
+      "output": {
+        "success": true,
+        "tracepoint": {
+          "id": "tp-2",
+          "type": "tracepoint",
+          "location": { "file": "/path/to/Calculator.cs", "line": 25 },
+          "state": "bound",
+          "enabled": true,
+          "logMessage": "Add({a}, {b}) = {result}"
+        }
+      }
+    },
+    {
+      "description": "Tracepoint with hit filtering",
+      "input": {
+        "file": "Loop.cs",
+        "line": 10,
+        "log_message": "Iteration {i}",
+        "hit_count_multiple": 100,
+        "max_notifications": 10
+      },
+      "output": {
+        "success": true,
+        "tracepoint": {
+          "id": "tp-3",
+          "type": "tracepoint",
+          "location": { "file": "/path/to/Loop.cs", "line": 10 },
+          "state": "bound",
+          "enabled": true,
+          "logMessage": "Iteration {i}",
+          "hitCountMultiple": 100,
+          "maxNotifications": 10
+        }
+      }
+    }
+  ]
+}

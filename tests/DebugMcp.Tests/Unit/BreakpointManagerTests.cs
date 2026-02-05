@@ -1,6 +1,7 @@
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Tests.Support;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -41,6 +42,7 @@ public class BreakpointManagerTests
             _pdbReaderMock.Object,
             _processDebuggerMock.Object,
             _conditionEvaluatorMock.Object,
+            NullBreakpointNotifier.Instance,
             managerLogger.Object);
     }
 

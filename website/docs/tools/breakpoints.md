@@ -243,6 +243,102 @@ Set an exception breakpoint to break when specific exception types are thrown.
 
 ---
 
+### tracepoint_set
+
+Set a tracepoint (non-blocking observation point) at a source location.
+
+**When to use:** You want to observe code execution without stopping it. Tracepoints send MCP notifications when code passes through, letting you trace execution flow, log variable values, or count how often code paths are hit — all without pausing the application.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `file` | string | Yes | Source file path |
+| `line` | integer | Yes | Line number (1-based) |
+| `column` | integer | No | Column for targeting specific sequence point (lambda/inline) |
+| `log_message` | string | No | Log message template with `{expression}` placeholders |
+| `hit_count_multiple` | integer | No | Notify only every Nth hit (0 = every hit) |
+| `max_notifications` | integer | No | Auto-disable after N notifications (0 = unlimited) |
+
+**Examples:**
+
+Basic tracepoint:
+```json
+{
+  "file": "Services/OrderService.cs",
+  "line": 55
+}
+```
+
+Tracepoint with log message:
+```json
+{
+  "file": "Services/OrderService.cs",
+  "line": 55,
+  "log_message": "Processing order {orderId}, total: {order.Total}"
+}
+```
+
+High-frequency tracepoint with filtering:
+```json
+{
+  "file": "Services/DataProcessor.cs",
+  "line": 120,
+  "log_message": "Processed item {i} of {total}",
+  "hit_count_multiple": 100,
+  "max_notifications": 10
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "tracepoint": {
+    "id": "tp-550e8400-e29b-41d4-a716-446655440000",
+    "type": "tracepoint",
+    "location": {
+      "file": "/app/Services/OrderService.cs",
+      "line": 55
+    },
+    "state": "bound",
+    "enabled": true,
+    "logMessage": "Processing order {orderId}, total: {order.Total}"
+  }
+}
+```
+
+**MCP Notification (sent when tracepoint hit):**
+```json
+{
+  "method": "debugger/breakpointHit",
+  "params": {
+    "breakpointId": "tp-550e8400-e29b-41d4-a716-446655440000",
+    "type": "tracepoint",
+    "location": {
+      "file": "/app/Services/OrderService.cs",
+      "line": 55
+    },
+    "threadId": 5,
+    "timestamp": "2024-01-15T10:30:45.123Z",
+    "hitCount": 42,
+    "logMessage": "Processing order ORD-12345, total: 299.99"
+  }
+}
+```
+
+**Log message expressions:**
+- Use `{variableName}` to interpolate variable values
+- Use `{object.Property}` to access properties
+- Use `{{` and `}}` for literal braces
+- Errors show as `<error: ExceptionType>`
+
+**Real-world use case:** An AI agent investigating slow order processing sets tracepoints at key stages with `hit_count_multiple: 1000`. After running a load test, the notifications reveal that 95% of time is spent in the validation step — without ever stopping the application.
+
+**Managing tracepoints:** Use `breakpoint_list` to see all tracepoints (they appear with `type: "tracepoint"`). Use `breakpoint_enable` to temporarily disable notifications. Use `breakpoint_remove` to delete.
+
+---
+
 ### breakpoint_wait
 
 Wait for any breakpoint to be hit.
@@ -289,3 +385,73 @@ Wait for any breakpoint to be hit.
   "message": "No breakpoint hit within 60000ms"
 }
 ```
+
+---
+
+## Breakpoint Notifications
+
+In addition to polling with `breakpoint_wait`, the debugger sends **push notifications** via MCP when breakpoints and tracepoints are hit. This enables event-driven debugging workflows.
+
+### Notification Method
+
+**Method:** `debugger/breakpointHit`
+
+This notification is sent whenever:
+- A blocking breakpoint is hit (execution pauses)
+- A tracepoint is hit (execution continues)
+- An exception breakpoint is triggered
+
+### Notification Format
+
+```json
+{
+  "method": "debugger/breakpointHit",
+  "params": {
+    "breakpointId": "bp-550e8400-e29b-41d4-a716-446655440000",
+    "type": "blocking",
+    "location": {
+      "file": "/app/Services/UserService.cs",
+      "line": 42,
+      "column": 8,
+      "functionName": "GetUser",
+      "moduleName": "MyApp.dll"
+    },
+    "threadId": 5,
+    "timestamp": "2024-01-15T10:30:45.123Z",
+    "hitCount": 1,
+    "logMessage": null,
+    "exceptionInfo": null
+  }
+}
+```
+
+### Type Field
+
+| Value | Description |
+|-------|-------------|
+| `blocking` | Regular breakpoint — execution is paused |
+| `tracepoint` | Tracepoint — execution continues, notification only |
+
+### Exception Info (when applicable)
+
+For exception breakpoints, the notification includes exception details:
+
+```json
+{
+  "exceptionInfo": {
+    "type": "System.NullReferenceException",
+    "message": "Object reference not set to an instance of an object.",
+    "isFirstChance": true,
+    "stackTrace": "   at MyApp.Services.UserService.GetUser(String userId)..."
+  }
+}
+```
+
+### Using Notifications vs. `breakpoint_wait`
+
+| Approach | Use Case |
+|----------|----------|
+| `breakpoint_wait` | Simple workflows — set breakpoint, wait for hit, inspect |
+| Notifications | Complex workflows — multiple breakpoints, tracepoints, event-driven agents |
+
+Both work together: `breakpoint_wait` still returns when a breakpoint is hit, AND a notification is sent. Use whichever fits your workflow.

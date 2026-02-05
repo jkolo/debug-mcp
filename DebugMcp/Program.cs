@@ -43,6 +43,7 @@ rootCommand.SetAction(async parseResult =>
     builder.Logging.SetMinimumLevel(LogLevel.Information);
 
     // Register debug services
+    builder.Services.AddSingleton<ProcessIoManager>();
     builder.Services.AddSingleton<IProcessDebugger, ProcessDebugger>();
     builder.Services.AddSingleton<IDebugSessionManager, DebugSessionManager>();
 
@@ -55,6 +56,8 @@ rootCommand.SetAction(async parseResult =>
         new DebuggerConditionEvaluator(
             sp.GetRequiredService<SimpleConditionEvaluator>(),
             sp.GetRequiredService<ILogger<DebuggerConditionEvaluator>>()));
+    builder.Services.AddSingleton<IBreakpointNotifier, BreakpointNotifier>();
+    builder.Services.AddSingleton<LogMessageEvaluator>();
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
 
     // Register code analysis services (015-roslyn-code-analysis)

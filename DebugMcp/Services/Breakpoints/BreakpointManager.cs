@@ -13,6 +13,8 @@ public sealed class BreakpointManager : IBreakpointManager
     private readonly IPdbSymbolReader _pdbReader;
     private readonly IProcessDebugger _processDebugger;
     private readonly IConditionEvaluator _conditionEvaluator;
+    private readonly IBreakpointNotifier _notifier;
+    private readonly LogMessageEvaluator? _logMessageEvaluator;
     private readonly ILogger<BreakpointManager> _logger;
 
     private readonly Lock _hitLock = new();
@@ -29,12 +31,16 @@ public sealed class BreakpointManager : IBreakpointManager
         IPdbSymbolReader pdbReader,
         IProcessDebugger processDebugger,
         IConditionEvaluator conditionEvaluator,
-        ILogger<BreakpointManager> logger)
+        IBreakpointNotifier notifier,
+        ILogger<BreakpointManager> logger,
+        LogMessageEvaluator? logMessageEvaluator = null)
     {
         _registry = registry;
         _pdbReader = pdbReader;
         _processDebugger = processDebugger;
         _conditionEvaluator = conditionEvaluator;
+        _notifier = notifier;
+        _logMessageEvaluator = logMessageEvaluator;
         _logger = logger;
 
         // Subscribe to debugger events
@@ -260,6 +266,160 @@ public sealed class BreakpointManager : IBreakpointManager
     }
 
     /// <inheritdoc />
+    public async Task<Breakpoint> SetTracepointAsync(
+        string file,
+        int line,
+        int? column = null,
+        string? logMessage = null,
+        int hitCountMultiple = 0,
+        int maxNotifications = 0,
+        CancellationToken cancellationToken = default)
+    {
+        // Check for duplicate tracepoint at same location
+        var existing = _registry.FindByLocation(file, line);
+        if (existing != null)
+        {
+            _logger.LogDebug("Tracepoint already exists at {File}:{Line}, returning existing ID {Id}",
+                file, line, existing.Id);
+
+            // Update tracepoint-specific fields if different
+            if (logMessage != existing.LogMessage ||
+                hitCountMultiple != existing.HitCountMultiple ||
+                maxNotifications != existing.MaxNotifications)
+            {
+                var updated = existing with
+                {
+                    Type = BreakpointType.Tracepoint,
+                    LogMessage = logMessage,
+                    HitCountMultiple = hitCountMultiple,
+                    MaxNotifications = maxNotifications
+                };
+                _registry.Update(updated);
+                return updated;
+            }
+
+            return existing;
+        }
+
+        // Generate unique ID with "tp-" prefix for tracepoints
+        var id = $"tp-{Guid.NewGuid()}";
+
+        // Create location
+        var location = new BreakpointLocation(
+            File: Path.GetFullPath(file),
+            Line: line,
+            Column: column);
+
+        // Try to bind the tracepoint if we have an active session
+        var state = BreakpointState.Pending;
+        var verified = false;
+        string? message = null;
+        BreakpointLocation? resolvedLocation = location;
+        string? boundModulePath = null;
+        object? nativeBreakpoint = null;
+
+        if (_processDebugger.IsAttached)
+        {
+            var wasStopped = _processDebugger.StopForInspection();
+            try
+            {
+                var loadedModules = _processDebugger.GetLoadedModules(processStopped: true);
+                _logger.LogDebug("Searching for source file in {Count} loaded modules for tracepoint", loadedModules.Count);
+
+                foreach (var moduleInfo in loadedModules)
+                {
+                    if (moduleInfo.IsDynamic || moduleInfo.IsInMemory)
+                        continue;
+
+                    try
+                    {
+                        var containsFile = await _pdbReader.ContainsSourceFileAsync(
+                            moduleInfo.ModulePath, file, cancellationToken);
+                        if (!containsFile)
+                            continue;
+
+                        _logger.LogDebug("Found source file {File} in module {Module} for tracepoint",
+                            file, moduleInfo.ModulePath);
+
+                        var bindResult = await TryBindBreakpointInModuleAsync(
+                            moduleInfo.NativeModule as CorDebugModule,
+                            moduleInfo.ModulePath,
+                            file,
+                            line,
+                            column,
+                            cancellationToken);
+
+                        if (bindResult.Success)
+                        {
+                            state = BreakpointState.Bound;
+                            verified = true;
+                            resolvedLocation = bindResult.ResolvedLocation ?? location;
+                            boundModulePath = moduleInfo.ModulePath;
+                            nativeBreakpoint = bindResult.NativeBreakpoint;
+                            _logger.LogDebug("Tracepoint {Id} bound at IL offset {Offset}",
+                                id, bindResult.ILOffset);
+                            break;
+                        }
+                        else
+                        {
+                            message = bindResult.ErrorMessage;
+                            _logger.LogDebug("Failed to bind tracepoint in module {Module}: {Error}",
+                                moduleInfo.ModulePath, bindResult.ErrorMessage);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Error checking module {Module} for source file",
+                            moduleInfo.ModulePath);
+                    }
+                }
+
+                if (state == BreakpointState.Pending)
+                {
+                    message = message ?? "Module not loaded; tracepoint will bind when module loads";
+                    _logger.LogDebug("Tracepoint {Id} pending: {Message}", id, message);
+                }
+            }
+            finally
+            {
+                _processDebugger.ResumeFromInspection(wasStopped);
+            }
+        }
+        else
+        {
+            message = "No active debug session; tracepoint will bind when session starts";
+        }
+
+        var tracepoint = new Breakpoint(
+            Id: id,
+            Location: resolvedLocation,
+            State: state,
+            Enabled: true,
+            Verified: verified,
+            HitCount: 0,
+            Type: BreakpointType.Tracepoint,
+            Condition: null,
+            Message: message,
+            LogMessage: logMessage,
+            HitCountMultiple: hitCountMultiple,
+            MaxNotifications: maxNotifications,
+            NotificationsSent: 0);
+
+        _registry.Add(tracepoint);
+
+        // Store native breakpoint handle if bound
+        if (nativeBreakpoint != null)
+        {
+            _registry.SetNativeBreakpoint(id, nativeBreakpoint, boundModulePath);
+        }
+
+        _logger.LogInformation("Created tracepoint {Id} at {File}:{Line} (state: {State})",
+            id, file, line, state);
+
+        return tracepoint;
+    }
+
+    /// <inheritdoc />
     public Task<bool> RemoveBreakpointAsync(
         string breakpointId,
         CancellationToken cancellationToken = default)
@@ -469,47 +629,86 @@ public sealed class BreakpointManager : IBreakpointManager
 
     /// <summary>
     /// Called by debugger callback when a breakpoint is hit.
-    /// Returns true if execution should pause, false if condition is false (silent continue).
+    /// Returns true if execution should pause, false if condition is false or tracepoint.
     /// </summary>
     internal bool OnBreakpointHit(BreakpointHit hit)
     {
         // Increment hit count in registry
         var breakpoint = _registry.Get(hit.BreakpointId);
-        if (breakpoint != null)
+        if (breakpoint == null)
         {
-            var newHitCount = breakpoint.HitCount + 1;
-            var updated = breakpoint with { HitCount = newHitCount };
-            _registry.Update(updated);
+            return true; // Pause by default if breakpoint not found
+        }
 
-            // Evaluate condition if present
-            if (!string.IsNullOrWhiteSpace(breakpoint.Condition))
+        var newHitCount = breakpoint.HitCount + 1;
+        var updated = breakpoint with { HitCount = newHitCount };
+        _registry.Update(updated);
+
+        // Evaluate condition if present (applies to both breakpoints and tracepoints)
+        if (!string.IsNullOrWhiteSpace(breakpoint.Condition))
+        {
+            var context = new ConditionContext
             {
-                var context = new ConditionContext
-                {
-                    HitCount = newHitCount,
-                    ThreadId = hit.ThreadId
-                };
+                HitCount = newHitCount,
+                ThreadId = hit.ThreadId
+            };
 
-                var result = _conditionEvaluator.Evaluate(breakpoint.Condition, context);
+            var result = _conditionEvaluator.Evaluate(breakpoint.Condition, context);
 
-                if (!result.Success)
-                {
-                    // Condition evaluation failed - log error and continue
-                    _logger.LogWarning("Condition evaluation failed for breakpoint {Id}: {Error}",
-                        hit.BreakpointId, result.ErrorMessage);
-                    // Still break so user can see the error
-                }
-                else if (!result.Value)
-                {
-                    // Condition is false - silent continue
-                    _logger.LogDebug("Breakpoint {Id} condition is false (hitCount={HitCount}), continuing",
-                        hit.BreakpointId, newHitCount);
-                    return false; // Don't pause
-                }
+            if (!result.Success)
+            {
+                // Condition evaluation failed - log error and continue
+                _logger.LogWarning("Condition evaluation failed for breakpoint {Id}: {Error}",
+                    hit.BreakpointId, result.ErrorMessage);
+                // Still break so user can see the error
+            }
+            else if (!result.Value)
+            {
+                // Condition is false - silent continue
+                _logger.LogDebug("Breakpoint {Id} condition is false (hitCount={HitCount}), continuing",
+                    hit.BreakpointId, newHitCount);
+                return false; // Don't pause, don't notify
             }
         }
 
-        // Signal the hit for waiting clients
+        // Check if tracepoint should send notification based on frequency filtering
+        var shouldNotify = ShouldSendNotification(breakpoint, newHitCount);
+
+        if (shouldNotify)
+        {
+            // Evaluate log message for tracepoints with log message templates
+            string? evaluatedLogMessage = null;
+            if (breakpoint.Type == BreakpointType.Tracepoint && !string.IsNullOrEmpty(breakpoint.LogMessage))
+            {
+                try
+                {
+                    evaluatedLogMessage = _logMessageEvaluator?.EvaluateLogMessageAsync(
+                        breakpoint.LogMessage,
+                        hit.ThreadId,
+                        frameIndex: 0,
+                        CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to evaluate log message for tracepoint {Id}", breakpoint.Id);
+                    evaluatedLogMessage = $"<error: {ex.GetType().Name}>";
+                }
+            }
+
+            // Send MCP notification (fire-and-forget)
+            var notification = CreateNotification(breakpoint, hit, newHitCount, evaluatedLogMessage);
+            _ = _notifier.SendBreakpointHitAsync(notification);
+        }
+
+        // For tracepoints, continue execution immediately (don't pause)
+        if (breakpoint.Type == BreakpointType.Tracepoint)
+        {
+            _logger.LogDebug("Tracepoint {Id} hit on thread {ThreadId}, continuing execution",
+                hit.BreakpointId, hit.ThreadId);
+            return false; // Don't pause
+        }
+
+        // Signal the hit for waiting clients (blocking breakpoints only)
         lock (_hitLock)
         {
             _pendingHit = hit;
@@ -521,6 +720,66 @@ public sealed class BreakpointManager : IBreakpointManager
 
         _logger.LogDebug("Breakpoint {Id} hit on thread {ThreadId}", hit.BreakpointId, hit.ThreadId);
         return true; // Pause execution
+    }
+
+    /// <summary>
+    /// Determines if a notification should be sent based on hit count filtering.
+    /// </summary>
+    private bool ShouldSendNotification(Breakpoint breakpoint, int hitCount)
+    {
+        // Check if tracepoint is enabled
+        if (!breakpoint.Enabled)
+        {
+            return false;
+        }
+
+        // Check max notifications limit
+        if (breakpoint.MaxNotifications > 0 && breakpoint.NotificationsSent >= breakpoint.MaxNotifications)
+        {
+            // Auto-disable tracepoint after reaching max
+            var disabled = breakpoint with { Enabled = false };
+            _registry.Update(disabled);
+            _logger.LogDebug("Tracepoint {Id} auto-disabled after {Count} notifications",
+                breakpoint.Id, breakpoint.MaxNotifications);
+            return false;
+        }
+
+        // Check hit count multiple filter
+        if (breakpoint.HitCountMultiple > 0 && hitCount % breakpoint.HitCountMultiple != 0)
+        {
+            return false;
+        }
+
+        // Increment notifications sent counter
+        var updated = breakpoint with { NotificationsSent = breakpoint.NotificationsSent + 1 };
+        _registry.Update(updated);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Creates a BreakpointNotification from hit information.
+    /// </summary>
+    private BreakpointNotification CreateNotification(
+        Breakpoint breakpoint,
+        BreakpointHit hit,
+        int hitCount,
+        string? logMessage)
+    {
+        return new BreakpointNotification(
+            BreakpointId: breakpoint.Id,
+            Type: breakpoint.Type,
+            Location: new NotificationLocation(
+                File: hit.Location.File,
+                Line: hit.Location.Line,
+                Column: hit.Location.Column,
+                FunctionName: null, // TODO: Could be enhanced with stack info
+                ModuleName: null),
+            ThreadId: hit.ThreadId,
+            Timestamp: hit.Timestamp,
+            HitCount: hitCount,
+            LogMessage: logMessage,
+            ExceptionInfo: hit.ExceptionInfo);
     }
 
     /// <summary>
@@ -563,6 +822,23 @@ public sealed class BreakpointManager : IBreakpointManager
             Location: location,
             HitCount: updated.HitCount,
             ExceptionInfo: exceptionInfo);
+
+        // Send MCP notification (fire-and-forget)
+        var notification = new BreakpointNotification(
+            BreakpointId: exBp.Id,
+            Type: BreakpointType.Blocking, // Exception breakpoints are always blocking
+            Location: new NotificationLocation(
+                File: location.File,
+                Line: location.Line,
+                Column: null,
+                FunctionName: null,
+                ModuleName: null),
+            ThreadId: e.ThreadId,
+            Timestamp: e.Timestamp,
+            HitCount: updated.HitCount,
+            LogMessage: null,
+            ExceptionInfo: exceptionInfo);
+        _ = _notifier.SendBreakpointHitAsync(notification);
 
         // Signal the hit for waiting clients
         lock (_hitLock)

@@ -51,7 +51,7 @@ public sealed class BreakpointListTool
             var serializedBreakpoints = breakpoints.Select(bp => new
             {
                 id = bp.Id,
-                type = "source", // Could be "source", "function", or "exception"
+                type = bp.Type == BreakpointType.Tracepoint ? "tracepoint" : "blocking",
                 location = new
                 {
                     file = bp.Location.File,
@@ -67,7 +67,11 @@ public sealed class BreakpointListTool
                 verified = bp.Verified,
                 condition = bp.Condition,
                 hitCount = bp.HitCount,
-                message = bp.Message
+                message = bp.Message,
+                logMessage = bp.Type == BreakpointType.Tracepoint ? bp.LogMessage : null,
+                hitCountMultiple = bp.Type == BreakpointType.Tracepoint && bp.HitCountMultiple > 0 ? bp.HitCountMultiple : (int?)null,
+                maxNotifications = bp.Type == BreakpointType.Tracepoint && bp.MaxNotifications > 0 ? bp.MaxNotifications : (int?)null,
+                notificationsSent = bp.Type == BreakpointType.Tracepoint ? bp.NotificationsSent : (int?)null
             }).ToList();
 
             return JsonSerializer.Serialize(new

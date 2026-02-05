@@ -74,6 +74,27 @@ public interface IBreakpointManager
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sets a tracepoint (non-blocking observation point) at the specified source location.
+    /// Unlike breakpoints, tracepoints don't pause execution but send notifications when hit.
+    /// </summary>
+    /// <param name="file">Absolute path to source file.</param>
+    /// <param name="line">1-based line number.</param>
+    /// <param name="column">Optional 1-based column for targeting lambdas/inline statements.</param>
+    /// <param name="logMessage">Optional log message template with {expression} placeholders.</param>
+    /// <param name="hitCountMultiple">Notify only every Nth hit (0 = every hit).</param>
+    /// <param name="maxNotifications">Auto-disable after N notifications (0 = unlimited).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created tracepoint.</returns>
+    Task<Breakpoint> SetTracepointAsync(
+        string file,
+        int line,
+        int? column = null,
+        string? logMessage = null,
+        int hitCountMultiple = 0,
+        int maxNotifications = 0,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Sets an exception breakpoint.
     /// </summary>
     /// <param name="exceptionType">Full type name of exception.</param>

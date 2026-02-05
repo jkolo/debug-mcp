@@ -162,4 +162,12 @@ public static class ErrorCodes
 
     /// <summary>Code analysis operation failed.</summary>
     public const string AnalysisFailed = "ANALYSIS_FAILED";
+
+    // Process I/O error codes (017-process-io-redirection)
+
+    /// <summary>Stdin is closed (EOF sent).</summary>
+    public const string StdinClosed = "STDIN_CLOSED";
+
+    /// <summary>I/O operation failed.</summary>
+    public const string IoFailed = "IO_FAILED";
 }
