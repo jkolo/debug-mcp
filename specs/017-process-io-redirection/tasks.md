@@ -12,7 +12,7 @@
 - [x] T005 Modify `ProcessDebugger.LaunchAsync` to use `Process.Start` with redirected I/O
 - [x] T006 Wire `ProcessIoManager` to capture stdout/stderr streams
 - [x] T007 Keep using DbgShim for runtime startup detection and attach
-- [ ] T008 Test launch + continue doesn't hang MCP
+- [x] T008 Test launch + continue doesn't hang MCP
 
 ## Phase 3: New MCP Tools
 
@@ -22,6 +22,6 @@
 
 ## Phase 4: Validation
 
-- [ ] T012 Manual test: launch TestTargetApp, continue, read output
-- [ ] T013 Manual test: write "loop" to stdin, verify loop runs
-- [ ] T014 Test tracepoint notifications work while process running
+- [x] T012 Manual test: launch TestTargetApp, continue, read output
+- [x] T013 Manual test: write "loop" to stdin, verify loop runs
+- [x] T014 Test tracepoint notifications work while process running
