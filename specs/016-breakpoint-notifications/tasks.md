@@ -36,10 +36,10 @@
 
 ### Tests for US1
 
-- [ ] T005 [P] [US1] Write unit test NotificationTests.SendNotification_BreakpointHit_SendsMcpNotification in tests/DebugMcp.Tests/Unit/Breakpoints/NotificationTests.cs
-- [ ] T006 [P] [US1] Write unit test NotificationTests.SendNotification_MultipleBreakpoints_SendsOnlyHitBreakpoint in tests/DebugMcp.Tests/Unit/Breakpoints/NotificationTests.cs
-- [ ] T007 [P] [US1] Write unit test NotificationTests.SendNotification_WithBreakpointWait_BothWork in tests/DebugMcp.Tests/Unit/Breakpoints/NotificationTests.cs
-- [ ] T008 [P] [US1] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/BreakpointNotification.feature: Scenario "Receive notification on breakpoint hit"
+- [x] T005 [P] [US1] Write unit test NotificationTests.SendNotification_BreakpointHit_SendsMcpNotification in tests/DebugMcp.Tests/Unit/Breakpoints/NotificationTests.cs
+- [x] T006 [P] [US1] Write unit test NotificationTests.SendNotification_MultipleBreakpoints_SendsOnlyHitBreakpoint in tests/DebugMcp.Tests/Unit/Breakpoints/NotificationTests.cs
+- [x] T007 [P] [US1] Write unit test NotificationTests.SendNotification_WithBreakpointWait_BothWork in tests/DebugMcp.Tests/Unit/Breakpoints/NotificationTests.cs
+- [ ] ~~T008 [P] [US1] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/BreakpointNotification.feature: Scenario "Receive notification on breakpoint hit"~~ — **DESCOPED**: MCP notifications cannot be captured in Reqnroll E2E tests (no client-side notification listener). Validated manually via MCP tools.
 
 ### Implementation for US1
 
@@ -61,10 +61,10 @@
 
 ### Tests for US2
 
-- [ ] T014 [P] [US2] Write unit test TracepointTests.SetTracepoint_ReturnsUniqueId in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T015 [P] [US2] Write unit test TracepointTests.TracepointHit_SendsNotification_ContinuesExecution in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T016 [P] [US2] Write unit test TracepointTests.TracepointInLoop_SendsMultipleNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T017 [P] [US2] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/Tracepoint.feature: Scenario "Tracepoint sends notification without pausing"
+- [x] T014 [P] [US2] Write unit test TracepointTests.SetTracepoint_ReturnsUniqueId in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T015 [P] [US2] Write unit test TracepointTests.TracepointHit_SendsNotification_ContinuesExecution in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T016 [P] [US2] Write unit test TracepointTests.TracepointInLoop_SendsMultipleNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [ ] ~~T017 [P] [US2] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/Tracepoint.feature: Scenario "Tracepoint sends notification without pausing"~~ — **DESCOPED**: see T008
 
 ### Implementation for US2
 
@@ -86,10 +86,10 @@
 
 ### Tests for US3
 
-- [ ] T023 [P] [US3] Write unit test TracepointTests.LogMessage_SingleExpression_EvaluatesCorrectly in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T024 [P] [US3] Write unit test TracepointTests.LogMessage_MultipleExpressions_EvaluatesAll in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T025 [P] [US3] Write unit test TracepointTests.LogMessage_ExpressionError_IncludesErrorMarker in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T026 [P] [US3] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/Tracepoint.feature: Scenario "Tracepoint evaluates log message expressions"
+- [x] T023 [P] [US3] Write unit test TracepointTests.LogMessage_SingleExpression_EvaluatesCorrectly in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T024 [P] [US3] Write unit test TracepointTests.LogMessage_MultipleExpressions_EvaluatesAll in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T025 [P] [US3] Write unit test TracepointTests.LogMessage_ExpressionError_IncludesErrorMarker in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [ ] ~~T026 [P] [US3] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/Tracepoint.feature: Scenario "Tracepoint evaluates log message expressions"~~ — **DESCOPED**: see T008
 
 ### Implementation for US3
 
@@ -112,10 +112,10 @@
 
 ### Tests for US4
 
-- [ ] T033 [P] [US4] Write unit test TracepointTests.BreakpointList_IncludesTracepointsWithType in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T034 [P] [US4] Write unit test TracepointTests.DisableTracepoint_StopsNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T035 [P] [US4] Write unit test TracepointTests.EnableTracepoint_ResumesNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T036 [P] [US4] Write unit test TracepointTests.RemoveTracepoint_DeletesAndStopsNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T033 [P] [US4] Write unit test TracepointTests.BreakpointList_IncludesTracepointsWithType in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T034 [P] [US4] Write unit test TracepointTests.DisableTracepoint_StopsNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T035 [P] [US4] Write unit test TracepointTests.EnableTracepoint_ResumesNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T036 [P] [US4] Write unit test TracepointTests.RemoveTracepoint_DeletesAndStopsNotifications in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
 
 ### Implementation for US4
 
@@ -136,9 +136,9 @@
 
 ### Tests for US5
 
-- [ ] T041 [P] [US5] Write unit test TracepointTests.HitCountMultiple_NotifiesEveryNthHit in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T042 [P] [US5] Write unit test TracepointTests.MaxNotifications_AutoDisablesAfterLimit in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
-- [ ] T043 [P] [US5] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/Tracepoint.feature: Scenario "Tracepoint filters by hit count"
+- [x] T041 [P] [US5] Write unit test TracepointTests.HitCountMultiple_NotifiesEveryNthHit in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [x] T042 [P] [US5] Write unit test TracepointTests.MaxNotifications_AutoDisablesAfterLimit in tests/DebugMcp.Tests/Unit/Breakpoints/TracepointTests.cs
+- [ ] ~~T043 [P] [US5] Write E2E test in tests/DebugMcp.E2E/Features/Breakpoints/Tracepoint.feature: Scenario "Tracepoint filters by hit count"~~ — **DESCOPED**: see T008
 
 ### Implementation for US5
 
@@ -248,22 +248,9 @@ Task: "Write E2E test Tracepoint.feature: Scenario Tracepoint sends notification
 ## Known Issues Found During Testing
 
 ### FEATURE-001: Breakpoint persistence across sessions
-**Status**: Partial (persistence works, rebinding missing)
-**Expected behavior**:
-1. Breakpoints persist across debug sessions by default
-2. `debug_disconnect(clearBreakpoints: true)` optionally clears all breakpoints
-3. When new session starts, existing breakpoints should be rebound to loaded modules
-**Current state**: Breakpoints persist but aren't rebound on new session start.
-**TODO**: Add `clearBreakpoints` parameter to disconnect, implement rebinding on session start.
+**Status**: Out-of-scope for 016. Tracked separately for future work.
+**Summary**: Breakpoints persist across debug sessions but aren't rebound on new session start. Needs `clearBreakpoints` parameter on disconnect + rebinding on session start.
 
 ### BUG-002: MCP operations hang when process is in running state
-**Severity**: High
-**Root cause**: `DbgShim.CreateProcessForLaunch` inherits stdio from parent process (MCP server).
-When debugged process calls `Console.ReadLine()`, it blocks MCP's stdin (JSON-RPC input).
-When debugged process calls `Console.WriteLine()`, it corrupts MCP's stdout (JSON-RPC output).
-**Affected**: Any MCP tool when debugged process uses stdin/stdout
-**Workaround**: Use test programs that don't use Console.ReadLine/WriteLine.
-**Fix options**:
-1. Use `System.Diagnostics.Process` to launch with redirected stdio, then attach debugger
-2. Create wrapper that redirects stdio before launching via DbgShim
-3. Set `DOTNET_CONSOLE_DISABLE_COLORS=1` and redirect process stdio to files/pipes
+**Status**: RESOLVED by feature 017 (Process I/O Redirection).
+**Fix**: `ProcessIoManager` redirects debuggee stdin/stdout/stderr to internal buffers, preventing interference with MCP's JSON-RPC transport.
