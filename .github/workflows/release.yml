@@ -40,9 +40,11 @@ jobs:
         run: dotnet pack -c Release -p:Version=${{ steps.version.outputs.VERSION }} -o ./nupkg --no-build
 
       - name: Publish to NuGet.org
+        continue-on-error: true
         run: dotnet nuget push ./nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
 
       - name: Publish to GitHub Packages
+        continue-on-error: true
         run: dotnet nuget push ./nupkg/*.nupkg --source https://nuget.pkg.github.com/jkolo/index.json --api-key ${{ secrets.GITHUB_TOKEN }} --skip-duplicate
 
       - name: Create GitHub Release
@@ -55,20 +57,36 @@ jobs:
         if: success() && env.HAS_MATRIX == 'true'
         env:
           HAS_MATRIX: ${{ secrets.MATRIX_HOMESERVER != '' }}
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         uses: s3krit/matrix-message-action@v0.0.3
         with:
           room_id: ${{ secrets.MATRIX_ROOM_ID }}
           access_token: ${{ secrets.MATRIX_TOKEN }}
           server: ${{ secrets.MATRIX_HOMESERVER }}
-          message: "Released ${{ github.ref_name }} ✅\nRelease: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}\nNuGet: https://www.nuget.org/packages/debug-mcp/${{ steps.version.outputs.VERSION }}"
+          message: |
+            🚀 **debug-mcp.net** — Release ${{ env.RELEASE_TAG }}
+
+            📦 Build, test & pack succeeded
+            🔗 Release notes: https://github.com/${{ env.REPO }}/releases/tag/${{ env.RELEASE_TAG }}
+            📋 NuGet: https://www.nuget.org/packages/debug-mcp/${{ env.RELEASE_VERSION }}
+            🏷️ Version: ${{ env.RELEASE_VERSION }}
 
       - name: Notify Matrix on failure
         if: failure() && env.HAS_MATRIX == 'true'
         env:
           HAS_MATRIX: ${{ secrets.MATRIX_HOMESERVER != '' }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         uses: s3krit/matrix-message-action@v0.0.3
         with:
           room_id: ${{ secrets.MATRIX_ROOM_ID }}
           access_token: ${{ secrets.MATRIX_TOKEN }}
           server: ${{ secrets.MATRIX_HOMESERVER }}
-          message: "Release ${{ github.ref_name }} failed ❌\nLogs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          message: |
+            ❌ **debug-mcp.net** — Release ${{ env.RELEASE_TAG }} failed
+
+            🔍 Logs: https://github.com/${{ env.REPO }}/actions/runs/${{ env.RUN_ID }}
+            🌿 Tag: ${{ env.RELEASE_TAG }}

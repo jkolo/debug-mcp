@@ -33,9 +33,18 @@ jobs:
         if: failure() && env.HAS_MATRIX == 'true'
         env:
           HAS_MATRIX: ${{ secrets.MATRIX_HOMESERVER != '' }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
         uses: s3krit/matrix-message-action@v0.0.3
         with:
           room_id: ${{ secrets.MATRIX_ROOM_ID }}
           access_token: ${{ secrets.MATRIX_TOKEN }}
           server: ${{ secrets.MATRIX_HOMESERVER }}
-          message: "CI failed for ${{ github.repository }} on ${{ github.ref_name }}"
+          message: |
+            ❌ **debug-mcp.net** — CI failed on `${{ env.BRANCH }}`
+
+            🔍 Logs: https://github.com/${{ env.REPO }}/actions/runs/${{ env.RUN_ID }}
+            🌿 Branch: ${{ env.BRANCH }}
+            📝 Commit: ${{ env.COMMIT_SHA }}
