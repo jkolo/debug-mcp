@@ -37,14 +37,12 @@ jobs:
         run: dotnet test -c Release --no-build --filter "FullyQualifiedName~Unit"
 
       - name: Pack
-        run: dotnet pack -c Release -p:Version=${{ steps.version.outputs.VERSION }} -o ./nupkg --no-build
+        run: dotnet pack DebugMcp/DebugMcp.csproj -c Release -p:Version=${{ steps.version.outputs.VERSION }} -o ./nupkg --no-build
 
       - name: Publish to NuGet.org
-        continue-on-error: true
         run: dotnet nuget push ./nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
 
       - name: Publish to GitHub Packages
-        continue-on-error: true
         run: dotnet nuget push ./nupkg/*.nupkg --source https://nuget.pkg.github.com/jkolo/index.json --api-key ${{ secrets.GITHUB_TOKEN }} --skip-duplicate
 
       - name: Create GitHub Release
