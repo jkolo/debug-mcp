@@ -172,6 +172,27 @@ public class CliArgumentTests
     }
 
     [Fact]
+    public async Task NoSymbols_Flag_Is_Recognized()
+    {
+        var (exitCode, stdout, _) = await RunToolAsync("--help");
+
+        exitCode.Should().Be(0);
+        stdout.Should().Contain("--no-symbols");
+    }
+
+    [Fact]
+    public async Task SymbolServer_Options_Are_Recognized()
+    {
+        var (exitCode, stdout, _) = await RunToolAsync("--help");
+
+        exitCode.Should().Be(0);
+        stdout.Should().Contain("--symbol-servers");
+        stdout.Should().Contain("--symbol-cache");
+        stdout.Should().Contain("--symbol-timeout");
+        stdout.Should().Contain("--symbol-max-size");
+    }
+
+    [Fact]
     public async Task No_Arguments_Starts_MCP_Server()
     {
         var psi = new ProcessStartInfo("dotnet", ["run", "--project", ProjectPath, "--no-build", "-c", Configuration])

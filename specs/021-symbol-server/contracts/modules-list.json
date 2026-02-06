@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "modules_list response (updated for 021-symbol-server)",
+  "description": "Response from the modules_list MCP tool with symbol status fields added",
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": {
+      "type": "boolean"
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name", "fullName", "path", "version", "isManaged",
+          "isDynamic", "hasSymbols", "moduleId", "baseAddress", "size",
+          "symbolStatus"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Assembly simple name"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full assembly name with version/culture/key"
+          },
+          "path": {
+            "type": ["string", "null"],
+            "description": "File path (null for in-memory modules)"
+          },
+          "version": {
+            "type": "string",
+            "description": "Assembly version"
+          },
+          "isManaged": {
+            "type": "boolean"
+          },
+          "isDynamic": {
+            "type": "boolean"
+          },
+          "hasSymbols": {
+            "type": "boolean",
+            "description": "True if PDB symbols are loaded (backwards-compatible)"
+          },
+          "moduleId": {
+            "type": "string",
+            "description": "Unique module identifier (mod-N)"
+          },
+          "baseAddress": {
+            "type": ["string", "null"],
+            "description": "Memory base address in hex"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Module size in bytes"
+          },
+          "symbolStatus": {
+            "type": "string",
+            "enum": ["loaded", "not_found", "downloading", "failed", "pending_download", "none"],
+            "description": "Current symbol resolution status"
+          },
+          "symbolStatusDetail": {
+            "type": ["string", "null"],
+            "description": "Additional context: source for loaded (local/embedded/cache/server), error message for failed, server URL for downloading"
+          }
+        }
+      }
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of modules returned"
+    },
+    "error": {
+      "type": "object",
+      "description": "Present only when success is false",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": {}
+      }
+    }
+  }
+}

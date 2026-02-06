@@ -13,6 +13,8 @@ namespace DebugMcp.Models.Modules;
 /// <param name="ModuleId">Unique identifier for this module.</param>
 /// <param name="BaseAddress">Memory base address (hex string, e.g., "0x00007FF8A1230000").</param>
 /// <param name="Size">Module size in bytes.</param>
+/// <param name="SymbolStatus">Symbol resolution status (none, loaded, pending_download, downloading, not_found, failed).</param>
+/// <param name="SymbolStatusDetail">Additional detail about symbol status (source for loaded, error message for failed).</param>
 public sealed record ModuleInfo(
     string Name,
     string FullName,
@@ -23,4 +25,6 @@ public sealed record ModuleInfo(
     bool HasSymbols,
     string ModuleId,
     string? BaseAddress,
-    int Size);
+    int Size,
+    string SymbolStatus = "none",
+    string? SymbolStatusDetail = null);

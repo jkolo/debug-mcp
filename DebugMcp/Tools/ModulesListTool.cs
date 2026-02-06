@@ -76,7 +76,9 @@ public sealed class ModulesListTool
                 ["hasSymbols"] = m.HasSymbols,
                 ["moduleId"] = m.ModuleId,
                 ["baseAddress"] = m.BaseAddress,
-                ["size"] = m.Size
+                ["size"] = m.Size,
+                ["symbolStatus"] = m.SymbolStatus,
+                ["symbolStatusDetail"] = m.SymbolStatusDetail
             }).ToList();
 
             var response = new Dictionary<string, object?>
