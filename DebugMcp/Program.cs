@@ -86,7 +86,10 @@ rootCommand.SetAction(async parseResult =>
     }
 
     // Configure MCP server with stdio transport, logging, and resources capabilities
-    // Note: --no-roslyn flag currently doesn't filter tools (TODO: implement proper filtering)
+    var toolTypes = typeof(Program).Assembly.GetTypes()
+        .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() != null)
+        .Where(t => !disableRoslyn || !t.Name.StartsWith("Code", StringComparison.Ordinal));
+
     builder.Services
         .AddMcpServer(options =>
         {
@@ -123,7 +126,7 @@ rootCommand.SetAction(async parseResult =>
             }
             return new ValueTask<EmptyResult>(new EmptyResult());
         })
-        .WithToolsFromAssembly(typeof(Program).Assembly)
+        .WithTools(toolTypes)
         .WithCompleteHandler(async (request, ct) =>
         {
             var provider = request.Services!.GetRequiredService<ExpressionCompletionProvider>();
