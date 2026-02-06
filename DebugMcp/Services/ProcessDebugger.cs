@@ -570,15 +570,30 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         await Task.Run(() =>
         {
-            // BUGFIX: Stop OUTSIDE lock to avoid deadlock with ICorDebug callbacks.
-            // We stop first, then acquire lock and terminate immediately (no Continue
-            // in between, so no FailFast race from callbacks calling Continue).
+            // BUGFIX: Resume and stop OUTSIDE lock to avoid deadlock with ICorDebug callbacks.
+            // ICorDebug requires the process to not be paused for Terminate() to succeed.
+            // If paused (e.g. at breakpoint), Continue first — same pattern as DetachAsync().
             CorDebugProcess? processToStop;
             bool needsStop;
+            bool needsContinue;
             lock (_lock)
             {
                 processToStop = _process;
                 needsStop = _process != null && _currentState == SessionState.Running;
+                needsContinue = _process != null && _currentState == SessionState.Paused;
+            }
+
+            if (needsContinue && processToStop != null)
+            {
+                try
+                {
+                    _logger.LogDebug("Continuing paused process before terminate (outside lock)");
+                    processToStop.Continue(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Continue before terminate failed (process may have exited)");
+                }
             }
 
             if (needsStop && processToStop != null)
@@ -600,13 +615,21 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 {
                     if (_process != null)
                     {
+                        // Wrap Terminate in timeout — if it still hangs, fall back to OS kill.
+                        var terminated = false;
                         try
                         {
-                            _process.Terminate(exitCode: 0);
+                            var terminateTask = Task.Run(() => _process.Terminate(exitCode: 0));
+                            terminated = terminateTask.Wait(TimeSpan.FromSeconds(5));
                         }
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "Terminate failed, trying OS kill");
+                        }
+
+                        if (!terminated)
+                        {
+                            _logger.LogWarning("Terminate timed out after 5s, trying OS kill");
                             try
                             {
                                 var pid = _process.Id;
