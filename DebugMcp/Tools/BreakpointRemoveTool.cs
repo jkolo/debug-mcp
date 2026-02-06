@@ -51,8 +51,10 @@ public sealed class BreakpointRemoveTool
                     "Breakpoint ID cannot be empty");
             }
 
-            // Remove the breakpoint
-            var removed = await _breakpointManager.RemoveBreakpointAsync(id, cancellationToken);
+            // Route to the correct removal method based on ID prefix
+            var removed = id.StartsWith("ebp-", StringComparison.Ordinal)
+                ? await _breakpointManager.RemoveExceptionBreakpointAsync(id, cancellationToken)
+                : await _breakpointManager.RemoveBreakpointAsync(id, cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("breakpoint_remove", stopwatch.ElapsedMilliseconds);

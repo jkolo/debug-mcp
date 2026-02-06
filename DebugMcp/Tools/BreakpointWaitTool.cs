@@ -3,6 +3,7 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
+using DebugMcp.Models.Inspection;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
@@ -18,15 +19,18 @@ public sealed class BreakpointWaitTool
 {
     private readonly IBreakpointManager _breakpointManager;
     private readonly IDebugSessionManager _sessionManager;
+    private readonly IExceptionAutopsyService _autopsyService;
     private readonly ILogger<BreakpointWaitTool> _logger;
 
     public BreakpointWaitTool(
         IBreakpointManager breakpointManager,
         IDebugSessionManager sessionManager,
+        IExceptionAutopsyService autopsyService,
         ILogger<BreakpointWaitTool> logger)
     {
         _breakpointManager = breakpointManager;
         _sessionManager = sessionManager;
+        _autopsyService = autopsyService;
         _logger = logger;
     }
 
@@ -42,6 +46,7 @@ public sealed class BreakpointWaitTool
     public async Task<string> WaitForBreakpointAsync(
         [Description("Timeout in milliseconds (default: 30000, max: 300000)")] int timeout_ms = 30000,
         [Description("Wait for specific breakpoint only (optional)")] string? breakpoint_id = null,
+        [Description("Include full exception autopsy context when an exception breakpoint fires (default: false)")] bool include_autopsy = false,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -118,6 +123,23 @@ public sealed class BreakpointWaitTool
             _logger.LogInformation("Breakpoint {BreakpointId} hit on thread {ThreadId} at {File}:{Line}",
                 hit.BreakpointId, hit.ThreadId, hit.Location.File, hit.Location.Line);
 
+            // Optionally collect autopsy context for exception hits
+            object? autopsy = null;
+            if (include_autopsy && hit.ExceptionInfo != null)
+            {
+                try
+                {
+                    var autopsyResult = await _autopsyService.GetExceptionContextAsync(
+                        cancellationToken: cancellationToken);
+                    autopsy = SerializeAutopsyResult(autopsyResult);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to collect exception autopsy for breakpoint_wait");
+                    autopsy = new { error = ex.Message };
+                }
+            }
+
             // Return hit response
             return JsonSerializer.Serialize(new
             {
@@ -127,7 +149,8 @@ public sealed class BreakpointWaitTool
                 timestamp = hit.Timestamp.ToString("O"),
                 location = SerializeLocation(hit.Location),
                 hitCount = hit.HitCount,
-                exceptionInfo = hit.ExceptionInfo != null ? SerializeExceptionInfo(hit.ExceptionInfo) : null
+                exceptionInfo = hit.ExceptionInfo != null ? SerializeExceptionInfo(hit.ExceptionInfo) : null,
+                autopsy
             }, new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -171,6 +194,57 @@ public sealed class BreakpointWaitTool
             message = info.Message,
             isFirstChance = info.IsFirstChance,
             stackTrace = info.StackTrace
+        };
+    }
+
+    private static object SerializeAutopsyResult(ExceptionAutopsyResult result)
+    {
+        return new
+        {
+            threadId = result.ThreadId,
+            exception = new
+            {
+                type = result.Exception.Type,
+                message = result.Exception.Message,
+                isFirstChance = result.Exception.IsFirstChance,
+                stackTraceString = result.Exception.StackTraceString
+            },
+            innerExceptions = result.InnerExceptions.Select(ie => new
+            {
+                type = ie.Type,
+                message = ie.Message,
+                depth = ie.Depth
+            }),
+            innerExceptionsTruncated = result.InnerExceptionsTruncated,
+            frames = result.Frames.Select(f => new Dictionary<string, object?>
+            {
+                ["index"] = f.Index,
+                ["function"] = f.Function,
+                ["module"] = f.Module,
+                ["isExternal"] = f.IsExternal,
+                ["location"] = f.Location != null ? new
+                {
+                    file = f.Location.File,
+                    line = f.Location.Line,
+                    column = f.Location.Column
+                } : null,
+                ["variables"] = f.Variables != null ? new
+                {
+                    locals = f.Variables.Locals.Select(v => new
+                    {
+                        name = v.Name,
+                        type = v.Type,
+                        value = v.Value
+                    }),
+                    errors = f.Variables.Errors?.Select(e => new
+                    {
+                        name = e.Name,
+                        error = e.Error
+                    })
+                } : null
+            }),
+            totalFrames = result.TotalFrames,
+            throwingFrameIndex = result.ThrowingFrameIndex
         };
     }
 

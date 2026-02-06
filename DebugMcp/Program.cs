@@ -107,6 +107,9 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<LogMessageEvaluator>();
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
 
+    // Register exception autopsy service (022-exception-autopsy)
+    builder.Services.AddSingleton<IExceptionAutopsyService, ExceptionAutopsyService>();
+
     // Register resource services (019-mcp-resources)
     builder.Services.AddSingleton<ThreadSnapshotCache>();
     builder.Services.AddSingleton<AllowedSourcePaths>();

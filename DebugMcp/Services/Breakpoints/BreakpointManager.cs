@@ -1,4 +1,5 @@
 using ClrDebug;
+using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
 using Microsoft.Extensions.Logging;
 
@@ -48,6 +49,7 @@ public sealed class BreakpointManager : IBreakpointManager
         _processDebugger.ModuleLoaded += OnModuleLoaded;
         _processDebugger.ModuleUnloaded += OnModuleUnloaded;
         _processDebugger.ExceptionHit += OnExceptionHit;
+        _processDebugger.StateChanged += OnStateChanged;
     }
 
     private void OnDebuggerBreakpointHit(object? sender, BreakpointHitEventArgs e)
@@ -601,6 +603,13 @@ public sealed class BreakpointManager : IBreakpointManager
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<ExceptionBreakpoint>> GetExceptionBreakpointsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(_registry.GetAllExceptions());
+    }
+
+    /// <inheritdoc />
     public Task ClearAllBreakpointsAsync(CancellationToken cancellationToken = default)
     {
         // Deactivate all native breakpoints before clearing
@@ -802,6 +811,9 @@ public sealed class BreakpointManager : IBreakpointManager
         if (exBp == null)
             return;
 
+        // Signal the debugger callback to NOT auto-continue — we want to pause
+        e.ShouldContinue = false;
+
         // Increment hit count
         var updated = exBp with { HitCount = exBp.HitCount + 1 };
         _registry.UpdateException(updated);
@@ -855,6 +867,15 @@ public sealed class BreakpointManager : IBreakpointManager
 
         _logger.LogInformation("Exception breakpoint {Id} hit: {ExceptionType} on thread {ThreadId}",
             exBp.Id, e.ExceptionType, e.ThreadId);
+    }
+
+    private void OnStateChanged(object? sender, SessionStateChangedEventArgs e)
+    {
+        if (e.NewState == SessionState.Disconnected)
+        {
+            _logger.LogInformation("Session disconnected — clearing all breakpoints");
+            _ = ClearAllBreakpointsAsync();
+        }
     }
 
     private void OnModuleLoaded(object? sender, ModuleLoadedEventArgs e)

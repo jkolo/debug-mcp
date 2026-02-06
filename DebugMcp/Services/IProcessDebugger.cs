@@ -66,6 +66,12 @@ public interface IProcessDebugger
     int? ActiveThreadId { get; }
 
     /// <summary>
+    /// Gets the most recent exception info from the last Exception2 callback.
+    /// Used as fallback when $exception eval fails (e.g., at unhandled exceptions).
+    /// </summary>
+    (string Type, string Message, bool IsFirstChance)? LastExceptionInfo { get; }
+
+    /// <summary>
     /// Checks if a process is a .NET process.
     /// </summary>
     /// <param name="pid">Process ID to check.</param>
@@ -534,4 +540,11 @@ public sealed class ExceptionHitEventArgs : EventArgs
 
     /// <summary>True if the exception is unhandled.</summary>
     public required bool IsUnhandled { get; init; }
+
+    /// <summary>
+    /// Set to false by event handlers (e.g. BreakpointManager) to signal that
+    /// the debugger callback should pause instead of auto-continuing.
+    /// Used when an exception breakpoint matches a first-chance exception.
+    /// </summary>
+    public bool ShouldContinue { get; set; } = true;
 }
