@@ -4,6 +4,7 @@ using DebugMcp.Infrastructure;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
+using DebugMcp.Services.Completions;
 using DebugMcp.Services.Resources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -75,6 +76,9 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<AllowedSourcePaths>();
     builder.Services.AddSingleton<ResourceNotifier, McpResourceNotifier>();
 
+    // Register completion services (020-mcp-completions)
+    builder.Services.AddSingleton<ExpressionCompletionProvider>();
+
     // Register code analysis services (015-roslyn-code-analysis)
     if (!disableRoslyn)
     {
@@ -97,6 +101,7 @@ rootCommand.SetAction(async parseResult =>
                 Subscribe = true,
                 ListChanged = true
             };
+            options.Capabilities.Completions = new();
         })
         .WithStdioServerTransport()
         .WithResources<DebuggerResourceProvider>()
@@ -118,7 +123,12 @@ rootCommand.SetAction(async parseResult =>
             }
             return new ValueTask<EmptyResult>(new EmptyResult());
         })
-        .WithToolsFromAssembly(typeof(Program).Assembly);
+        .WithToolsFromAssembly(typeof(Program).Assembly)
+        .WithCompleteHandler(async (request, ct) =>
+        {
+            var provider = request.Services!.GetRequiredService<ExpressionCompletionProvider>();
+            return await provider.GetCompletionsAsync(request.Params!, ct);
+        });
 
     // Add MCP logger provider (must be after AddMcpServer)
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();
