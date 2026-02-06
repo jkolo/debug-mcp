@@ -14,8 +14,10 @@ const sidebars: SidebarsConfig = {
         'tools/memory',
         'tools/modules',
         'tools/code-analysis',
+        'tools/process-io',
       ],
     },
+    'resources',
     {
       type: 'category',
       label: 'Workflows',
@@ -24,6 +26,7 @@ const sidebars: SidebarsConfig = {
         'workflows/inspect-memory-layout',
         'workflows/profile-module-loading',
         'workflows/analyze-codebase',
+        'workflows/debug-exceptions',
       ],
     },
     'architecture',

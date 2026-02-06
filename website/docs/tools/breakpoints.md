@@ -388,6 +388,117 @@ Wait for any breakpoint to be hit.
 
 ---
 
+### exception_get_context
+
+Get full exception context when paused at an exception.
+
+**When to use:** After an exception breakpoint fires (or the process stops on an unhandled exception), use this to get everything at once: exception details, inner exception chain, stack frames with source locations, and local variables in the throwing frame. This is the "exception autopsy" tool — one call replaces multiple `stacktrace_get` + `variables_get` + `evaluate` calls.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `max_frames` | integer | No | Maximum stack frames to return (1–100, default: 10) |
+| `include_variables_for_frames` | integer | No | Number of top frames to include local variables for (0–10, default: 1). Set to 0 to skip variable collection. |
+| `max_inner_exceptions` | integer | No | Maximum inner exception chain depth (0–20, default: 5). Set to 0 to skip inner exceptions. |
+
+**Example request:**
+```json
+{
+  "max_frames": 5,
+  "include_variables_for_frames": 2,
+  "max_inner_exceptions": 3
+}
+```
+
+**Example response:**
+```json
+{
+  "threadId": 5,
+  "exception": {
+    "type": "System.InvalidOperationException",
+    "message": "Sequence contains no matching element",
+    "isFirstChance": true,
+    "stackTraceString": "   at System.Linq.Enumerable.First[TSource](...)\n   at MyApp.Services.UserService.GetUser(String userId) in /app/Services/UserService.cs:line 42"
+  },
+  "innerExceptions": [
+    {
+      "type": "System.Collections.Generic.KeyNotFoundException",
+      "message": "The given key 'user-123' was not present in the dictionary.",
+      "depth": 1
+    }
+  ],
+  "innerExceptionsTruncated": false,
+  "frames": [
+    {
+      "index": 0,
+      "function": "System.Linq.Enumerable.First",
+      "module": "System.Linq.dll",
+      "isExternal": true,
+      "location": null,
+      "arguments": null,
+      "variables": null
+    },
+    {
+      "index": 1,
+      "function": "MyApp.Services.UserService.GetUser",
+      "module": "MyApp.dll",
+      "isExternal": false,
+      "location": {
+        "file": "/app/Services/UserService.cs",
+        "line": 42,
+        "column": 8,
+        "functionName": "GetUser",
+        "moduleName": "MyApp.dll"
+      },
+      "arguments": [
+        {
+          "name": "userId",
+          "type": "System.String",
+          "value": "\"user-123\"",
+          "scope": "Argument",
+          "hasChildren": false
+        }
+      ],
+      "variables": {
+        "locals": [
+          {
+            "name": "users",
+            "type": "System.Collections.Generic.List<User>",
+            "value": "Count = 0",
+            "scope": "Local",
+            "hasChildren": true,
+            "childrenCount": 0
+          }
+        ],
+        "errors": null
+      }
+    },
+    {
+      "index": 2,
+      "function": "MyApp.Controllers.UserController.HandleRequest",
+      "module": "MyApp.dll",
+      "isExternal": false,
+      "location": {
+        "file": "/app/Controllers/UserController.cs",
+        "line": 15,
+        "column": 12,
+        "functionName": "HandleRequest",
+        "moduleName": "MyApp.dll"
+      },
+      "arguments": null,
+      "variables": null
+    }
+  ],
+  "totalFrames": 12,
+  "throwingFrameIndex": 0
+}
+```
+
+**Real-world use case:** An AI agent catches a `NullReferenceException` via `breakpoint_wait`. Instead of making 3 separate calls to get the stack trace, variables, and exception details, it calls `exception_get_context` once. The response shows that `users` is an empty list and the code called `.First()` without checking — the agent immediately identifies the fix: use `.FirstOrDefault()` with a null check.
+
+---
+
 ## Breakpoint Notifications
 
 In addition to polling with `breakpoint_wait`, the debugger sends **push notifications** via MCP when breakpoints and tracepoints are hit. This enables event-driven debugging workflows.
