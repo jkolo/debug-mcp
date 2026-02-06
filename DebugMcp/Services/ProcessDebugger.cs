@@ -41,11 +41,19 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private Process? _managedProcess; // For I/O redirection
     private readonly object _lock = new();
 
+    // Separate lock for state fields — used inside UpdateState and for state reads.
+    // Key invariant: _lock → _stateLock nesting is OK; _stateLock → _lock is FORBIDDEN.
+    // ICorDebug callbacks must use _stateLock (via UpdateState), never _lock, because
+    // other code holds _lock while calling ICorDebug APIs (Stop/Continue/DebugActiveProcess)
+    // that may synchronously dispatch callbacks.
+    private readonly object _stateLock = new();
+
     private volatile SessionState _currentState = SessionState.Disconnected;
     private PauseReason? _currentPauseReason;
     private SourceLocation? _currentLocation;
     private int? _activeThreadId;
     private StepMode? _pendingStepMode;
+    private (string Type, string Message, bool IsFirstChance)? _lastExceptionInfo;
 
     // ICorDebugEval support for expression evaluation
     private TaskCompletionSource<EvalResult>? _evalCompletionSource;
@@ -109,7 +117,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         get
         {
-            lock (_lock)
+            lock (_stateLock)
             {
                 return _currentPauseReason;
             }
@@ -121,7 +129,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         get
         {
-            lock (_lock)
+            lock (_stateLock)
             {
                 return _currentLocation;
             }
@@ -133,12 +141,15 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         get
         {
-            lock (_lock)
+            lock (_stateLock)
             {
                 return _activeThreadId;
             }
         }
     }
+
+    /// <inheritdoc />
+    public (string Type, string Message, bool IsFirstChance)? LastExceptionInfo => _lastExceptionInfo;
 
     /// <inheritdoc />
     public bool IsNetProcess(int pid)
@@ -205,14 +216,13 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // Initialize ICorDebug via dbgshim for this specific process
         await Task.Run(() => InitializeCorDebugForProcess(pid), cancellationToken);
 
-        // Attach to process
+        // Attach to process — DebugActiveProcess OUTSIDE lock to avoid
+        // deadlock with callbacks (same pattern as OnRuntimeStartup).
         await Task.Run(() =>
         {
-            lock (_lock)
-            {
-                _process = _corDebug!.DebugActiveProcess(pid, win32Attach: false);
-                UpdateState(SessionState.Running);
-            }
+            var process = _corDebug!.DebugActiveProcess(pid, win32Attach: false);
+            Volatile.Write(ref _process, process);
+            UpdateState(SessionState.Running);
         }, cancellationToken);
 
         // Get runtime version after attach
@@ -411,18 +421,21 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
                 var callback = CreateManagedCallback();
                 _corDebug.SetManagedHandler(callback);
+            }
 
-                // Start debugging the process — this triggers OnCreateProcess callback
-                _process = _corDebug.DebugActiveProcess(_launchPid, win32Attach: false);
+            // DebugActiveProcess OUTSIDE lock — it may trigger callbacks (OnCreateProcess etc.)
+            // that need _stateLock (via UpdateState). Holding _lock here would risk deadlock
+            // if callbacks also needed _lock.
+            var process = _corDebug.DebugActiveProcess(_launchPid, win32Attach: false);
+            Volatile.Write(ref _process, process);
 
-                if (_stopAtEntry)
-                {
-                    UpdateState(SessionState.Paused, PauseReason.Entry);
-                }
-                else
-                {
-                    UpdateState(SessionState.Running);
-                }
+            if (_stopAtEntry)
+            {
+                UpdateState(SessionState.Paused, PauseReason.Entry);
+            }
+            else
+            {
+                UpdateState(SessionState.Running);
             }
 
             _launchCompletionSource?.TrySetResult(true);
@@ -588,14 +601,30 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
             if (needsContinue && processToStop != null)
             {
-                try
+                // BUG-1 fix: When paused at an unhandled exception, Continue(false) will
+                // re-enter the exception handler and re-pause, creating an infinite loop.
+                // Skip Continue and go directly to Terminate/kill.
+                bool pausedAtException;
+                lock (_stateLock)
                 {
-                    _logger.LogDebug("Continuing paused process before terminate (outside lock)");
-                    processToStop.Continue(false);
+                    pausedAtException = _currentPauseReason == PauseReason.Exception;
                 }
-                catch (Exception ex)
+
+                if (pausedAtException)
                 {
-                    _logger.LogDebug(ex, "Continue before terminate failed (process may have exited)");
+                    _logger.LogDebug("Paused at exception — skipping Continue, will terminate/kill directly");
+                }
+                else
+                {
+                    try
+                    {
+                        _logger.LogDebug("Continuing paused process before terminate (outside lock)");
+                        processToStop.Continue(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Continue before terminate failed (process may have exited)");
+                    }
                 }
             }
 
@@ -885,14 +914,22 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         }
     }
 
+    /// <summary>
+    /// Thread-safe state update — uses _stateLock internally.
+    /// Safe to call from ICorDebug callbacks (does NOT acquire _lock).
+    /// </summary>
     private void UpdateState(SessionState newState, PauseReason? pauseReason = null,
         SourceLocation? location = null, int? threadId = null)
     {
-        var oldState = _currentState;
-        _currentState = newState;
-        _currentPauseReason = pauseReason;
-        _currentLocation = location;
-        _activeThreadId = threadId;
+        SessionState oldState;
+        lock (_stateLock)
+        {
+            oldState = _currentState;
+            _currentState = newState;
+            _currentPauseReason = pauseReason;
+            _currentLocation = location;
+            _activeThreadId = threadId;
+        }
 
         StateChanged?.Invoke(this, new SessionStateChangedEventArgs
         {
@@ -1042,6 +1079,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         await Task.Run(() =>
         {
+            CorDebugProcess process;
             lock (_lock)
             {
                 if (_process == null)
@@ -1054,12 +1092,15 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     throw new InvalidOperationException($"Cannot continue: process is not paused (current state: {_currentState})");
                 }
 
-                _logger.LogDebug("Continuing execution...");
+                process = _process;
                 _stopAtEntry = false; // Allow callbacks to auto-continue from now on
-                _process.Continue(false);
-                UpdateState(SessionState.Running);
-                _logger.LogInformation("Execution resumed");
             }
+
+            // Continue OUTSIDE lock — avoids deadlock with ICorDebug callbacks
+            _logger.LogDebug("Continuing execution...");
+            process.Continue(false);
+            UpdateState(SessionState.Running);
+            _logger.LogInformation("Execution resumed");
         }, cancellationToken);
     }
 
@@ -1090,12 +1131,13 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // Allow callbacks to auto-continue so modules can load
         _stopAtEntry = false;
 
-        // Resume the process — it may be frozen in a callback or already running.
-        lock (_lock)
+        // Resume the process — Continue OUTSIDE lock to avoid deadlock with callbacks.
+        var processToResume = Volatile.Read(ref _process);
+        if (processToResume != null)
         {
             try
             {
-                _process!.Continue(false);
+                processToResume.Continue(false);
             }
             catch
             {
@@ -1165,6 +1207,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     {
         await Task.Run(() =>
         {
+            CorDebugProcess process;
             lock (_lock)
             {
                 if (_process == null)
@@ -1219,11 +1262,13 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         throw new ArgumentOutOfRangeException(nameof(mode), mode, "Invalid step mode");
                 }
 
-                // Continue execution - the stepper will pause at the next step location
-                _process.Continue(false);
-                UpdateState(SessionState.Running);
-                _logger.LogInformation("Step {Mode} initiated", mode);
+                process = _process;
             }
+
+            // Continue OUTSIDE lock — avoids deadlock with ICorDebug callbacks
+            process.Continue(false);
+            UpdateState(SessionState.Running);
+            _logger.LogInformation("Step {Mode} initiated", mode);
         }, cancellationToken);
     }
 
@@ -2429,15 +2474,14 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // so we've added handlers for all known events.
 
         // CRITICAL: Handle process creation (needed for attach and launch)
+        // NOTE: Must NOT acquire _lock — this callback fires from ICorDebug thread
+        // while other code may hold _lock during DebugActiveProcess/Stop/Continue calls.
         callback.OnCreateProcess += (sender, e) =>
         {
             _logger.LogDebug("Process created/attached (isLaunched={IsLaunched}, stopAtEntry={StopAtEntry})",
                 _isLaunched, _stopAtEntry);
 
-            lock (_lock)
-            {
-                _process ??= e.Process;
-            }
+            Interlocked.CompareExchange(ref _process, e.Process, null);
 
             if (ShouldAutoContinue())
                 e.Controller.Continue(false);
@@ -2463,6 +2507,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         };
 
         // Handle breakpoint events
+        // NOTE: Must NOT acquire _lock — see OnCreateProcess comment.
         callback.OnBreakpoint += (sender, e) =>
         {
             var locationInfo = GetCurrentLocationInfo(e.Thread);
@@ -2470,10 +2515,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var threadId = (int)e.Thread.Id;
             var timestamp = DateTimeOffset.UtcNow;
 
-            lock (_lock)
-            {
-                UpdateState(SessionState.Paused, Models.PauseReason.Breakpoint, location, threadId);
-            }
+            UpdateState(SessionState.Paused, Models.PauseReason.Breakpoint, location, threadId);
 
             // Notify listeners about the breakpoint hit with full location info
             var args = new BreakpointHitEventArgs
@@ -2491,10 +2533,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             // auto-continue instead of staying paused
             if (args.ShouldContinue)
             {
-                lock (_lock)
-                {
-                    UpdateState(SessionState.Running);
-                }
+                UpdateState(SessionState.Running);
                 e.Controller.Continue(false);
             }
             // Otherwise stay paused - let the session manager decide
@@ -2524,11 +2563,14 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             // Get exception information from the thread
             var (exceptionType, exceptionMessage) = GetExceptionInfo(e.Thread);
 
+            // Store last exception info for fallback when $exception eval fails (BUG-3)
+            _lastExceptionInfo = (exceptionType, exceptionMessage, isFirstChance);
+
             _logger.LogDebug("Exception2: {Type} at {Location}, firstChance={IsFirstChance}, unhandled={IsUnhandled}",
                 exceptionType, location?.File, isFirstChance, isUnhandled);
 
             // Fire the exception hit event for exception breakpoint matching
-            ExceptionHit?.Invoke(this, new ExceptionHitEventArgs
+            var args = new ExceptionHitEventArgs
             {
                 ThreadId = threadId,
                 Location = location,
@@ -2537,36 +2579,36 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 ExceptionMessage = exceptionMessage,
                 IsFirstChance = isFirstChance,
                 IsUnhandled = isUnhandled
-            });
+            };
+            ExceptionHit?.Invoke(this, args);
 
             // Only pause for unhandled exceptions by default
             // Exception breakpoints will control pausing for first-chance
+            // NOTE: Must NOT acquire _lock — see OnCreateProcess comment.
             if (isUnhandled)
             {
-                lock (_lock)
-                {
-                    UpdateState(SessionState.Paused, Models.PauseReason.Exception, location, threadId);
-                }
+                UpdateState(SessionState.Paused, Models.PauseReason.Exception, location, threadId);
                 // Don't call Continue - let the session manager decide
+            }
+            else if (!args.ShouldContinue)
+            {
+                // An exception breakpoint matched — pause the process
+                UpdateState(SessionState.Paused, Models.PauseReason.Exception, location, threadId);
             }
             else
             {
-                // For first-chance exceptions, let the BreakpointManager decide
-                // based on registered exception breakpoints
-                // If no exception breakpoint handlers stop it, continue
+                // No matching exception breakpoint — auto-continue
                 if (ShouldAutoContinue())
                     e.Controller.Continue(false);
             }
         };
 
         // Handle process exit
+        // NOTE: Must NOT acquire _lock — see OnCreateProcess comment.
         callback.OnExitProcess += (sender, e) =>
         {
-            lock (_lock)
-            {
-                _process = null;
-                UpdateState(SessionState.Disconnected);
-            }
+            Volatile.Write(ref _process, null);
+            UpdateState(SessionState.Disconnected);
             e.Controller.Continue(false);
         };
 
@@ -2712,13 +2754,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var timestamp = DateTimeOffset.UtcNow;
 
             // Get the step mode that was pending
-            StepMode stepMode;
-            lock (_lock)
-            {
-                stepMode = _pendingStepMode ?? StepMode.Over;
-                _pendingStepMode = null;
-                UpdateState(SessionState.Paused, Models.PauseReason.Step, location, threadId);
-            }
+            // NOTE: Must NOT acquire _lock — see OnCreateProcess comment.
+            var stepMode = _pendingStepMode ?? StepMode.Over;
+            _pendingStepMode = null;
+            UpdateState(SessionState.Paused, Models.PauseReason.Step, location, threadId);
 
             // Map ClrDebug step reason to our enum
             var reason = e.Reason switch
@@ -2755,10 +2794,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var location = GetCurrentLocation(e.Thread);
             var threadId = (int)e.Thread.Id;
 
-            lock (_lock)
-            {
-                UpdateState(SessionState.Paused, Models.PauseReason.Pause, location, threadId);
-            }
+            // NOTE: Must NOT acquire _lock — see OnCreateProcess comment.
+            UpdateState(SessionState.Paused, Models.PauseReason.Pause, location, threadId);
 
             _logger.LogDebug("Debug break on thread {ThreadId}", threadId);
             // Don't call Continue - let the session manager decide
@@ -2950,7 +2987,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     /// <summary>
     /// Extracts exception type and message from the current exception on a thread.
     /// </summary>
-    private static (string Type, string Message) GetExceptionInfo(CorDebugThread thread)
+    private (string Type, string Message) GetExceptionInfo(CorDebugThread thread)
     {
         try
         {
@@ -3065,28 +3102,45 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     }
 
     /// <summary>
-    /// Attempts to get the exception message from an ICorDebugValue.
-    /// Note: Full implementation requires ICorDebugEval to call get_Message().
-    /// This is a simplified version that returns empty string.
+    /// Reads the _message field from an exception's ICorDebugValue.
+    /// Uses TryGetFieldValue to traverse the type hierarchy (handles
+    /// _message being defined on System.Exception base class).
     /// </summary>
-    private static string TryGetExceptionMessage(CorDebugValue exceptionValue)
+    private string TryGetExceptionMessage(CorDebugValue exceptionValue)
     {
-        // Getting the Message property requires calling the getter method via ICorDebugEval
-        // which is complex and requires the process to be stopped in a specific way.
-        // For T074, this is marked as incomplete - full implementation would:
-        // 1. Get the Message property getter method token
-        // 2. Create an ICorDebugEval
-        // 3. Call the method and wait for completion
-        // 4. Extract the string result
-        //
-        // For now, return empty string - the exception type is the most important info
-        return "";
+        try
+        {
+            var fieldValue = TryGetFieldValue(exceptionValue, "_message");
+            if (fieldValue == null)
+                return "";
+
+            // Dereference if reference
+            if (fieldValue is CorDebugReferenceValue fieldRef)
+            {
+                if (fieldRef.IsNull) return "";
+                fieldValue = fieldRef.Dereference();
+                if (fieldValue == null) return "";
+            }
+
+            // Read string value
+            if (fieldValue is CorDebugStringValue stringValue)
+            {
+                var len = stringValue.Length;
+                return stringValue.GetString((int)len) ?? "";
+            }
+
+            return "";
+        }
+        catch
+        {
+            return "";
+        }
     }
 
     /// <summary>
     /// Formats an exception value from ICorDebugEval result.
     /// </summary>
-    private static (string Type, string Message) FormatExceptionValue(CorDebugValue? exceptionValue)
+    private (string Type, string Message) FormatExceptionValue(CorDebugValue? exceptionValue)
     {
         if (exceptionValue == null)
         {

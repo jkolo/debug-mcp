@@ -14,6 +14,10 @@ public sealed class DebugSessionManager : IDebugSessionManager
     private DebugSession? _currentSession;
     private readonly object _lock = new();
 
+    // Race detection: if OnStateChanged(Disconnected) fires before _currentSession is set,
+    // the event is lost. This flag allows LaunchAsync/AttachAsync to detect and handle it.
+    private bool _missedDisconnect;
+
     // Step completion signaling
     private readonly SemaphoreSlim _stepCompleteSemaphore = new(0);
     private readonly System.Collections.Concurrent.ConcurrentQueue<StepCompleteEventArgs> _stepCompleteQueue = new();
@@ -53,6 +57,10 @@ public sealed class DebugSessionManager : IDebugSessionManager
             {
                 throw new InvalidOperationException("A debug session is already active. Disconnect first.");
             }
+
+            // Reset flag — a stale _missedDisconnect from a previous session's late
+            // OnExitProcess callback must not poison this new attach attempt.
+            _missedDisconnect = false;
         }
 
         _logger.AttachingToProcess(pid);
@@ -73,6 +81,16 @@ public sealed class DebugSessionManager : IDebugSessionManager
         lock (_lock)
         {
             _currentSession = session;
+
+            // Guard against race: if OnStateChanged(Disconnected) fired before we set _currentSession,
+            // the event was missed. Check and handle here.
+            if (_missedDisconnect)
+            {
+                _missedDisconnect = false;
+                _currentSession = null;
+                _logger.LogWarning("Process exited during attach (PID {Pid})", session.ProcessId);
+                throw new InvalidOperationException("Process exited during attach");
+            }
         }
 
         _logger.AttachedToProcess(session.ProcessId, session.ProcessName, session.RuntimeVersion);
@@ -96,6 +114,10 @@ public sealed class DebugSessionManager : IDebugSessionManager
             {
                 throw new InvalidOperationException("A debug session is already active. Disconnect first.");
             }
+
+            // Reset flag — a stale _missedDisconnect from a previous session's late
+            // OnExitProcess callback must not poison this new launch attempt.
+            _missedDisconnect = false;
         }
 
         _logger.LaunchingProcess(program);
@@ -120,6 +142,16 @@ public sealed class DebugSessionManager : IDebugSessionManager
         lock (_lock)
         {
             _currentSession = session;
+
+            // Guard against race: if OnStateChanged(Disconnected) fired before we set _currentSession,
+            // the event was missed. Check and handle here.
+            if (_missedDisconnect)
+            {
+                _missedDisconnect = false;
+                _currentSession = null;
+                _logger.LogWarning("Process exited during launch (PID {Pid})", session.ProcessId);
+                throw new InvalidOperationException("Process exited during launch");
+            }
         }
 
         _logger.LaunchedProcess(session.ProcessId, session.ProcessName);
@@ -318,7 +350,13 @@ public sealed class DebugSessionManager : IDebugSessionManager
     {
         lock (_lock)
         {
-            if (_currentSession == null) return;
+            if (_currentSession == null)
+            {
+                // Session not yet set — track missed disconnects for race detection
+                if (e.NewState == SessionState.Disconnected)
+                    _missedDisconnect = true;
+                return;
+            }
 
             var oldState = _currentSession.State.ToString();
             _currentSession.State = e.NewState;

@@ -1,0 +1,48 @@
+{
+  "_comment": "Extension to existing breakpoint_wait tool — new optional parameter",
+  "newParameter": {
+    "name": "include_autopsy",
+    "type": "boolean",
+    "description": "When true and an exception breakpoint fires, include full exception autopsy context in the response (default: false)",
+    "default": false
+  },
+  "extendedResponse": {
+    "_comment": "When include_autopsy=true and an exception breakpoint fires, adds 'autopsy' field to response",
+    "hit": true,
+    "breakpointId": "ex-abc123",
+    "threadId": 1,
+    "timestamp": "2026-02-06T12:00:00.000Z",
+    "location": {
+      "file": "/src/Services/UserService.cs",
+      "line": 42
+    },
+    "hitCount": 1,
+    "exceptionInfo": {
+      "type": "System.NullReferenceException",
+      "message": "Object reference not set to an instance of an object.",
+      "isFirstChance": true,
+      "stackTrace": null
+    },
+    "autopsy": {
+      "_comment": "Same structure as exception_get_context successResponse, included only when exception present",
+      "exception": { "type": "...", "message": "...", "isFirstChance": true, "stackTraceString": "..." },
+      "innerExceptions": [],
+      "innerExceptionsTruncated": false,
+      "frames": [],
+      "totalFrames": 10,
+      "throwingFrameIndex": 0
+    }
+  },
+  "nonExceptionResponse": {
+    "_comment": "When include_autopsy=true but a regular breakpoint fires (no exception), autopsy is null",
+    "hit": true,
+    "breakpointId": "bp-def456",
+    "autopsy": null
+  },
+  "defaultBehavior": {
+    "_comment": "When include_autopsy is not provided or false, response is unchanged (backward compatible)",
+    "hit": true,
+    "breakpointId": "ex-abc123",
+    "exceptionInfo": { "type": "...", "message": "..." }
+  }
+}

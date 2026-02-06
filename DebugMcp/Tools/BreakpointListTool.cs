@@ -40,14 +40,18 @@ public sealed class BreakpointListTool
 
         try
         {
-            // Get all breakpoints
+            // Get all breakpoints (source + tracepoints)
             var breakpoints = await _breakpointManager.GetBreakpointsAsync(cancellationToken);
+
+            // Get all exception breakpoints (BUG-4 fix)
+            var exceptionBreakpoints = await _breakpointManager.GetExceptionBreakpointsAsync(cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("breakpoint_list", stopwatch.ElapsedMilliseconds);
-            _logger.LogDebug("Listed {Count} breakpoints", breakpoints.Count);
+            _logger.LogDebug("Listed {Count} breakpoints + {ExCount} exception breakpoints",
+                breakpoints.Count, exceptionBreakpoints.Count);
 
-            // Serialize breakpoints
+            // Serialize source/tracepoint breakpoints
             var serializedBreakpoints = breakpoints.Select(bp => new
             {
                 id = bp.Id,
@@ -74,10 +78,25 @@ public sealed class BreakpointListTool
                 notificationsSent = bp.Type == BreakpointType.Tracepoint ? bp.NotificationsSent : (int?)null
             }).ToList();
 
+            // Serialize exception breakpoints
+            var serializedExceptionBreakpoints = exceptionBreakpoints.Select(eb => new
+            {
+                id = eb.Id,
+                type = "exception",
+                exceptionType = eb.ExceptionType,
+                breakOnFirstChance = eb.BreakOnFirstChance,
+                breakOnSecondChance = eb.BreakOnSecondChance,
+                includeSubtypes = eb.IncludeSubtypes,
+                enabled = eb.Enabled,
+                verified = eb.Verified,
+                hitCount = eb.HitCount
+            }).ToList();
+
             return JsonSerializer.Serialize(new
             {
                 breakpoints = serializedBreakpoints,
-                count = breakpoints.Count
+                exceptionBreakpoints = serializedExceptionBreakpoints,
+                count = breakpoints.Count + exceptionBreakpoints.Count
             }, new JsonSerializerOptions
             {
                 WriteIndented = true,

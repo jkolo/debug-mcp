@@ -121,6 +121,14 @@ public interface IBreakpointManager
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets all exception breakpoints in the current session.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of all exception breakpoints.</returns>
+    Task<IReadOnlyList<ExceptionBreakpoint>> GetExceptionBreakpointsAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Clears all breakpoints (called when session disconnects).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>

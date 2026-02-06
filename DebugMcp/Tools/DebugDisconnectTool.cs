@@ -14,6 +14,15 @@ namespace DebugMcp.Tools;
 [McpServerToolType]
 public sealed class DebugDisconnectTool
 {
+    /// <summary>
+    /// Maximum time to wait for disconnect before returning a timeout error.
+    /// Internal timeout in ProcessDebugger.TerminateAsync is 5s for Terminate() + OS kill fallback,
+    /// so 10s gives enough headroom for the full cleanup sequence.
+    /// </summary>
+    private static readonly TimeSpan DisconnectTimeout = TimeSpan.FromSeconds(10);
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
     private readonly IDebugSessionManager _sessionManager;
     private readonly ILogger<DebugDisconnectTool> _logger;
 
@@ -54,7 +63,7 @@ public sealed class DebugDisconnectTool
                     state = "disconnected",
                     message = "No active debug session",
                     previousSession = (object?)null
-                }, new JsonSerializerOptions { WriteIndented = true });
+                }, JsonOptions);
             }
 
             // Capture session info before disconnect
@@ -68,8 +77,34 @@ public sealed class DebugDisconnectTool
             // Determine if process will be terminated
             var willTerminate = terminateProcess && currentSession.LaunchMode == LaunchMode.Launch;
 
-            // Perform disconnect
-            await _sessionManager.DisconnectAsync(terminateProcess, cancellationToken);
+            // Perform disconnect with timeout to prevent hanging
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(DisconnectTimeout);
+
+            try
+            {
+                await _sessionManager.DisconnectAsync(terminateProcess, timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Timeout hit, not user cancellation — force-kill the process as last resort
+                _logger.LogWarning(
+                    "debug_disconnect timed out after {TimeoutSeconds}s, force-killing process {Pid}",
+                    DisconnectTimeout.TotalSeconds, currentSession.ProcessId);
+
+                ForceKillProcess(currentSession.ProcessId);
+
+                stopwatch.Stop();
+                return JsonSerializer.Serialize(new
+                {
+                    success = true,
+                    state = "disconnected",
+                    wasTerminated = true,
+                    timedOut = true,
+                    message = $"Disconnect timed out after {DisconnectTimeout.TotalSeconds}s. Process was force-killed.",
+                    previousSession = previousSessionInfo
+                }, JsonOptions);
+            }
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_disconnect", stopwatch.ElapsedMilliseconds);
@@ -80,7 +115,7 @@ public sealed class DebugDisconnectTool
                 state = "disconnected",
                 wasTerminated = willTerminate,
                 previousSession = previousSessionInfo
-            }, new JsonSerializerOptions { WriteIndented = true });
+            }, JsonOptions);
         }
         catch (Exception ex)
         {
@@ -94,7 +129,20 @@ public sealed class DebugDisconnectTool
                     code = "DISCONNECT_FAILED",
                     message = $"Failed to disconnect: {ex.Message}"
                 }
-            }, new JsonSerializerOptions { WriteIndented = true });
+            }, JsonOptions);
+        }
+    }
+
+    private void ForceKillProcess(int pid)
+    {
+        try
+        {
+            System.Diagnostics.Process.GetProcessById(pid)?.Kill(entireProcessTree: true);
+            _logger.LogWarning("Force-killed process {Pid}", pid);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Force-kill of process {Pid} failed (may have already exited)", pid);
         }
     }
 }

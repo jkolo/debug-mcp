@@ -163,6 +163,11 @@ public static class ErrorCodes
     /// <summary>Code analysis operation failed.</summary>
     public const string AnalysisFailed = "ANALYSIS_FAILED";
 
+    // Exception autopsy error codes (022-exception-autopsy)
+
+    /// <summary>Debugger is not paused at an exception.</summary>
+    public const string NoException = "NO_EXCEPTION";
+
     // Process I/O error codes (017-process-io-redirection)
 
     /// <summary>Stdin is closed (EOF sent).</summary>

@@ -1,0 +1,118 @@
+{
+  "tool": {
+    "name": "exception_get_context",
+    "description": "Get full exception context when paused at an exception. Returns exception details, inner exception chain, stack frames with source locations, and local variables for the throwing frame — all in a single call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "max_frames": {
+          "type": "integer",
+          "description": "Maximum stack frames to return (default: 10, min: 1, max: 100)",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100
+        },
+        "include_variables_for_frames": {
+          "type": "integer",
+          "description": "Number of top frames to include local variables for (default: 1, min: 0, max: 10). 0 = no variables, 1 = throwing frame only.",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 10
+        },
+        "max_inner_exceptions": {
+          "type": "integer",
+          "description": "Maximum inner exception chain depth to traverse (default: 5, min: 0, max: 20). 0 = skip inner exceptions.",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "successResponse": {
+    "threadId": 1,
+    "exception": {
+      "type": "System.InvalidOperationException",
+      "message": "Sequence contains no elements",
+      "isFirstChance": true,
+      "stackTraceString": "   at System.Linq.ThrowHelper.ThrowNoElementsException()..."
+    },
+    "innerExceptions": [
+      {
+        "type": "System.ArgumentNullException",
+        "message": "Value cannot be null. (Parameter 'source')",
+        "depth": 1
+      }
+    ],
+    "innerExceptionsTruncated": false,
+    "frames": [
+      {
+        "index": 0,
+        "function": "ThrowHelper.ThrowNoElementsException()",
+        "module": "System.Linq",
+        "isExternal": true,
+        "location": null,
+        "arguments": [],
+        "variables": null
+      },
+      {
+        "index": 1,
+        "function": "UserService.GetActiveUser(int userId)",
+        "module": "MyApp",
+        "isExternal": false,
+        "location": {
+          "file": "/src/Services/UserService.cs",
+          "line": 42,
+          "column": 12,
+          "functionName": "GetActiveUser",
+          "moduleName": "MyApp"
+        },
+        "arguments": [
+          { "name": "userId", "type": "int", "value": "0", "scope": "Argument", "hasChildren": false }
+        ],
+        "variables": {
+          "locals": [
+            { "name": "query", "type": "IQueryable<User>", "value": "{IQueryable<User>}", "scope": "Local", "hasChildren": true, "childrenCount": 3 },
+            { "name": "filter", "type": "string", "value": "\"active\"", "scope": "Local", "hasChildren": false }
+          ],
+          "errors": null
+        }
+      }
+    ],
+    "totalFrames": 15,
+    "throwingFrameIndex": 0
+  },
+  "errorResponse": {
+    "success": false,
+    "error": {
+      "code": "NO_EXCEPTION",
+      "message": "No exception context available. The debugger is not currently paused at an exception."
+    }
+  },
+  "partialResponse": {
+    "_comment": "When some data is unavailable, fields are null/empty with status indicators",
+    "threadId": 1,
+    "exception": {
+      "type": "System.AccessViolationException",
+      "message": "Attempted to read or write protected memory.",
+      "isFirstChance": false,
+      "stackTraceString": null
+    },
+    "innerExceptions": [],
+    "innerExceptionsTruncated": false,
+    "frames": [
+      {
+        "index": 0,
+        "function": "[Native Frame]",
+        "module": "ntdll",
+        "isExternal": true,
+        "location": null,
+        "arguments": null,
+        "variables": null
+      }
+    ],
+    "totalFrames": 8,
+    "throwingFrameIndex": 0
+  }
+}

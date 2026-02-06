@@ -33,6 +33,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-17
 - N/A (in-memory, uses existing debugger state) (020-mcp-completions)
 - C# / .NET 10.0 + System.Reflection.Metadata (in-box), System.Reflection.PortableExecutable (in-box), System.Net.Http (in-box), System.IO.Compression (in-box for DeflateStream) (021-symbol-server)
 - Persistent file-based symbol cache at `~/.debug-mcp/symbols/{pdbFileName}/{signature}/{pdbFileName}` (021-symbol-server)
+- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Text.Json (022-exception-autopsy)
+- N/A (in-memory, reads existing debugger state) (022-exception-autopsy)
 
 - C# / .NET 10.0 + Microsoft.Diagnostics.Runtime (ClrMD), System.Text.Json, (001-debug-session)
 
@@ -52,9 +54,9 @@ tests/
 C# / .NET 10.0: Follow standard conventions
 
 ## Recent Changes
+- 022-exception-autopsy: Added C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Text.Json
 - 021-symbol-server: Added C# / .NET 10.0 + System.Reflection.Metadata (in-box), System.Reflection.PortableExecutable (in-box), System.Net.Http (in-box), System.IO.Compression (in-box for DeflateStream)
 - 020-mcp-completions: Added C# / .NET 10.0 + ModelContextProtocol SDK 0.7.0-preview.1, ClrDebug 0.3.4 (ICorDebug wrappers)
-- 019-mcp-resources: Added C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, ClrDebug 0.3.4 (ICorDebug wrappers), System.Reflection.Metadata (PDB reading)
 
 
 <!-- MANUAL ADDITIONS START -->
