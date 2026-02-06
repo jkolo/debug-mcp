@@ -14,6 +14,12 @@ public sealed class TestTargetProcess : IDisposable
     private readonly object _outputLock = new();
 
     /// <summary>
+    /// Detected build configuration (Debug or Release) based on the test assembly output path.
+    /// </summary>
+    public static string BuildConfiguration { get; } =
+        AppContext.BaseDirectory.Contains(Path.Combine("bin", "Release")) ? "Release" : "Debug";
+
+    /// <summary>
     /// Path to the test target DLL.
     /// </summary>
     public static string TestTargetDllPath
@@ -22,9 +28,8 @@ public sealed class TestTargetProcess : IDisposable
         {
             // Navigate from test assembly location to TestTargetApp output
             var testAssemblyDir = Path.GetDirectoryName(typeof(TestTargetProcess).Assembly.Location)!;
-            // tests/DebugMcp.Tests/bin/Debug/net10.0 -> tests/TestTargetApp/bin/Debug/net10.0
             var testTargetPath = Path.GetFullPath(Path.Combine(
-                testAssemblyDir, "..", "..", "..", "..", "TestTargetApp", "bin", "Debug", "net10.0", "TestTargetApp.dll"));
+                testAssemblyDir, "..", "..", "..", "..", "TestTargetApp", "bin", BuildConfiguration, "net10.0", "TestTargetApp.dll"));
             return testTargetPath;
         }
     }

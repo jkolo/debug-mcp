@@ -5,5 +5,17 @@
   <Folder Name="/tests/">
     <Project Path="tests/DebugMcp.E2E/DebugMcp.E2E.csproj" />
     <Project Path="tests/DebugMcp.Tests/DebugMcp.Tests.csproj" />
+    <Project Path="tests/DebugTestApp/DebugTestApp.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/AsyncOps/AsyncOps.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/BaseTypes/BaseTypes.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/Collections/Collections.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/ComplexObjects/ComplexObjects.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/Exceptions/Exceptions.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/Expressions/Expressions.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/MemoryStructs/MemoryStructs.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/Recursion/Recursion.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/Scenarios/Scenarios.csproj" />
+    <Project Path="tests/TestTargetApp/Libs/Threading/Threading.csproj" />
+    <Project Path="tests/TestTargetApp/TestTargetApp.csproj" />
   </Folder>
 </Solution>

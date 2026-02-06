@@ -1,4 +1,5 @@
 using DebugMcp.Services.Symbols;
+using DebugMcp.Tests.Helpers;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DebugMcp.Tests.Unit.Symbols;
@@ -6,7 +7,7 @@ namespace DebugMcp.Tests.Unit.Symbols;
 public class PeDebugInfoReaderTests
 {
     private static readonly string TestAppDir = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "DebugTestApp", "bin", "Debug", "net10.0"));
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "DebugTestApp", "bin", TestTargetProcess.BuildConfiguration, "net10.0"));
 
     private static readonly string TestAppDll = Path.Combine(TestAppDir, "DebugTestApp.dll");
 
