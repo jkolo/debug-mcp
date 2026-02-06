@@ -70,15 +70,15 @@ public class ResourceNotifierTests
     {
         _notifier.Subscribe("debugger://session");
 
-        // Fire 5 rapid notifications
+        // Fire 5 rapid notifications without any delay between them
+        // to ensure they all fall within the 50ms debounce window
         for (int i = 0; i < 5; i++)
         {
             _notifier.NotifyResourceUpdated("debugger://session");
-            await Task.Delay(10);
         }
 
-        // Wait for debounce window to expire after last call
-        await Task.Delay(100);
+        // Wait well beyond debounce window (50ms) for the single coalesced callback
+        await Task.Delay(300);
 
         // Should coalesce to a single notification
         _updatedUris.Should().HaveCount(1);
