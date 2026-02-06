@@ -141,10 +141,11 @@ Claude: I'll set an exception breakpoint and trigger the flow.
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) — System design and components
-- [How Debugging Works](docs/DEBUGGER.md) — ICorDebug internals explained
-- [MCP Tools Reference](docs/MCP_TOOLS.md) — Complete API documentation
-- [Development Guide](docs/DEVELOPMENT.md) — Building, testing, contributing
+- [Architecture](https://debug-mcp.net/docs/architecture) — System design and components
+- [How Debugging Works](https://debug-mcp.net/docs/debugger) — ICorDebug internals explained
+- [MCP Tools Reference](https://debug-mcp.net/docs/tools/session) — Complete API documentation
+- [MCP Resources](https://debug-mcp.net/docs/resources) — Subscribable state views
+- [Development Guide](https://debug-mcp.net/docs/development) — Building, testing, contributing
 
 ## Similar Projects
 
