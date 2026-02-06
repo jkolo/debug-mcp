@@ -35,6 +35,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-17
 - Persistent file-based symbol cache at `~/.debug-mcp/symbols/{pdbFileName}/{signature}/{pdbFileName}` (021-symbol-server)
 - C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Text.Json (022-exception-autopsy)
 - N/A (in-memory, reads existing debugger state) (022-exception-autopsy)
+- TypeScript (Docusaurus 3.9.2), Markdown/MDX + Docusaurus 3.9.2, React 19, asciinema-player 3.14.0, @docusaurus/theme-mermaid (023-docs-site-update)
+- Static files (Markdown, JSON examples) (023-docs-site-update)
 
 - C# / .NET 10.0 + Microsoft.Diagnostics.Runtime (ClrMD), System.Text.Json, (001-debug-session)
 
@@ -54,9 +56,9 @@ tests/
 C# / .NET 10.0: Follow standard conventions
 
 ## Recent Changes
+- 023-docs-site-update: Added TypeScript (Docusaurus 3.9.2), Markdown/MDX + Docusaurus 3.9.2, React 19, asciinema-player 3.14.0, @docusaurus/theme-mermaid
 - 022-exception-autopsy: Added C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Text.Json
 - 021-symbol-server: Added C# / .NET 10.0 + System.Reflection.Metadata (in-box), System.Reflection.PortableExecutable (in-box), System.Net.Http (in-box), System.IO.Compression (in-box for DeflateStream)
-- 020-mcp-completions: Added C# / .NET 10.0 + ModelContextProtocol SDK 0.7.0-preview.1, ClrDebug 0.3.4 (ICorDebug wrappers)
 
 
 <!-- MANUAL ADDITIONS START -->
