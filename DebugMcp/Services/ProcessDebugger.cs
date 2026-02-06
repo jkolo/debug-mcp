@@ -12,6 +12,7 @@ using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Models.Memory;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Services.Symbols;
 using Microsoft.Extensions.Logging;
 using static System.Runtime.InteropServices.NativeLibrary;
 
@@ -33,6 +34,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private readonly ILogger<ProcessDebugger> _logger;
     private readonly IPdbSymbolReader _pdbSymbolReader;
     private readonly ProcessIoManager _ioManager;
+    private readonly ISymbolResolver? _symbolResolver;
     private DbgShim? _dbgShim;
     private CorDebug? _corDebug;
     private CorDebugProcess? _process;
@@ -70,11 +72,12 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private readonly object _moduleCacheLock = new();
     private readonly List<LoadedModuleInfo> _cachedModules = new();
 
-    public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader, ProcessIoManager ioManager)
+    public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader, ProcessIoManager ioManager, ISymbolResolver? symbolResolver = null)
     {
         _logger = logger;
         _pdbSymbolReader = pdbSymbolReader;
         _ioManager = ioManager;
+        _symbolResolver = symbolResolver;
     }
 
     /// <inheritdoc />
@@ -2618,6 +2621,22 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     NativeModule = module
                 });
 
+                // Fire-and-forget symbol resolution (FR-009: non-blocking)
+                if (_symbolResolver != null && !isDynamic && !isInMemory && !string.IsNullOrEmpty(moduleName))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _symbolResolver.ResolveAsync(moduleName);
+                        }
+                        catch (Exception ex2)
+                        {
+                            _logger.LogDebug(ex2, "Background symbol resolution failed for {ModuleName}", moduleName);
+                        }
+                    });
+                }
+
                 // Signal WaitForModulesAsync if waiting for this module
                 if (_moduleLoadedTcs != null)
                 {
@@ -5018,8 +5037,9 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // Try to get version from assembly metadata
         var version = ExtractModuleVersion(module, modulePath);
 
-        // Check for symbols
+        // Check for symbols and get status
         var hasSymbols = CheckHasSymbols(modulePath);
+        var (symbolStatusStr, symbolStatusDetail) = GetSymbolStatusInfo(modulePath);
 
         var moduleId = $"mod-{++moduleIdCounter}";
 
@@ -5033,7 +5053,9 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             HasSymbols: hasSymbols,
             ModuleId: moduleId,
             BaseAddress: baseAddress > 0 ? $"0x{baseAddress:X16}" : null,
-            Size: (int)size
+            Size: (int)size,
+            SymbolStatus: symbolStatusStr,
+            SymbolStatusDetail: symbolStatusDetail
         );
     }
 
@@ -5101,17 +5123,25 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
     /// <summary>
     /// Checks if the module has symbols (PDB) available.
+    /// Uses ISymbolResolver when available, falls back to local file check.
     /// </summary>
-    private static bool CheckHasSymbols(string modulePath)
+    private bool CheckHasSymbols(string modulePath)
     {
         if (string.IsNullOrEmpty(modulePath) || !File.Exists(modulePath))
         {
             return false;
         }
 
+        // Use symbol resolver if available (checks local + cache + embedded + server results)
+        if (_symbolResolver != null)
+        {
+            var status = _symbolResolver.GetStatus(modulePath);
+            return status == Models.Modules.SymbolStatus.Loaded;
+        }
+
         try
         {
-            // Check for PDB file in same directory
+            // Fallback: check for PDB file in same directory
             var directory = Path.GetDirectoryName(modulePath);
             var baseName = Path.GetFileNameWithoutExtension(modulePath);
 
@@ -5127,6 +5157,43 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Gets the symbol status string and detail for a module.
+    /// Maps SymbolStatus enum to snake_case strings and provides source/failure detail.
+    /// </summary>
+    private (string Status, string? Detail) GetSymbolStatusInfo(string modulePath)
+    {
+        if (_symbolResolver == null || string.IsNullOrEmpty(modulePath))
+        {
+            return ("none", null);
+        }
+
+        var result = _symbolResolver.GetResult(modulePath);
+        if (result == null)
+        {
+            return ("none", null);
+        }
+
+        var statusStr = result.Status switch
+        {
+            Models.Modules.SymbolStatus.Loaded => "loaded",
+            Models.Modules.SymbolStatus.PendingDownload => "pending_download",
+            Models.Modules.SymbolStatus.Downloading => "downloading",
+            Models.Modules.SymbolStatus.NotFound => "not_found",
+            Models.Modules.SymbolStatus.Failed => "failed",
+            _ => "none"
+        };
+
+        var detail = result.Status switch
+        {
+            Models.Modules.SymbolStatus.Loaded => result.Source.ToString().ToLowerInvariant(),
+            Models.Modules.SymbolStatus.Failed or Models.Modules.SymbolStatus.NotFound => result.FailureReason,
+            _ => null
+        };
+
+        return (statusStr, detail);
     }
 
     /// <summary>

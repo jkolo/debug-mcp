@@ -153,6 +153,107 @@ public class ModulesListContractTests
     }
 
     /// <summary>
+    /// ModuleInfo includes symbolStatus field with valid enum values.
+    /// </summary>
+    [Theory]
+    [InlineData("none")]
+    [InlineData("loaded")]
+    [InlineData("pending_download")]
+    [InlineData("downloading")]
+    [InlineData("not_found")]
+    [InlineData("failed")]
+    public void ModuleInfo_SymbolStatus_HasValidValue(string status)
+    {
+        var module = new ModuleInfo(
+            Name: "Test",
+            FullName: "Test",
+            Path: null,
+            Version: "1.0",
+            IsManaged: true,
+            IsDynamic: false,
+            HasSymbols: status == "loaded",
+            ModuleId: "mod-1",
+            BaseAddress: null,
+            Size: 0,
+            SymbolStatus: status
+        );
+
+        var validStatuses = new[] { "none", "loaded", "pending_download", "downloading", "not_found", "failed" };
+        module.SymbolStatus.Should().BeOneOf(validStatuses);
+    }
+
+    /// <summary>
+    /// ModuleInfo symbolStatusDetail can be null.
+    /// </summary>
+    [Fact]
+    public void ModuleInfo_SymbolStatusDetail_CanBeNull()
+    {
+        var module = new ModuleInfo(
+            Name: "Test",
+            FullName: "Test",
+            Path: null,
+            Version: "1.0",
+            IsManaged: true,
+            IsDynamic: false,
+            HasSymbols: false,
+            ModuleId: "mod-1",
+            BaseAddress: null,
+            Size: 0,
+            SymbolStatus: "none",
+            SymbolStatusDetail: null
+        );
+
+        module.SymbolStatusDetail.Should().BeNull();
+    }
+
+    /// <summary>
+    /// ModuleInfo symbolStatusDetail contains source info when loaded.
+    /// </summary>
+    [Fact]
+    public void ModuleInfo_SymbolStatusDetail_ContainsSourceWhenLoaded()
+    {
+        var module = new ModuleInfo(
+            Name: "Test",
+            FullName: "Test",
+            Path: "/test.dll",
+            Version: "1.0",
+            IsManaged: true,
+            IsDynamic: false,
+            HasSymbols: true,
+            ModuleId: "mod-1",
+            BaseAddress: null,
+            Size: 0,
+            SymbolStatus: "loaded",
+            SymbolStatusDetail: "local"
+        );
+
+        module.SymbolStatusDetail.Should().NotBeNullOrEmpty();
+    }
+
+    /// <summary>
+    /// ModuleInfo defaults symbolStatus to "none" when not specified.
+    /// </summary>
+    [Fact]
+    public void ModuleInfo_SymbolStatus_DefaultsToNone()
+    {
+        var module = new ModuleInfo(
+            Name: "Test",
+            FullName: "Test",
+            Path: null,
+            Version: "1.0",
+            IsManaged: true,
+            IsDynamic: false,
+            HasSymbols: false,
+            ModuleId: "mod-1",
+            BaseAddress: null,
+            Size: 0
+        );
+
+        module.SymbolStatus.Should().Be("none");
+        module.SymbolStatusDetail.Should().BeNull();
+    }
+
+    /// <summary>
     /// name_filter supports wildcard patterns.
     /// </summary>
     [Theory]

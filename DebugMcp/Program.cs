@@ -6,6 +6,7 @@ using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
 using DebugMcp.Services.Completions;
 using DebugMcp.Services.Resources;
+using DebugMcp.Services.Symbols;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -26,10 +27,45 @@ var noRoslynOption = new Option<bool>("--no-roslyn", "-r")
 };
 rootCommand.Options.Add(noRoslynOption);
 
+var noSymbolsOption = new Option<bool>("--no-symbols")
+{
+    Description = "Disable automatic PDB symbol downloads from symbol servers"
+};
+rootCommand.Options.Add(noSymbolsOption);
+
+var symbolServersOption = new Option<string?>("--symbol-servers")
+{
+    Description = "Semicolon-separated list of SSQP symbol server URLs (default: Microsoft + NuGet)"
+};
+rootCommand.Options.Add(symbolServersOption);
+
+var symbolCacheOption = new Option<string?>("--symbol-cache")
+{
+    Description = "Directory path for persistent PDB symbol cache (default: ~/.debug-mcp/symbols)"
+};
+rootCommand.Options.Add(symbolCacheOption);
+
+var symbolTimeoutOption = new Option<int?>("--symbol-timeout")
+{
+    Description = "Per-file download timeout in seconds (default: 30)"
+};
+rootCommand.Options.Add(symbolTimeoutOption);
+
+var symbolMaxSizeOption = new Option<int?>("--symbol-max-size")
+{
+    Description = "Maximum PDB file size to download in MB (default: 100)"
+};
+rootCommand.Options.Add(symbolMaxSizeOption);
+
 rootCommand.SetAction(async parseResult =>
 {
     var enableStderr = parseResult.GetValue(stderrOption);
     var disableRoslyn = parseResult.GetValue(noRoslynOption);
+    var noSymbols = parseResult.GetValue(noSymbolsOption);
+    var symbolServers = parseResult.GetValue(symbolServersOption);
+    var symbolCache = parseResult.GetValue(symbolCacheOption);
+    var symbolTimeout = parseResult.GetValue(symbolTimeoutOption);
+    var symbolMaxSize = parseResult.GetValue(symbolMaxSizeOption);
 
     var builder = Host.CreateApplicationBuilder([]);
 
@@ -75,6 +111,19 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<ThreadSnapshotCache>();
     builder.Services.AddSingleton<AllowedSourcePaths>();
     builder.Services.AddSingleton<ResourceNotifier, McpResourceNotifier>();
+
+    // Register symbol server services (021-symbol-server)
+    var symbolOptions = SymbolServerOptions.Create(symbolServers, symbolCache, noSymbols, symbolTimeout, symbolMaxSize);
+    builder.Services.AddSingleton(symbolOptions);
+    builder.Services.AddSingleton<PeDebugInfoReader>();
+    builder.Services.AddSingleton(sp => new PersistentSymbolCache(
+        symbolOptions.CacheDirectory,
+        sp.GetRequiredService<ILogger<PersistentSymbolCache>>()));
+    builder.Services.AddSingleton(sp => new SymbolServerClient(
+        new HttpClient(),
+        symbolOptions,
+        sp.GetRequiredService<ILogger<SymbolServerClient>>()));
+    builder.Services.AddSingleton<ISymbolResolver, SymbolResolver>();
 
     // Register completion services (020-mcp-completions)
     builder.Services.AddSingleton<ExpressionCompletionProvider>();
@@ -146,6 +195,16 @@ rootCommand.SetAction(async parseResult =>
     else
     {
         logger.LogInformation("Roslyn code analysis tools enabled");
+    }
+
+    if (!symbolOptions.Enabled)
+    {
+        logger.LogInformation("Symbol server downloads disabled");
+    }
+    else
+    {
+        logger.LogInformation("Symbol servers: {Servers}", string.Join(", ", symbolOptions.ServerUrls));
+        logger.LogInformation("Symbol cache: {CacheDir}", symbolOptions.CacheDirectory);
     }
 
     await host.RunAsync();

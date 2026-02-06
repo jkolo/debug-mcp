@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection.Metadata;
+using DebugMcp.Models.Modules;
+using DebugMcp.Services.Symbols;
 using Microsoft.Extensions.Logging;
 
 namespace DebugMcp.Services.Breakpoints;
@@ -7,16 +9,19 @@ namespace DebugMcp.Services.Breakpoints;
 /// <summary>
 /// Caches MetadataReaderProvider instances per assembly to avoid repeated file I/O.
 /// Thread-safe and disposes cached readers on disposal.
+/// When an ISymbolResolver is available, uses it to find PDBs from symbol servers and caches.
 /// </summary>
 public sealed class PdbSymbolCache : IDisposable
 {
     private readonly ILogger<PdbSymbolCache> _logger;
+    private readonly ISymbolResolver? _symbolResolver;
     private readonly ConcurrentDictionary<string, CachedPdbEntry> _cache = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
-    public PdbSymbolCache(ILogger<PdbSymbolCache> logger)
+    public PdbSymbolCache(ILogger<PdbSymbolCache> logger, ISymbolResolver? symbolResolver = null)
     {
         _logger = logger;
+        _symbolResolver = symbolResolver;
     }
 
     /// <summary>
@@ -74,8 +79,21 @@ public sealed class PdbSymbolCache : IDisposable
 
     private CachedPdbEntry? LoadPdb(string assemblyPath)
     {
-        // Try to find PDB file
+        // Try to find PDB file: first local, then via symbol resolver
         var pdbPath = FindPdbPath(assemblyPath);
+
+        if (pdbPath == null && _symbolResolver != null)
+        {
+            // Use the symbol resolver to check cache/embedded/server
+            var result = _symbolResolver.ResolveAsync(assemblyPath).GetAwaiter().GetResult();
+            if (result.Status == SymbolStatus.Loaded && result.PdbPath != null)
+            {
+                pdbPath = result.PdbPath;
+                _logger.LogDebug("Symbol resolver found PDB for {AssemblyPath}: {PdbPath} (source: {Source})",
+                    assemblyPath, pdbPath, result.Source);
+            }
+        }
+
         if (pdbPath == null)
         {
             _logger.LogDebug("No PDB found for {AssemblyPath}", assemblyPath);
