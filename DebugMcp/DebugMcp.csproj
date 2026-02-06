@@ -16,14 +16,24 @@
         <!-- NuGet Metadata -->
         <PackageId>debug-mcp</PackageId>
         <Authors>Jerzy Kołosowski</Authors>
-        <Description>MCP server for debugging .NET applications via the ICorDebug API</Description>
+        <Description>MCP server that gives AI agents full debugging capabilities for .NET applications. Supports 34 tools for breakpoints, stepping, inspection, memory analysis, module exploration, code analysis (Roslyn), exception autopsy, and process I/O — all via the Model Context Protocol. Built on ICorDebug for native, zero-overhead .NET debugging on Linux.</Description>
         <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+        <PackageProjectUrl>https://debug-mcp.net</PackageProjectUrl>
         <RepositoryUrl>https://github.com/jkolo/debug-mcp</RepositoryUrl>
-        <PackageTags>mcp;debugger;dotnet;icordebug</PackageTags>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>mcp;mcp-server;debugger;dotnet;icordebug;ai;ai-agent;debugging;breakpoints;inspection;roslyn;code-analysis</PackageTags>
+        <PackageIcon>icon.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageReleaseNotes>https://github.com/jkolo/debug-mcp/releases</PackageReleaseNotes>
     </PropertyGroup>
 
     <ItemGroup>
         <InternalsVisibleTo Include="DebugMcp.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="../icon.png" Pack="true" PackagePath="" />
+        <None Include="../README.md" Pack="true" PackagePath="" />
     </ItemGroup>
 
     <ItemGroup>

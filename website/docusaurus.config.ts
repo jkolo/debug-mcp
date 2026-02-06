@@ -51,8 +51,13 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
+    image: 'img/social-card.jpg',
     navbar: {
       title: 'debug-mcp.net',
+      logo: {
+        alt: 'debug-mcp logo',
+        src: 'img/logo.png',
+      },
       items: [
         {
           type: 'docSidebar',
