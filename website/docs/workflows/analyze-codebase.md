@@ -1,6 +1,6 @@
 ---
 title: Analyze a Codebase
-sidebar_position: 4
+sidebar_position: 5
 ---
 
 # Workflow: Analyze a Codebase
@@ -15,8 +15,8 @@ You're working with an unfamiliar .NET solution and need to understand how diffe
 
 ### 1. Load the solution
 
+**Request** (`code_load`):
 ```json
-// code_load
 {
   "path": "/app/MyApp.sln"
 }
@@ -45,8 +45,8 @@ The workspace is now ready for analysis. Loading only needs to happen once per s
 
 You want to understand how `UserService` is used throughout the codebase.
 
+**Request** (`code_find_usages`):
 ```json
-// code_find_usages
 {
   "name": "MyApp.Services.UserService",
   "symbolKind": "Type"
@@ -94,8 +94,8 @@ You can see the class is declared in `UserService.cs`, injected in `Startup.cs`,
 
 You see a call to `GetUserById` and want to see its implementation.
 
+**Request** (`code_goto_definition`):
 ```json
-// code_goto_definition
 {
   "file": "/app/Controllers/UserController.cs",
   "line": 28,
@@ -131,8 +131,8 @@ Now you know exactly where to look: line 35 of `UserService.cs`.
 
 You're debugging an issue where `_connectionString` has the wrong value. Find all places where it's assigned.
 
+**Request** (`code_find_assignments`):
 ```json
-// code_find_assignments
 {
   "name": "MyApp.Data.DbContext._connectionString",
   "symbolKind": "Field"
@@ -176,8 +176,8 @@ The field is initialized to empty and then set in the constructor from configura
 
 Before making changes, verify the code compiles.
 
+**Request** (`code_get_diagnostics`):
 ```json
-// code_get_diagnostics
 {
   "minSeverity": "Warning"
 }

@@ -4,9 +4,14 @@ sidebar_position: 1
 ---
 
 
+:::info
+This page explains how debug-mcp works internally.
+You don't need this to use the tool — start with [Getting Started](/docs/getting-started).
+:::
+
 ## Overview
 
-DebugMcp is structured as a bridge between the MCP protocol (JSON-RPC over stdio) and the .NET debugging infrastructure (ICorDebug COM APIs).
+debug-mcp is structured as a bridge between the MCP protocol (JSON-RPC over stdio) and the .NET debugging infrastructure (ICorDebug COM APIs).
 
 ```mermaid
 graph TD

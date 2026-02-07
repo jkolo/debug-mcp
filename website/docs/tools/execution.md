@@ -19,6 +19,8 @@ Use execution tools after the process is stopped (at a breakpoint, after a step,
 
 Resume execution.
 
+**Requires:** Paused session
+
 **When to use:** After inspecting state at a breakpoint or step, resume normal execution until the next breakpoint is hit or the process exits.
 
 **Parameters:**
@@ -43,6 +45,8 @@ Resume execution.
 
 Pause execution.
 
+**Requires:** Active session (running)
+
 **When to use:** The process is running and you need to stop it immediately — for example, to inspect what's happening in a loop or a long-running operation.
 
 **Parameters:** None
@@ -64,6 +68,8 @@ Pause execution.
 ### debug_step
 
 Step through code. Supports three modes: step over (next line), step into (enter method call), and step out (finish current method).
+
+**Requires:** Paused session
 
 **When to use:**
 - **Step over:** Execute the current line and move to the next one. Method calls on the current line execute fully without stopping inside them.

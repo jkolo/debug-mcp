@@ -1,11 +1,11 @@
 ---
-title: Profile Module Loading
-sidebar_position: 3
+title: Explore Application Structure
+sidebar_position: 4
 ---
 
-# Workflow: Profile Module Loading
+# Workflow: Explore Application Structure
 
-This guide walks through using debug-mcp to analyze what assemblies an application loads, explore their types, and understand the application's structure from metadata.
+This guide walks through using debug-mcp to explore what assemblies an application loads, browse their types, and understand the application's structure from metadata.
 
 ## Scenario
 
@@ -15,8 +15,8 @@ You want to understand the structure of a .NET application without reading its s
 
 ### 1. Launch the application
 
+**Request** (`debug_launch`):
 ```json
-// debug_launch
 {
   "program": "/app/MyService.dll",
   "stop_at_entry": false
@@ -27,8 +27,8 @@ Launch without stopping at entry — module operations work on running processes
 
 ### 2. List loaded modules
 
+**Request** (`modules_list`):
 ```json
-// modules_list
 {
   "include_system": false,
   "name_filter": "MyApp*"
@@ -51,8 +51,8 @@ Notice `MyApp.Data` has no symbols and is optimized — debugging will be limite
 
 ### 3. Search for types across modules
 
+**Request** (`modules_search`):
 ```json
-// modules_search
 {
   "pattern": "*Service*",
   "search_type": "types",
@@ -74,8 +74,8 @@ Find all service classes:
 
 ### 4. Browse types in a module
 
+**Request** (`types_get`):
 ```json
-// types_get
 {
   "module_name": "MyApp",
   "namespace_filter": "MyApp.Models*",
@@ -97,8 +97,8 @@ See all model classes:
 
 ### 5. Inspect a type's members
 
+**Request** (`members_get`):
 ```json
-// members_get
 {
   "type_name": "MyApp.Services.OrderService",
   "member_kinds": "methods,properties",
@@ -123,8 +123,8 @@ Understand the type's API:
 
 ### 6. Disconnect
 
+**Request** (`debug_disconnect`):
 ```json
-// debug_disconnect
 {
   "terminate": true
 }

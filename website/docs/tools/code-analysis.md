@@ -25,6 +25,8 @@ Use code analysis tools when you need to understand code structure and relations
 
 Load a solution or project file into the analysis workspace.
 
+**Requires:** No session needed (works offline)
+
 **When to use:** Before using any other code analysis tools. This tool initializes Roslyn's workspace with your codebase.
 
 **Parameters:**
@@ -68,6 +70,8 @@ Load a solution or project file into the analysis workspace.
 ### code_find_usages
 
 Find all usages of a symbol across the workspace.
+
+**Requires:** No session needed (requires loaded workspace via `code_load`)
 
 **When to use:** Understand how a type, method, property, or variable is used throughout the codebase. Useful for refactoring decisions or understanding code impact.
 
@@ -168,6 +172,8 @@ Find all usages of a symbol across the workspace.
 
 Find all assignments to a variable, field, or property.
 
+**Requires:** No session needed (requires loaded workspace via `code_load`)
+
 **When to use:** Track where a value comes from. Useful for debugging "why does this variable have this value?" questions.
 
 **Parameters:**
@@ -266,6 +272,8 @@ Find all assignments to a variable, field, or property.
 
 Get compilation diagnostics (errors and warnings) for projects.
 
+**Requires:** No session needed (requires loaded workspace via `code_load`)
+
 **When to use:** Check for compilation errors before running. Useful for validating code changes or understanding why a build fails.
 
 **Parameters:**
@@ -336,6 +344,8 @@ Get compilation diagnostics (errors and warnings) for projects.
 ### code_goto_definition
 
 Navigate to the definition of a symbol.
+
+**Requires:** No session needed (requires loaded workspace via `code_load`)
 
 **When to use:** Find where a type, method, or property is defined. Essential for understanding code and navigating large codebases.
 

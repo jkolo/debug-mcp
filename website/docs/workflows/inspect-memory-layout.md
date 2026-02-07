@@ -1,6 +1,6 @@
 ---
 title: Inspect Memory Layout
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Workflow: Inspect Memory Layout
@@ -15,8 +15,8 @@ You want to understand how the CLR lays out a specific type in memory. This is u
 
 ### 1. Attach to the running process
 
+**Request** (`debug_attach`):
 ```json
-// debug_attach
 {
   "pid": 12345
 }
@@ -24,8 +24,8 @@ You want to understand how the CLR lays out a specific type in memory. This is u
 
 ### 2. Set a breakpoint where the object exists
 
+**Request** (`breakpoint_set`):
 ```json
-// breakpoint_set
 {
   "file": "Services/OrderService.cs",
   "line": 50
@@ -34,13 +34,13 @@ You want to understand how the CLR lays out a specific type in memory. This is u
 
 ### 3. Continue and wait for the breakpoint
 
+**Request** (`debug_continue`):
 ```json
-// debug_continue
 {}
 ```
 
+**Request** (`breakpoint_wait`):
 ```json
-// breakpoint_wait
 {
   "timeout_ms": 30000
 }
@@ -48,8 +48,8 @@ You want to understand how the CLR lays out a specific type in memory. This is u
 
 ### 4. Inspect the object
 
+**Request** (`object_inspect`):
 ```json
-// object_inspect
 {
   "object_ref": "customer",
   "depth": 2
@@ -75,8 +75,8 @@ See all fields with their values, addresses, and sizes:
 
 ### 5. Get the type's memory layout
 
+**Request** (`layout_get`):
 ```json
-// layout_get
 {
   "type_name": "MyApp.Models.Customer",
   "include_padding": true
@@ -106,8 +106,8 @@ See field offsets, alignment, and padding gaps:
 
 ### 6. Read raw memory at the object's address
 
+**Request** (`memory_read`):
 ```json
-// memory_read
 {
   "address": "0x00007FF8A1234560",
   "size": 48,
@@ -128,8 +128,8 @@ See the actual bytes:
 
 ### 7. Trace object references
 
+**Request** (`references_get`):
 ```json
-// references_get
 {
   "object_ref": "customer",
   "direction": "outbound"
@@ -151,8 +151,8 @@ See what other objects this object holds references to:
 
 ### 8. Disconnect
 
+**Request** (`debug_disconnect`):
 ```json
-// debug_disconnect
 {
   "terminate": false
 }

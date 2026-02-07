@@ -19,6 +19,8 @@ Use inspection tools after the process is stopped (at a breakpoint or after a st
 
 List all managed threads.
 
+**Requires:** Paused session
+
 **When to use:** See what threads exist, which one is current, and where each thread is executing. Useful for debugging multi-threaded issues.
 
 **Parameters:** None
@@ -58,6 +60,8 @@ List all managed threads.
 ### stacktrace_get
 
 Get the stack trace for a thread.
+
+**Requires:** Paused session
 
 **When to use:** Understand the call chain that led to the current point. Shows you which methods called which, with source file and line information.
 
@@ -110,6 +114,8 @@ Get the stack trace for a thread.
 ### variables_get
 
 Get variables for a stack frame.
+
+**Requires:** Paused session
 
 **When to use:** Inspect local variables, method arguments, and `this` at a specific point in the call stack. Use `expand` to drill into object fields.
 
@@ -185,6 +191,8 @@ Get variables for a stack frame.
 
 Evaluate a C# expression in the context of a stopped thread.
 
+**Requires:** Paused session
+
 **When to use:** Compute values that aren't directly visible as local variables — call methods, access properties, run LINQ queries, or test hypotheses about the bug.
 
 **Parameters:**
@@ -238,6 +246,8 @@ Complex expression:
 ### object_inspect
 
 Inspect a heap object's contents including all fields, sizes, and addresses.
+
+**Requires:** Paused session
 
 **When to use:** Get detailed information about an object beyond what `variables_get` shows — field offsets, memory addresses, sizes, and deep nested expansion.
 

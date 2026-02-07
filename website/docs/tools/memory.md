@@ -19,6 +19,8 @@ Use memory tools when you need to go beyond variable inspection and understand w
 
 Read raw memory bytes from the debuggee process.
 
+**Requires:** Paused session
+
 **When to use:** Examine the actual bytes at a memory address. Useful for verifying object contents, checking for corruption, or understanding binary data.
 
 **Parameters:**
@@ -64,6 +66,8 @@ Read raw memory bytes from the debuggee process.
 ### layout_get
 
 Get the memory layout of a type including field offsets, sizes, and padding.
+
+**Requires:** Paused session
 
 **When to use:** Understand how the CLR lays out a type in memory — field order, alignment, padding gaps. Useful for performance analysis (cache-line alignment, struct packing) and understanding memory usage.
 
@@ -148,6 +152,8 @@ Get the memory layout of a type including field offsets, sizes, and padding.
 ### references_get
 
 Analyze object references — find what objects a target references (outbound).
+
+**Requires:** Paused session
 
 **When to use:** Trace the object graph from a specific object. See what other objects it holds references to. Useful for understanding ownership, finding memory leaks, or mapping object relationships.
 

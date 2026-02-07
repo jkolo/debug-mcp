@@ -19,9 +19,14 @@ Use breakpoint tools to control where execution pauses. You can break on specifi
 
 ## Tools
 
+**On this page:**
+[`breakpoint_set`](#breakpoint_set) | [`breakpoint_remove`](#breakpoint_remove) | [`breakpoint_list`](#breakpoint_list) | [`breakpoint_enable`](#breakpoint_enable) | [`breakpoint_set_exception`](#breakpoint_set_exception) | [`tracepoint_set`](#tracepoint_set) | [`breakpoint_wait`](#breakpoint_wait) | [`exception_get_context`](#exception_get_context) | [Notifications](#breakpoint-notifications)
+
 ### breakpoint_set
 
 Set a breakpoint in source code.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** You know the file and line (or function name) where you want execution to stop. Supports conditional breakpoints (break only when a condition is true), hit-count breakpoints (break after N hits), and logpoints (log without breaking).
 
@@ -103,6 +108,8 @@ If the module isn't loaded yet:
 
 Remove a breakpoint.
 
+**Requires:** Active session (running or paused)
+
 **When to use:** A breakpoint is no longer needed. Removing it avoids unnecessary stops.
 
 **Parameters:**
@@ -124,6 +131,8 @@ Remove a breakpoint.
 ### breakpoint_list
 
 List all breakpoints.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** Review which breakpoints are set, their hit counts, and whether they're verified (bound to code).
 
@@ -160,6 +169,8 @@ List all breakpoints.
 ### breakpoint_enable
 
 Enable or disable a breakpoint without removing it.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** Temporarily disable a breakpoint you might need later, without losing its configuration.
 
@@ -201,6 +212,8 @@ Enable or disable a breakpoint without removing it.
 ### breakpoint_set_exception
 
 Set an exception breakpoint to break when specific exception types are thrown.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** You want to catch exceptions as they happen — before any catch block runs. This is essential for debugging crashes, unhandled exceptions, or finding where unexpected exceptions originate.
 
@@ -246,6 +259,8 @@ Set an exception breakpoint to break when specific exception types are thrown.
 ### tracepoint_set
 
 Set a tracepoint (non-blocking observation point) at a source location.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** You want to observe code execution without stopping it. Tracepoints send MCP notifications when code passes through, letting you trace execution flow, log variable values, or count how often code paths are hit — all without pausing the application.
 
@@ -343,6 +358,8 @@ High-frequency tracepoint with filtering:
 
 Wait for any breakpoint to be hit.
 
+**Requires:** Active session (running or paused)
+
 **When to use:** After setting breakpoints and continuing execution, use this to block until a breakpoint fires. Without this, you'd have to poll `debug_state`.
 
 **Parameters:**
@@ -391,6 +408,8 @@ Wait for any breakpoint to be hit.
 ### exception_get_context
 
 Get full exception context when paused at an exception.
+
+**Requires:** Paused session (at an exception)
 
 **When to use:** After an exception breakpoint fires (or the process stops on an unhandled exception), use this to get everything at once: exception details, inner exception chain, stack frames with source locations, and local variables in the throwing frame. This is the "exception autopsy" tool — one call replaces multiple `stacktrace_get` + `variables_get` + `evaluate` calls.
 

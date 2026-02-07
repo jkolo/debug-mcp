@@ -19,6 +19,8 @@ Use process I/O tools when the debugged application reads from stdin or writes t
 
 Write data to the debugged process's stdin.
 
+**Requires:** Active session (running or paused)
+
 **When to use:** The debugged application is waiting for user input — a CLI prompt, a menu selection, a line of text. Use `close_after` to send EOF when the application reads until end of stream.
 
 **Parameters:**
@@ -72,6 +74,8 @@ Write data to the debugged process's stdin.
 ### process_read_output
 
 Read accumulated stdout and/or stderr output from the debugged process.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** You want to see what the process has printed — startup messages, log output, error messages, or command responses. Output accumulates between reads; use `clear` to empty the buffer after reading.
 

@@ -1,31 +1,63 @@
 import type {ReactNode} from 'react';
+import {useState} from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 import AsciinemaPlayer from '@site/src/components/AsciinemaPlayer';
 
 const features = [
   {
-    tag: 'ICorDebug',
-    name: 'Direct ICorDebug Access',
-    desc: 'Interfaces directly with the .NET runtime using ICorDebug APIs — the same approach used by JetBrains Rider. No DAP overhead.',
+    tag: 'Ask & Debug',
+    name: 'AI-Driven Debugging',
+    desc: 'Describe the bug in plain language — your AI agent launches the app, sets breakpoints, and inspects the state for you.',
   },
   {
-    tag: 'Tools',
-    name: 'Full Debug Toolkit',
-    desc: 'Launch, attach, breakpoints, stepping, variable inspection, expression evaluation, stack traces, memory layout analysis.',
+    tag: '34 Tools',
+    name: 'Complete Toolkit',
+    desc: 'Breakpoints, stepping, variables, expressions, memory layout, exception autopsy, code analysis — everything a debugger needs.',
   },
   {
-    tag: '.NET 10',
+    tag: 'One Command',
     name: 'Zero Installation',
-    desc: <>Run instantly with <code>dotnet tool run debug-mcp</code> on .NET 10+. No global install needed.</>,
+    desc: <>Run instantly with <code>dotnet tool run debug-mcp</code> on .NET 10+. No global install, no config files, ready in seconds.</>,
   },
 ];
+
+function QuickStartStep({number, title, children}: {number: number; title: string; children: ReactNode}) {
+  const [copied, setCopied] = useState(false);
+  const text = typeof children === 'string' ? children : null;
+
+  function handleCopy() {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="quickstart-step">
+      <div className="quickstart-step-number">{number}</div>
+      <div className="quickstart-step-title">{title}</div>
+      <div className="quickstart-step-content">
+        {typeof children === 'string' ? (
+          <pre className="quickstart-code">
+            <code>{children}</code>
+            <button className="quickstart-copy" onClick={handleCopy} title="Copy to clipboard">
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </pre>
+        ) : (
+          <div className="quickstart-inline">{children}</div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="MCP server for .NET debugging"
-      description="Enable AI agents to debug .NET applications interactively via ICorDebug APIs">
+      title="AI-powered .NET debugging"
+      description="Let your AI agent set breakpoints, inspect variables, and find bugs in your .NET apps">
       <div className="landing">
         {/* Hero */}
         <section className="hero-section">
@@ -35,8 +67,8 @@ export default function Home(): ReactNode {
               debug<span className="dot">-</span>mcp<span className="dot">.</span>net
             </h1>
             <p className="hero-tagline">
-              MCP server for .NET debugging — enable AI agents to debug
-              .NET applications interactively.
+              Let your AI agent set breakpoints, inspect variables, and
+              find bugs — in your .NET apps.
             </p>
             <div className="hero-actions">
               <Link className="btn-primary" to="/docs/getting-started">
@@ -61,11 +93,36 @@ export default function Home(): ReactNode {
           />
         </section>
 
+        {/* Quick Start */}
+        <section className="quickstart-section">
+          <div className="quickstart-header">
+            <div className="features-label">Quick Start</div>
+            <h2 className="features-title">Up and running in 3 steps</h2>
+          </div>
+          <div className="quickstart-steps">
+            <QuickStartStep number={1} title="Install">
+              <code>dotnet tool install -g debug-mcp</code>
+            </QuickStartStep>
+            <QuickStartStep number={2} title="Configure">
+{`{
+  "mcpServers": {
+    "dotnet-debugger": {
+      "command": "debug-mcp"
+    }
+  }
+}`}
+            </QuickStartStep>
+            <QuickStartStep number={3} title="Debug">
+              <span className="quickstart-prompt">"Launch MyApp.dll and find why GetUser throws null"</span>
+            </QuickStartStep>
+          </div>
+        </section>
+
         {/* Features */}
         <section className="features-section">
           <div className="features-header">
             <div className="features-label">Capabilities</div>
-            <h2 className="features-title">Native .NET debugging for AI agents</h2>
+            <h2 className="features-title">Everything your AI agent needs to debug .NET</h2>
           </div>
           <div className="features-grid">
             {features.map((f) => (

@@ -19,6 +19,8 @@ Use session tools to start and end debugging sessions. Every debugging workflow 
 
 Launch a .NET application under the debugger.
 
+**Requires:** No active session
+
 **When to use:** Starting a fresh debugging session with a .NET application. Use `stop_at_entry` to pause immediately at the entry point — useful when you want to set breakpoints before any code runs.
 
 **Parameters:**
@@ -62,6 +64,8 @@ Launch a .NET application under the debugger.
 
 Attach to a running .NET process.
 
+**Requires:** No active session
+
 **When to use:** Debugging an application that's already running — a long-lived service, a web server, or a process you can't easily restart.
 
 **Parameters:**
@@ -101,6 +105,8 @@ Attach to a running .NET process.
 
 End the debugging session.
 
+**Requires:** Active session (running or paused)
+
 **When to use:** Finishing a debugging session. By default, the process continues running after detaching. Set `terminate: true` to kill it.
 
 **Parameters:**
@@ -129,6 +135,8 @@ End the debugging session.
 ### debug_state
 
 Get the current debugging state.
+
+**Requires:** No session needed (works anytime)
 
 **When to use:** Check whether the process is running, stopped at a breakpoint, or has exited. This is the first tool to call when you need to understand what's happening before performing other operations.
 

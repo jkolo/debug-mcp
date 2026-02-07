@@ -4,7 +4,12 @@ sidebar_position: 2
 ---
 
 
-This document explains the .NET debugging infrastructure that DebugMcp uses.
+:::info
+This page explains how debug-mcp works internally.
+You don't need this to use the tool — start with [Getting Started](/docs/getting-started).
+:::
+
+This document explains the .NET debugging infrastructure that debug-mcp uses.
 
 ## Overview
 

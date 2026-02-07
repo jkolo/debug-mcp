@@ -13,6 +13,10 @@ import AsciinemaPlayer from '@site/src/components/AsciinemaPlayer';
 
 <AsciinemaPlayer src="/casts/getting-started.cast" rows={24} cols={120} idleTimeLimit={2} speed={1.5} />
 
+## Prerequisites
+
+- [.NET 10 SDK](https://dot.net) or later
+
 ## Install
 
 The recommended way to install debug-mcp is via [`dnx`](https://github.com/dn-vm/dnx):
@@ -29,24 +33,9 @@ dotnet tool install -g debug-mcp
 
 ## Configure Your AI Agent
 
-### Claude Code
+### Claude Code / Claude Desktop
 
-Add to your Claude Code MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "dotnet-debugger": {
-      "command": "dnx",
-      "args": ["debug-mcp"]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Add to `claude_desktop_config.json`:
+Add to your MCP configuration (`settings.json` or `claude_desktop_config.json`):
 
 ```json
 {
@@ -71,17 +60,28 @@ dnx debug-mcp
 debug-mcp
 ```
 
+## Verify It Works
+
+Ask your AI agent:
+
+> "What debug-mcp tools are available?"
+
+You should see a list of 34 tools including `debug_launch`, `breakpoint_set`, and `evaluate`.
+
 ## Your First Debugging Session
 
 Let's debug a simple .NET application step by step.
 
 ### 1. Launch the application
 
-Ask your AI agent:
-
 > "Launch `/path/to/MyApp.dll` and stop at the entry point"
 
-The agent calls `debug_launch`:
+The process starts and pauses immediately at `Main()`.
+
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`debug_launch`):
 ```json
 {
   "program": "/path/to/MyApp.dll",
@@ -89,10 +89,18 @@ The agent calls `debug_launch`:
 }
 ```
 
+</details>
+
 ### 2. Set a breakpoint
 
 > "Set a breakpoint at line 25 in Program.cs"
 
+The agent maps the file and line to an IL offset and creates the breakpoint.
+
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`breakpoint_set`):
 ```json
 {
   "file": "Program.cs",
@@ -100,44 +108,67 @@ The agent calls `debug_launch`:
 }
 ```
 
+</details>
+
 ### 3. Continue and wait
 
 > "Continue execution and wait for the breakpoint"
 
-The agent calls `debug_continue`, then `breakpoint_wait`.
+The agent calls `debug_continue`, then `breakpoint_wait`. Execution resumes until line 25 is hit.
 
 ### 4. Inspect variables
 
 > "Show me the local variables"
 
+The agent retrieves all local variables, arguments, and `this` for the current frame.
+
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`variables_get`):
 ```json
-// variables_get
 {
   "scope": "all"
 }
 ```
 
+</details>
+
 ### 5. Evaluate an expression
 
 > "What is the value of `items.Count`?"
 
+The agent evaluates the expression in the context of the stopped thread and returns the result.
+
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`evaluate`):
 ```json
-// evaluate
 {
   "expression": "items.Count"
 }
 ```
 
+</details>
+
 ### 6. Disconnect
 
 > "Stop debugging"
 
+The agent terminates the process and ends the session.
+
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`debug_disconnect`):
 ```json
-// debug_disconnect
 {
   "terminate": true
 }
 ```
+
+</details>
 
 ## Static Code Analysis
 
@@ -147,42 +178,57 @@ debug-mcp also provides Roslyn-based code analysis tools that work without runni
 
 > "Load the solution at /path/to/MyApp.sln for code analysis"
 
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`code_load`):
 ```json
-// code_load
 {
   "path": "/path/to/MyApp.sln"
 }
 ```
 
+</details>
+
 ### Find all usages
 
 > "Find all usages of the UserService class"
 
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`code_find_usages`):
 ```json
-// code_find_usages
 {
   "name": "MyApp.Services.UserService",
   "symbolKind": "Type"
 }
 ```
 
+</details>
+
 ### Check for errors
 
 > "Are there any compilation errors?"
 
+<details>
+<summary>Tool call details</summary>
+
+**Request** (`code_get_diagnostics`):
 ```json
-// code_get_diagnostics
 {
   "minSeverity": "Error"
 }
 ```
 
+</details>
+
 ## What's Next?
 
-- **[Tools Reference](/docs/tools/session)** — Full documentation for all MCP tools
-- **[Code Analysis](/docs/tools/code-analysis)** — Static analysis: find usages, assignments, and diagnostics
+- **[Tools Overview](/docs/tools)** — All 34 tools at a glance
+- **[Debug with Breakpoints](/docs/workflows/debug-with-breakpoints)** — The most common debugging workflow
+- **[Debug an Exception](/docs/workflows/debug-an-exception)** — Find crash root causes with exception autopsy
 - **[Analyze a Codebase](/docs/workflows/analyze-codebase)** — Navigate and understand unfamiliar code
-- **[Debug a Crash](/docs/workflows/debug-a-crash)** — Step-by-step guide for finding crash root causes
 - **[Inspect Memory Layout](/docs/workflows/inspect-memory-layout)** — Analyze object layout and memory usage
-- **[Profile Module Loading](/docs/workflows/profile-module-loading)** — Explore loaded assemblies and types
+- **[Explore Application Structure](/docs/workflows/explore-application-structure)** — Browse loaded assemblies and types
 - **[Architecture](/docs/architecture)** — Understand how debug-mcp works internally

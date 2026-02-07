@@ -6,6 +6,10 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Tools',
+      link: {
+        type: 'doc',
+        id: 'tools/index',
+      },
       items: [
         'tools/session',
         'tools/breakpoints',
@@ -22,16 +26,22 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Workflows',
       items: [
-        'workflows/debug-a-crash',
+        'workflows/debug-with-breakpoints',
+        'workflows/debug-an-exception',
         'workflows/inspect-memory-layout',
-        'workflows/profile-module-loading',
+        'workflows/explore-application-structure',
         'workflows/analyze-codebase',
-        'workflows/debug-exceptions',
       ],
     },
-    'architecture',
-    'debugger',
-    'development',
+    {
+      type: 'category',
+      label: 'Internals',
+      items: [
+        'architecture',
+        'debugger',
+        'development',
+      ],
+    },
   ],
 };
 

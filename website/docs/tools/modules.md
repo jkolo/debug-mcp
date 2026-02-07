@@ -19,6 +19,8 @@ Use module tools to understand the structure of the debugged application at the 
 
 List all loaded modules (assemblies) in the debugged process.
 
+**Requires:** Active session (running or paused)
+
 **When to use:** See what assemblies are loaded, check if your assembly has debug symbols, or filter to find application assemblies vs. framework assemblies.
 
 **Parameters:**
@@ -71,6 +73,8 @@ List all loaded modules (assemblies) in the debugged process.
 ### modules_search
 
 Search for types and methods across all loaded modules.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** Find a type or method by name when you don't know which module it's in. Supports wildcard patterns.
 
@@ -142,6 +146,8 @@ Search for types and methods across all loaded modules.
 
 Get types defined in a module, organized by namespace.
 
+**Requires:** Active session (running or paused)
+
 **When to use:** Browse the types in a specific module. Filter by namespace, kind (class/interface/struct/enum), or visibility.
 
 **Parameters:**
@@ -196,6 +202,8 @@ Get types defined in a module, organized by namespace.
 ### members_get
 
 Get members (methods, properties, fields, events) of a type.
+
+**Requires:** Active session (running or paused)
 
 **When to use:** Understand the API surface of a type — what methods it has, what properties, whether they're public or private, static or instance.
 
