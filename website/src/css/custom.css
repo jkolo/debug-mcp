@@ -44,11 +44,27 @@
 }
 
 /* ── Landing page ── */
+[data-theme='light'] .landing {
+  --page-bg: #f8f6fc;
+  --dm-surface: #ffffff;
+  --dm-surface-raised: #f0ecf8;
+  --dm-surface-border: #ddd6ee;
+  --dm-text-dim: #5c5470;
+  --dm-text-muted: #8b839e;
+  --dm-purple-light: #7b5ea7;
+  --dm-purple-glow: rgba(123, 94, 167, 0.2);
+}
+
 .landing {
   --page-bg: #0c0a13;
   background: var(--page-bg);
   color: #e4e0ed;
   overflow-x: hidden;
+}
+
+[data-theme='light'] .landing {
+  background: var(--page-bg);
+  color: #2a2438;
 }
 
 /* ── Hero ── */
@@ -111,6 +127,10 @@
   margin-bottom: 1.5rem;
 }
 
+[data-theme='light'] .hero-title {
+  color: #1a1626;
+}
+
 .hero-title .dot {
   color: var(--dm-purple-light);
 }
@@ -155,6 +175,16 @@
   text-decoration: none;
   box-shadow: 0 0 20px var(--dm-purple-glow);
   transform: translateY(-1px);
+}
+
+[data-theme='light'] .btn-primary {
+  background: var(--dm-purple);
+  color: #fff;
+}
+
+[data-theme='light'] .btn-primary:hover {
+  background: #6d4f9a;
+  color: #fff;
 }
 
 .btn-ghost {
@@ -250,6 +280,10 @@
   color: #f0ecf8;
 }
 
+[data-theme='light'] .terminal-cmd {
+  color: #1a1626;
+}
+
 .terminal-comment {
   color: var(--dm-text-muted);
   font-style: italic;
@@ -283,6 +317,10 @@
   font-weight: 600;
   color: #f0ecf8;
   letter-spacing: -0.02em;
+}
+
+[data-theme='light'] .features-title {
+  color: #1a1626;
 }
 
 .features-grid {
@@ -330,6 +368,10 @@
   margin-bottom: 0.75rem;
 }
 
+[data-theme='light'] .feature-name {
+  color: #1a1626;
+}
+
 .feature-desc {
   font-size: 0.9rem;
   color: var(--dm-text-dim);
@@ -361,6 +403,58 @@
   .features-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Light mode: hero scanlines & feature gradient ── */
+[data-theme='light'] .hero-section {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(123, 94, 167, 0.08) 0%, transparent 70%),
+    var(--page-bg);
+}
+
+[data-theme='light'] .hero-section::before {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(123, 94, 167, 0.015) 2px,
+      rgba(123, 94, 167, 0.015) 4px
+    );
+}
+
+[data-theme='light'] .features-section {
+  background:
+    linear-gradient(180deg, var(--page-bg) 0%, #ede8f5 100%);
+}
+
+[data-theme='light'] .feature-card {
+  background: #ffffff;
+  border-color: #ddd6ee;
+}
+
+[data-theme='light'] .feature-card:hover {
+  border-color: rgba(123, 94, 167, 0.35);
+  box-shadow: 0 0 30px rgba(123, 94, 167, 0.08);
+}
+
+[data-theme='light'] .feature-icon {
+  color: var(--dm-purple);
+  background: rgba(123, 94, 167, 0.06);
+  border-color: rgba(123, 94, 167, 0.15);
+}
+
+[data-theme='light'] .feature-desc code {
+  color: var(--dm-purple);
+  background: rgba(123, 94, 167, 0.06);
+  border-color: rgba(123, 94, 167, 0.12);
+}
+
+[data-theme='light'] .navbar {
+  background: rgba(248, 246, 252, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #ddd6ee;
+  box-shadow: none;
 }
 
 /* ── Override Docusaurus dark navbar to match ── */

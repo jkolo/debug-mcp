@@ -17,7 +17,7 @@ const features = [
   {
     tag: '.NET 10',
     name: 'Zero Installation',
-    desc: <>Run instantly with <code>dnx debug-mcp</code> on .NET 10+. No global install needed.</>,
+    desc: <>Run instantly with <code>dotnet tool run debug-mcp</code> on .NET 10+. No global install needed.</>,
   },
 ];
 
@@ -42,7 +42,7 @@ export default function Home(): ReactNode {
               <Link className="btn-primary" to="/docs/getting-started">
                 Get Started →
               </Link>
-              <Link className="btn-ghost" href="https://github.com/jkolo/debug-mcp.net">
+              <Link className="btn-ghost" href="https://github.com/jkolo/debug-mcp">
                 GitHub
               </Link>
             </div>
