@@ -30,7 +30,8 @@ public sealed class DebugAttachTool
     /// <param name="timeout">Maximum time to wait for attachment in milliseconds (default: 30000).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Debug session information or error response.</returns>
-    [McpServerTool(Name = "debug_attach")]
+    [McpServerTool(Name = "debug_attach", Title = "Attach to Process",
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Attach debugger to a running .NET process by process ID")]
     public async Task<string> AttachAsync(
         [Description("Process ID of the .NET application to debug")] int pid,

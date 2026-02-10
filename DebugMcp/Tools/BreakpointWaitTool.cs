@@ -41,8 +41,9 @@ public sealed class BreakpointWaitTool
     /// <param name="breakpoint_id">Wait for specific breakpoint only (optional).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Hit information or timeout response.</returns>
-    [McpServerTool(Name = "breakpoint_wait")]
-    [Description("Wait for a breakpoint to be hit")]
+    [McpServerTool(Name = "breakpoint_wait", Title = "Wait for Breakpoint Hit",
+        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Wait for any breakpoint or exception breakpoint to be hit. Blocks until the debuggee pauses at a breakpoint, or the timeout expires. Returns hit=true with breakpointId, threadId, timestamp, location (file/line/column/function), and hitCount when a breakpoint fires. Returns hit=false with timeout=true if no hit within the timeout period. Requires an active debug session with the process running. Optionally filter by breakpoint_id or include full exception autopsy context with include_autopsy=true. Example response: {\"success\": true, \"hit\": true, \"breakpointId\": \"bp-a1b2c3\", \"threadId\": 1, \"location\": {\"file\": \"Program.cs\", \"line\": 42, \"functionName\": \"Main\"}, \"hitCount\": 1}")]
     public async Task<string> WaitForBreakpointAsync(
         [Description("Timeout in milliseconds (default: 30000, max: 300000)")] int timeout_ms = 30000,
         [Description("Wait for specific breakpoint only (optional)")] string? breakpoint_id = null,

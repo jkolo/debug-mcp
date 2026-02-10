@@ -45,8 +45,9 @@ public sealed class BreakpointSetTool
     /// <param name="condition">Optional C# condition expression (breakpoint only triggers when true).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Breakpoint information or error response.</returns>
-    [McpServerTool(Name = "breakpoint_set")]
-    [Description("Set a breakpoint at a source location (file and line)")]
+    [McpServerTool(Name = "breakpoint_set", Title = "Set Breakpoint",
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Set a breakpoint at a source location (file and line). The debugger will pause execution when this line is reached. If a debug session is active, the breakpoint is verified immediately; otherwise it stays pending until a session starts. Supports optional column targeting for lambdas and conditional expressions. Returns: breakpoint object with id (bp-{guid}), location, state (verified/pending/error), enabled, verified, condition, hitCount. Use breakpoint_list to see all breakpoints, breakpoint_remove to delete. Example response: {\"success\": true, \"breakpoint\": {\"id\": \"bp-a1b2c3\", \"location\": {\"file\": \"Program.cs\", \"line\": 42}, \"state\": \"verified\", \"enabled\": true, \"hitCount\": 0}}")]
     public async Task<string> SetBreakpointAsync(
         [Description("Source file path (absolute or relative to project)")] string file,
         [Description("1-based line number")] int line,

@@ -31,7 +31,8 @@ public sealed class ObjectInspectTool
     /// <param name="thread_id">Thread ID (default: current thread).</param>
     /// <param name="frame_index">Frame index (0 = top of stack, default: 0).</param>
     /// <returns>Object inspection with type, size, fields, and values.</returns>
-    [McpServerTool(Name = "object_inspect")]
+    [McpServerTool(Name = "object_inspect", Title = "Inspect Object",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Inspect a heap object's contents including all fields")]
     public async Task<string> InspectObject(
         [Description("Object reference (variable name or expression)")] string object_ref,

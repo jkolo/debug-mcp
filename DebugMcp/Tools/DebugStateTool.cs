@@ -27,7 +27,8 @@ public sealed class DebugStateTool
     /// Get the current state of the debug session.
     /// </summary>
     /// <returns>Current session state and details.</returns>
-    [McpServerTool(Name = "debug_state")]
+    [McpServerTool(Name = "debug_state", Title = "Get Debug State",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Get the current state of the debug session")]
     public string GetState()
     {

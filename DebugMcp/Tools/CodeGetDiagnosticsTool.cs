@@ -35,7 +35,8 @@ public sealed class CodeGetDiagnosticsTool
     /// <param name="maxResults">Maximum number of diagnostics to return (default: 100, max: 500).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of diagnostics or error response.</returns>
-    [McpServerTool(Name = "code_get_diagnostics")]
+    [McpServerTool(Name = "code_get_diagnostics", Title = "Get Diagnostics",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Get compilation diagnostics (errors and warnings) for projects in the workspace.")]
     public async Task<string> GetDiagnosticsAsync(
         [Description("Optional project name. If omitted, returns diagnostics for all projects.")] string? projectName = null,

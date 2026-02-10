@@ -40,7 +40,8 @@ public sealed class MembersGetTool
     /// <param name="include_static">Include static members.</param>
     /// <param name="include_instance">Include instance members.</param>
     /// <returns>Type members with methods, properties, fields, and events.</returns>
-    [McpServerTool(Name = "members_get")]
+    [McpServerTool(Name = "members_get", Title = "Get Type Members",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Get members (methods, properties, fields, events) of a type")]
     public async Task<string> GetMembers(
         [Description("Full type name to inspect")] string type_name,

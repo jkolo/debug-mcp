@@ -34,8 +34,9 @@ public sealed class DebugLaunchTool
     /// <param name="timeout">Maximum time to wait for launch in milliseconds.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Debug session information or error response.</returns>
-    [McpServerTool(Name = "debug_launch")]
-    [Description("Launch a .NET executable under debugger control")]
+    [McpServerTool(Name = "debug_launch", Title = "Launch Process",
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+    [Description("Launch a .NET executable under debugger control. Starts a new process, loads the CLR runtime, and pauses at the entry point (by default). Only one debug session can be active at a time — call debug_disconnect first if already attached. Returns: session object with processId, processName, executablePath, runtimeVersion, state, launchMode, attachedAt. Errors: ALREADY_ATTACHED if session exists, INVALID_PATH if program not found, PERMISSION_DENIED if insufficient privileges. Example response: {\"success\": true, \"session\": {\"processId\": 1234, \"processName\": \"MyApp\", \"state\": \"paused\", \"runtimeVersion\": \"10.0.0\", \"launchMode\": \"launch\", \"attachedAt\": \"2026-01-15T10:30:00Z\"}}")]
     public async Task<string> LaunchAsync(
         [Description("Path to the .NET executable or DLL to debug")] string program,
         [Description("Command-line arguments to pass to the program")] string[]? args = null,

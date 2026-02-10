@@ -28,8 +28,9 @@ public sealed class DebugContinueTool
     /// </summary>
     /// <param name="timeout">Timeout in milliseconds (default: 30000, min: 1000, max: 300000).</param>
     /// <returns>Updated session state after continuing.</returns>
-    [McpServerTool(Name = "debug_continue")]
-    [Description("Continue execution of the paused process")]
+    [McpServerTool(Name = "debug_continue", Title = "Continue Execution",
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Continue execution of the paused process. The process must be in the 'paused' state (from a breakpoint hit, step completion, or debug_pause). After continuing, the process runs until it hits another breakpoint, throws an exception, or exits. Returns: updated session state (typically 'running'). Use breakpoint_wait to wait for the next pause event. Example response: {\"success\": true, \"session\": {\"processId\": 1234, \"processName\": \"MyApp\", \"state\": \"running\", \"launchMode\": \"launch\"}}")]
     public async Task<string> ContinueAsync(
         [Description("Timeout in milliseconds")] int timeout = 30000)
     {

@@ -28,7 +28,8 @@ public sealed class ThreadsListTool
     /// List all managed threads in the debuggee process.
     /// </summary>
     /// <returns>List of threads with their states and locations.</returns>
-    [McpServerTool(Name = "threads_list")]
+    [McpServerTool(Name = "threads_list", Title = "List Threads",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("List all managed threads in the debuggee process")]
     public string ListThreads()
     {

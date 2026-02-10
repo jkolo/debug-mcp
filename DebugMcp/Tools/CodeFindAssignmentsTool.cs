@@ -37,7 +37,8 @@ public sealed class CodeFindAssignmentsTool
     /// <param name="column">1-based column number where the symbol is located. Used with file/line.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of assignment locations or error response.</returns>
-    [McpServerTool(Name = "code_find_assignments")]
+    [McpServerTool(Name = "code_find_assignments", Title = "Find Assignments",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Find all assignments to a variable, field, or property. Includes simple assignments, compound (+=, -=), increment/decrement (++, --), and out/ref parameters.")]
     public async Task<string> FindAssignmentsAsync(
         [Description("Fully qualified symbol name. Mutually exclusive with file/line/column.")] string? name = null,

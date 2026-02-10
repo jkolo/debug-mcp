@@ -33,7 +33,8 @@ public sealed class BreakpointEnableTool
     /// <param name="enabled">True to enable, false to disable. Default: true.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Updated breakpoint information or error response.</returns>
-    [McpServerTool(Name = "breakpoint_enable")]
+    [McpServerTool(Name = "breakpoint_enable", Title = "Enable/Disable Breakpoint",
+        ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Enable or disable a breakpoint by ID")]
     public async Task<string> EnableBreakpointAsync(
         [Description("Breakpoint ID to enable or disable")] string id,

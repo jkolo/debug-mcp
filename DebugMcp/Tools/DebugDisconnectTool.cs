@@ -38,8 +38,9 @@ public sealed class DebugDisconnectTool
     /// <param name="terminateProcess">Terminate the process instead of detaching (only for launched processes).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Disconnect result.</returns>
-    [McpServerTool(Name = "debug_disconnect")]
-    [Description("Disconnect from the current debug session")]
+    [McpServerTool(Name = "debug_disconnect", Title = "Disconnect Debug Session",
+        ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
+    [Description("Disconnect from the current debug session. For launched processes, optionally terminates the debuggee (terminateProcess=true). For attached processes, detaches and lets the process continue running. Safe to call when no session is active (returns success). Has a 10-second internal timeout — if the process doesn't respond, it is force-killed. Returns: disconnect status with previousSession info (processId, processName, launchMode). Example response: {\"success\": true, \"state\": \"disconnected\", \"wasTerminated\": true, \"previousSession\": {\"processId\": 1234, \"processName\": \"MyApp\", \"launchMode\": \"launch\"}}")]
     public async Task<string> DisconnectAsync(
         [Description("Terminate the process instead of detaching (only for launched processes)")] bool terminateProcess = false,
         CancellationToken cancellationToken = default)

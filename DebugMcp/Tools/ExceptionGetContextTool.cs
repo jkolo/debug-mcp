@@ -28,8 +28,9 @@ public sealed class ExceptionGetContextTool
         _logger = logger;
     }
 
-    [McpServerTool(Name = "exception_get_context")]
-    [Description("Get full exception context when paused at an exception. Returns exception details, inner exception chain, stack frames with source locations, and local variables for the throwing frame — all in a single call.")]
+    [McpServerTool(Name = "exception_get_context", Title = "Get Exception Context",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description("Get full exception context when paused at an exception. Returns exception details (type, message, isFirstChance), inner exception chain, stack frames with source locations, and local variables for the throwing frame — all in a single call. This is the recommended first tool to call when the debugger pauses due to an exception. Requires the process to be paused at an exception breakpoint. Use breakpoint_set_exception to configure which exceptions cause pauses. Example response: {\"success\": true, \"threadId\": 1, \"exception\": {\"type\": \"System.NullReferenceException\", \"message\": \"Object reference not set\", \"isFirstChance\": true}, \"frames\": [{\"index\": 0, \"function\": \"MyApp.Service.Process()\", \"module\": \"MyApp.dll\"}], \"totalFrames\": 3}")]
     public async Task<string> GetExceptionContext(
         [Description("Maximum stack frames to return (default: 10, min: 1, max: 100)")]
         int max_frames = 10,

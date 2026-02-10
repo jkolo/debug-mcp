@@ -32,7 +32,8 @@ public sealed class LayoutGetTool
     /// <param name="thread_id">Thread ID (default: current thread).</param>
     /// <param name="frame_index">Frame index (0 = top of stack, default: 0).</param>
     /// <returns>Type memory layout with fields, offsets, sizes, and padding.</returns>
-    [McpServerTool(Name = "layout_get")]
+    [McpServerTool(Name = "layout_get", Title = "Get Memory Layout",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Get the memory layout of a type including field offsets, sizes, and padding")]
     public async Task<string> GetLayout(
         [Description("Full type name or object reference")] string type_name,

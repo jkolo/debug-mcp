@@ -34,7 +34,8 @@ public sealed class CodeGoToDefinitionTool
     /// <param name="column">1-based column number where the symbol appears.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Definition location(s) or error response.</returns>
-    [McpServerTool(Name = "code_goto_definition")]
+    [McpServerTool(Name = "code_goto_definition", Title = "Go to Definition",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Navigate to the definition of a symbol at a given source location. Returns source file location or assembly info for metadata symbols.")]
     public async Task<string> GoToDefinitionAsync(
         [Description("Absolute path to source file")] string file,

@@ -42,7 +42,8 @@ public sealed class TracepointSetTool
     /// <param name="max_notifications">Auto-disable tracepoint after N notifications (0 = unlimited).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Tracepoint information or error response.</returns>
-    [McpServerTool(Name = "tracepoint_set")]
+    [McpServerTool(Name = "tracepoint_set", Title = "Set Tracepoint",
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Set a tracepoint (non-blocking observation point) at a source location. Unlike breakpoints, tracepoints do not pause execution but send notifications when code passes through.")]
     public async Task<string> SetTracepointAsync(
         [Description("Source file path (absolute or relative to project)")] string file,

@@ -37,7 +37,8 @@ public sealed class CodeFindUsagesTool
     /// <param name="column">1-based column number where the symbol is located. Used with file/line.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of symbol usages or error response.</returns>
-    [McpServerTool(Name = "code_find_usages")]
+    [McpServerTool(Name = "code_find_usages", Title = "Find Usages",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Find all usages of a symbol across the workspace. Specify either name (fully qualified) or file+line+column location.")]
     public async Task<string> FindUsagesAsync(
         [Description("Fully qualified symbol name (e.g., 'Namespace.Class.Method'). Mutually exclusive with file/line/column.")] string? name = null,
