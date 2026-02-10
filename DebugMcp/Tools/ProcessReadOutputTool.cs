@@ -29,7 +29,8 @@ public sealed class ProcessReadOutputTool
     /// <param name="stream">Which stream to read: "stdout", "stderr", or "both" (default)</param>
     /// <param name="clear">Clear the buffer after reading (default: false)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    [McpServerTool(Name = "process_read_output")]
+    [McpServerTool(Name = "process_read_output", Title = "Read Process Output",
+        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Read accumulated stdout and/or stderr output from the debugged process")]
     public Task<string> ReadOutputAsync(
         [Description("Which stream to read: 'stdout', 'stderr', or 'both' (default)")] string stream = "both",

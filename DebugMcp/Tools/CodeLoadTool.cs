@@ -32,7 +32,8 @@ public sealed class CodeLoadTool
     /// <param name="path">Absolute path to .sln or .csproj file.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Workspace information or error response.</returns>
-    [McpServerTool(Name = "code_load")]
+    [McpServerTool(Name = "code_load", Title = "Load Workspace",
+        ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Load a .sln or .csproj file into the analysis workspace. Replaces any previously loaded workspace.")]
     public async Task<string> LoadAsync(
         [Description("Absolute path to .sln or .csproj file")] string path,

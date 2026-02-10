@@ -33,7 +33,8 @@ public sealed class ReferencesGetTool
     /// <param name="thread_id">Thread ID (default: current thread).</param>
     /// <param name="frame_index">Frame index (0 = top of stack, default: 0).</param>
     /// <returns>Reference analysis with outbound object references.</returns>
-    [McpServerTool(Name = "references_get")]
+    [McpServerTool(Name = "references_get", Title = "Get Object References",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Analyze object references - find what objects a target references")]
     public async Task<string> GetReferences(
         [Description("Object reference (variable name or expression)")] string object_ref,

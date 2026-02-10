@@ -30,8 +30,9 @@ public sealed class StacktraceGetTool
     /// <param name="start_frame">Start from frame N (for pagination, default: 0).</param>
     /// <param name="max_frames">Maximum frames to return (default: 20, min: 1, max: 1000).</param>
     /// <returns>Stack frames with source locations and arguments.</returns>
-    [McpServerTool(Name = "stacktrace_get")]
-    [Description("Get stack trace for a thread")]
+    [McpServerTool(Name = "stacktrace_get", Title = "Get Stack Trace",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description("Get the call stack for a thread. The process must be paused. Returns ordered stack frames from top (index 0, most recent call) to bottom (entry point). Each frame includes: index, function name, module, is_external flag, source location (file/line/column), and arguments. Supports pagination via start_frame and max_frames. Use variables_get with a specific frame_index to inspect locals at any frame depth. Example response: {\"success\": true, \"thread_id\": 1, \"total_frames\": 5, \"frames\": [{\"index\": 0, \"function\": \"MyApp.Program.Main()\", \"module\": \"MyApp.dll\", \"is_external\": false, \"location\": {\"file\": \"Program.cs\", \"line\": 42}}]}")]
     public string GetStackTrace(
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Start from frame N (for pagination)")] int start_frame = 0,

@@ -28,7 +28,8 @@ public sealed class DebugPauseTool
     /// Pause execution of the running debuggee process.
     /// </summary>
     /// <returns>Pause result with thread locations.</returns>
-    [McpServerTool(Name = "debug_pause")]
+    [McpServerTool(Name = "debug_pause", Title = "Pause Execution",
+        ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Pause execution of the running debuggee process")]
     public async Task<string> PauseAsync()
     {

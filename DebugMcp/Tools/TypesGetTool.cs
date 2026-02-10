@@ -39,7 +39,8 @@ public sealed class TypesGetTool
     /// <param name="max_results">Maximum types to return (default: 100, max: 1000).</param>
     /// <param name="continuation_token">Token from previous response for pagination.</param>
     /// <returns>Types with namespace hierarchy and pagination info.</returns>
-    [McpServerTool(Name = "types_get")]
+    [McpServerTool(Name = "types_get", Title = "Get Types",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Get types defined in a module, organized by namespace")]
     public async Task<string> GetTypes(
         [Description("Name of the module to inspect")] string module_name,

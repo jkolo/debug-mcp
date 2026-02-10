@@ -32,8 +32,9 @@ public sealed class EvaluateTool
     /// <param name="frame_index">Stack frame context (0 = top).</param>
     /// <param name="timeout_ms">Evaluation timeout in milliseconds (default: 5000).</param>
     /// <returns>Evaluation result with value or error.</returns>
-    [McpServerTool(Name = "evaluate")]
-    [Description("Evaluate a C# expression in the debuggee context")]
+    [McpServerTool(Name = "evaluate", Title = "Evaluate Expression",
+        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Evaluate a C# expression in the debuggee context. The process must be paused. Supports property access, method calls, LINQ, string interpolation, arithmetic. Examples: 'myList.Count', 'customer.Name.ToUpper()', 'x + y * 2'. Returns: value (string representation), type (CLR type name), has_children flag. On failure: error with code, message, and optional position for syntax errors. Note: expressions with side effects (e.g., 'list.Add(x)') will modify debuggee state. Example response: {\"success\": true, \"value\": \"42\", \"type\": \"System.Int32\", \"has_children\": false}")]
     public async Task<string> EvaluateAsync(
         [Description("C# expression to evaluate")] string expression,
         [Description("Thread context (default: current thread)")] int? thread_id = null,

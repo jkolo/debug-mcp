@@ -34,8 +34,9 @@ public sealed class VariablesGetTool
     /// <param name="scope">Which variables to return: all, locals, arguments, this (default: all).</param>
     /// <param name="expand">Variable path to expand children (e.g., 'user.Address').</param>
     /// <returns>Variables with types, values, and expandability info.</returns>
-    [McpServerTool(Name = "variables_get")]
-    [Description("Get variables for a stack frame")]
+    [McpServerTool(Name = "variables_get", Title = "Get Variables",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description("Get local variables, arguments, and 'this' for a stack frame. The process must be paused. Each variable includes name, type, string value, scope (local/argument/this), and has_children flag. Use the expand parameter with a dot-separated path (e.g., 'user.Address') to drill into nested object fields. Use object_inspect for deeper inspection or evaluate for arbitrary expressions. Example response: {\"success\": true, \"variables\": [{\"name\": \"count\", \"type\": \"System.Int32\", \"value\": \"42\", \"scope\": \"local\", \"has_children\": false}, {\"name\": \"user\", \"type\": \"MyApp.User\", \"value\": \"{MyApp.User}\", \"scope\": \"local\", \"has_children\": true}]}")]
     public string GetVariables(
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Frame index (0 = top of stack)")] int frame_index = 0,

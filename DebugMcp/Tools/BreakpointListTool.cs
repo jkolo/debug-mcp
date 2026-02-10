@@ -31,7 +31,8 @@ public sealed class BreakpointListTool
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of all breakpoints with their details.</returns>
-    [McpServerTool(Name = "breakpoint_list")]
+    [McpServerTool(Name = "breakpoint_list", Title = "List Breakpoints",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("List all breakpoints in the current debug session")]
     public async Task<string> ListBreakpointsAsync(CancellationToken cancellationToken = default)
     {

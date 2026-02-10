@@ -31,7 +31,8 @@ public sealed class BreakpointRemoveTool
     /// <param name="id">Breakpoint ID to remove.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Success message or error response.</returns>
-    [McpServerTool(Name = "breakpoint_remove")]
+    [McpServerTool(Name = "breakpoint_remove", Title = "Remove Breakpoint",
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Remove a breakpoint by ID")]
     public async Task<string> RemoveBreakpointAsync(
         [Description("Breakpoint ID to remove")] string id,

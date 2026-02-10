@@ -29,7 +29,8 @@ public sealed class ProcessWriteInputTool
     /// <param name="data">Data to write to stdin</param>
     /// <param name="close_after">Close stdin after writing (send EOF)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    [McpServerTool(Name = "process_write_input")]
+    [McpServerTool(Name = "process_write_input", Title = "Write Process Input",
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Write data to the debugged process's stdin")]
     public Task<string> WriteInputAsync(
         [Description("Data to write to stdin")] string data,

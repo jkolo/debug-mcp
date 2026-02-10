@@ -34,7 +34,8 @@ public sealed class ModulesListTool
     /// <param name="include_system">Include system assemblies (System.*, Microsoft.*). Default: true.</param>
     /// <param name="name_filter">Filter modules by name pattern (supports * wildcard).</param>
     /// <returns>List of loaded modules with metadata.</returns>
-    [McpServerTool(Name = "modules_list")]
+    [McpServerTool(Name = "modules_list", Title = "List Modules",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("List all loaded modules/assemblies in the debuggee process")]
     public async Task<string> ListModules(
         [Description("Include system assemblies (System.*, Microsoft.*)")] bool include_system = true,

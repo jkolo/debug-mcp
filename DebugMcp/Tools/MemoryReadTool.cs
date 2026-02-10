@@ -30,7 +30,8 @@ public sealed class MemoryReadTool
     /// <param name="size">Number of bytes to read (default: 256, max: 65536).</param>
     /// <param name="format">Output format: 'hex', 'hex_ascii' (default), 'raw'.</param>
     /// <returns>Memory dump with hex bytes and optional ASCII representation.</returns>
-    [McpServerTool(Name = "memory_read")]
+    [McpServerTool(Name = "memory_read", Title = "Read Memory",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Read raw memory bytes from the debuggee process")]
     public async Task<string> ReadMemory(
         [Description("Memory address in hex (0x...) or decimal")] string address,

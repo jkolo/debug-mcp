@@ -34,7 +34,8 @@ public sealed class BreakpointSetExceptionTool
     /// <param name="include_subtypes">Also break on exception types that inherit from the specified type. Default: true.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Exception breakpoint information or error response.</returns>
-    [McpServerTool(Name = "breakpoint_set_exception")]
+    [McpServerTool(Name = "breakpoint_set_exception", Title = "Set Exception Breakpoint",
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Set an exception breakpoint to break when specific exception types are thrown")]
     public async Task<string> SetExceptionBreakpointAsync(
         [Description("Full exception type name (e.g., System.NullReferenceException)")] string exception_type,

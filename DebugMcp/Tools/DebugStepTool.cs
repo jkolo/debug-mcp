@@ -29,8 +29,9 @@ public sealed class DebugStepTool
     /// <param name="mode">Step mode: "in" (step into), "over" (step over), or "out" (step out).</param>
     /// <param name="timeout">Timeout in milliseconds (default: 30000, min: 1000, max: 300000).</param>
     /// <returns>Updated session state after stepping.</returns>
-    [McpServerTool(Name = "debug_step")]
-    [Description("Step through code during debugging")]
+    [McpServerTool(Name = "debug_step", Title = "Step Through Code",
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Step through code during debugging. The process must be paused. Modes: 'in' (step into function calls), 'over' (step over, staying in current scope), 'out' (step out to caller). Returns: updated session state with new source location after the step completes. The step blocks until the debuggee re-pauses at the next source line. Example response: {\"success\": true, \"stepMode\": \"over\", \"session\": {\"processId\": 1234, \"state\": \"paused\", \"pauseReason\": \"step\", \"location\": {\"file\": \"Program.cs\", \"line\": 43, \"functionName\": \"Main\"}}}")]
     public async Task<string> StepAsync(
         [Description("Step mode: 'in', 'over', or 'out'")] string mode,
         [Description("Timeout in milliseconds")] int timeout = 30000)

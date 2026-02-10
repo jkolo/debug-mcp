@@ -38,7 +38,8 @@ public sealed class ModulesSearchTool
     /// <param name="case_sensitive">Enable case-sensitive matching.</param>
     /// <param name="max_results">Maximum results to return (max: 100).</param>
     /// <returns>Search results with matching types and/or methods.</returns>
-    [McpServerTool(Name = "modules_search")]
+    [McpServerTool(Name = "modules_search", Title = "Search Modules",
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Search for types and methods across all loaded modules")]
     public async Task<string> SearchModules(
         [Description("Search pattern (supports * wildcard)")] string pattern,
