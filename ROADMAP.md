@@ -13,7 +13,7 @@
 | 007 | Debug Launch | Launch with env, cwd, args, stopAtEntry |
 | 008 | Reqnroll E2E Tests | BDD end-to-end tests with Reqnroll/Gherkin |
 | 009 | Comprehensive E2E Coverage | Extended BDD test scenarios across all tool categories |
-| 010 | .NET Tool Packaging | Distributed as `dotnet tool install debug-mcp` |
+| 010 | .NET Tool Packaging | Distributed as `dnx -y debug-mcp` |
 | 011 | CI/CD Pipeline | GitHub Actions build, test, publish workflow |
 | 012 | Documentation Improvement | Docusaurus website, architecture docs, asciinema demos |
 | 013 | Cleanup & Bugfixes | Code quality, consistency, edge case fixes |

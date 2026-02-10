@@ -18,7 +18,7 @@ const features = [
   {
     tag: 'One Command',
     name: 'Zero Installation',
-    desc: <>Run instantly with <code>dotnet tool run debug-mcp</code> on .NET 10+. No global install, no config files, ready in seconds.</>,
+    desc: <>Run instantly with <code>dnx -y debug-mcp</code> on .NET 10+. No global install, no config files, ready in seconds.</>,
   },
 ];
 
@@ -100,14 +100,15 @@ export default function Home(): ReactNode {
             <h2 className="features-title">Up and running in 3 steps</h2>
           </div>
           <div className="quickstart-steps">
-            <QuickStartStep number={1} title="Install">
-              <code>dotnet tool install -g debug-mcp</code>
+            <QuickStartStep number={1} title="Run">
+              <code>dnx -y debug-mcp</code>
             </QuickStartStep>
             <QuickStartStep number={2} title="Configure">
 {`{
   "mcpServers": {
     "dotnet-debugger": {
-      "command": "debug-mcp"
+      "command": "dnx",
+      "args": ["-y", "debug-mcp"]
     }
   }
 }`}

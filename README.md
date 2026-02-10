@@ -29,21 +29,7 @@ Unlike similar tools that use external debuggers via DAP protocol, debug-mcp int
 
 ```bash
 # No installation needed (.NET 10+)
-dnx debug-mcp
-
-# Or one-shot execution
-dotnet tool exec debug-mcp
-```
-
-### Install (optional)
-
-```bash
-# Global tool
-dotnet tool install -g debug-mcp
-
-# Local tool (per-project)
-dotnet new tool-manifest   # if not already present
-dotnet tool install debug-mcp
+dnx -y debug-mcp
 ```
 
 ### Requirements
@@ -60,7 +46,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "dotnet-debugger": {
       "command": "dnx",
-      "args": ["debug-mcp"]
+      "args": ["-y", "debug-mcp"]
     }
   }
 }
@@ -75,7 +61,7 @@ Add to your `.mcp.json`:
   "mcpServers": {
     "dotnet-debugger": {
       "command": "dnx",
-      "args": ["debug-mcp"]
+      "args": ["-y", "debug-mcp"]
     }
   }
 }

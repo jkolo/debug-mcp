@@ -19,16 +19,10 @@ import AsciinemaPlayer from '@site/src/components/AsciinemaPlayer';
 
 ## Install
 
-The recommended way to install debug-mcp is via [`dnx`](https://github.com/dn-vm/dnx):
+The recommended way to run debug-mcp is via [`dnx`](https://github.com/dn-vm/dnx):
 
 ```bash
-dnx debug-mcp
-```
-
-Alternatively, install as a .NET global tool:
-
-```bash
-dotnet tool install -g debug-mcp
+dnx -y debug-mcp
 ```
 
 ## Configure Your AI Agent
@@ -42,7 +36,7 @@ Add to your MCP configuration (`settings.json` or `claude_desktop_config.json`):
   "mcpServers": {
     "dotnet-debugger": {
       "command": "dnx",
-      "args": ["debug-mcp"]
+      "args": ["-y", "debug-mcp"]
     }
   }
 }
@@ -53,11 +47,7 @@ Add to your MCP configuration (`settings.json` or `claude_desktop_config.json`):
 debug-mcp communicates via MCP over stdio. Any MCP-compatible client can use it:
 
 ```bash
-# Run directly
-dnx debug-mcp
-
-# Or via dotnet tool
-debug-mcp
+dnx -y debug-mcp
 ```
 
 ## Verify It Works
