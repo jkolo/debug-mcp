@@ -6,6 +6,7 @@ using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
 using DebugMcp.Services.Completions;
 using DebugMcp.Services.Resources;
+using DebugMcp.Services.Snapshots;
 using DebugMcp.Services.Symbols;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -112,6 +113,10 @@ rootCommand.SetAction(async parseResult =>
 
     // Register async stack trace service (026-async-stack-traces)
     builder.Services.AddSingleton<IAsyncStackTraceService, AsyncStackTraceService>();
+
+    // Register snapshot services (027-state-snapshot-diff)
+    builder.Services.AddSingleton<ISnapshotStore, SnapshotStore>();
+    builder.Services.AddSingleton<ISnapshotService, SnapshotService>();
 
     // Register resource services (019-mcp-resources)
     builder.Services.AddSingleton<ThreadSnapshotCache>();
