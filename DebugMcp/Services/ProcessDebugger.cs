@@ -3503,6 +3503,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         CorDebugFunction function,
         CorDebugValue? thisArg,
         CorDebugValue[]? args,
+        CorDebugType[]? typeArgs = null,
         int timeoutMs = 5000,
         CancellationToken cancellationToken = default)
     {
@@ -3545,11 +3546,14 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
             _logger.LogDebug("Calling function with {ArgCount} arguments (including this)", allArgs.Count);
 
-            // Call the function
-            // Note: CallFunction is obsolete but CallParameterizedFunction requires type arguments
-            // For simple method calls, CallFunction should work
-            eval.CallFunction(
+            // Call the function using CallParameterizedFunction (ICorDebugEval2)
+            // This supports generic types — type args are class type args first, then method type args
+            // For non-generic types, pass an empty type args array
+            var typeArgArray = typeArgs ?? [];
+            eval.CallParameterizedFunction(
                 function.Raw,
+                typeArgArray.Length,
+                typeArgArray.Select(t => t.Raw).ToArray(),
                 allArgs.Count,
                 allArgs.Select(a => a.Raw).ToArray());
 
@@ -3966,6 +3970,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         propertyGetter,
                         currentValue,  // 'this' for the property getter
                         null,          // No additional arguments
+                        GetTypeArguments(currentValue),
                         timeoutMs,
                         cancellationToken);
 
@@ -3996,6 +4001,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                             method,
                             currentValue,  // 'this' for the method
                             null,          // No additional arguments for parameterless methods
+                            GetTypeArguments(currentValue),
                             timeoutMs,
                             cancellationToken);
 
@@ -4248,7 +4254,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             if (getter != null)
             {
                 _logger.LogDebug("Calling property getter for '{MemberName}' via ICorDebugEval", memberName);
-                var result = await CallFunctionAsync(thread, getter, parentValue, null, timeoutMs, cancellationToken);
+                var result = await CallFunctionAsync(thread, getter, parentValue, null, GetTypeArguments(parentValue), timeoutMs, cancellationToken);
                 if (result.Success && result.Value != null)
                 {
                     return result.Value;
@@ -4711,6 +4717,25 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             IsNull = false,
             Truncated = truncated
         };
+    }
+
+    private static CorDebugType[] GetTypeArguments(CorDebugValue value)
+    {
+        try
+        {
+            var v = value;
+            if (v is CorDebugReferenceValue refVal && !refVal.IsNull)
+                v = refVal.Dereference();
+
+            var exactType = v?.ExactType;
+            if (exactType?.TypeParameters != null)
+                return exactType.TypeParameters.ToArray();
+        }
+        catch
+        {
+            // Type argument extraction is best-effort
+        }
+        return [];
     }
 
     private string GetArrayElementTypeName(CorDebugArrayValue arrayValue)
