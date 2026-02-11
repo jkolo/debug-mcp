@@ -148,6 +148,8 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 ## Active Technologies
 - C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants) (025-cross-platform)
 - C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4 (ICorDebug wrappers), ModelContextProtocol 0.7.0-preview.1, System.Reflection.Metadata (PDB reading) (026-async-stack-traces)
+- C# / .NET 10.0 + ModelContextProtocol SDK 0.7.0-preview.1, ClrDebug 0.3.4 (ICorDebug) (027-state-snapshot-diff)
+- In-memory only (ConcurrentDictionary), session-scoped (027-state-snapshot-diff)
 
 ## Recent Changes
 - 025-cross-platform: Added C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants)
