@@ -113,6 +113,11 @@ while (true)
             Console.Out.Flush();
             break;
 
+        case "async":
+            // Async method chain - for async stack trace testing
+            AsyncTarget.RunAsync().GetAwaiter().GetResult();
+            break;
+
         case "complex":
             // Complex objects test - for deep object inspection
             var deepObj = ComplexObjects.DeepObject.CreateChain(5);
