@@ -175,4 +175,9 @@ public static class ErrorCodes
 
     /// <summary>I/O operation failed.</summary>
     public const string IoFailed = "IO_FAILED";
+
+    // Snapshot error codes (027-state-snapshot-diff)
+
+    /// <summary>Snapshot ID does not exist.</summary>
+    public const string SnapshotNotFound = "SNAPSHOT_NOT_FOUND";
 }
