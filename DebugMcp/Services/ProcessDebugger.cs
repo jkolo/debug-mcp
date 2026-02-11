@@ -35,6 +35,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private readonly IPdbSymbolReader _pdbSymbolReader;
     private readonly ProcessIoManager _ioManager;
     private readonly ISymbolResolver? _symbolResolver;
+    private readonly IAsyncStackTraceService? _asyncStackTraceService;
     private DbgShim? _dbgShim;
     private CorDebug? _corDebug;
     private CorDebugProcess? _process;
@@ -80,12 +81,13 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     private readonly object _moduleCacheLock = new();
     private readonly List<LoadedModuleInfo> _cachedModules = new();
 
-    public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader, ProcessIoManager ioManager, ISymbolResolver? symbolResolver = null)
+    public ProcessDebugger(ILogger<ProcessDebugger> logger, IPdbSymbolReader pdbSymbolReader, ProcessIoManager ioManager, ISymbolResolver? symbolResolver = null, IAsyncStackTraceService? asyncStackTraceService = null)
     {
         _logger = logger;
         _pdbSymbolReader = pdbSymbolReader;
         _ioManager = ioManager;
         _symbolResolver = symbolResolver;
+        _asyncStackTraceService = asyncStackTraceService;
     }
 
     /// <inheritdoc />
@@ -1446,6 +1448,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
             var allFrames = new List<Models.Inspection.StackFrame>();
             var frameIndex = 0;
+            CorDebugFrame? topAsyncCorFrame = null; // Track the ICorDebug frame for async chain walking
 
             // Walk through chains and frames
             try
@@ -1463,6 +1466,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         var stackFrame = CreateStackFrame(frame, frameIndex);
                         if (stackFrame != null)
                         {
+                            // Track the first async frame's ICorDebug frame for chain walking
+                            if (topAsyncCorFrame == null && stackFrame.FrameKind == "async")
+                            {
+                                topAsyncCorFrame = frame;
+                            }
                             allFrames.Add(stackFrame);
                             frameIndex++;
                         }
@@ -1472,6 +1480,27 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error enumerating stack frames for thread {ThreadId}", targetThreadId);
+            }
+
+            // Walk async continuation chain to discover suspended callers
+            if (_asyncStackTraceService != null && topAsyncCorFrame != null)
+            {
+                try
+                {
+                    var taskValue = GetTaskValueFromAsyncFrame(topAsyncCorFrame);
+                    if (taskValue != null)
+                    {
+                        allFrames = _asyncStackTraceService.BuildLogicalFrames(
+                            allFrames,
+                            (value, fieldName) => TryGetFieldValue((CorDebugValue)value, fieldName)!,
+                            (value) => GetTypeNameFromValue((CorDebugValue)value),
+                            taskValue).ToList();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Error walking async continuation chain");
+                }
             }
 
             var totalFrames = allFrames.Count;
@@ -1547,15 +1576,32 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
             var variables = new List<Variable>();
 
-            // Get locals
-            if (scope == "all" || scope == "locals")
+            // Detect if this is an async state machine frame (MoveNext)
+            var (frameTypeName, frameMethodName) = GetTypeAndMethodName(ilFrame.Function);
+            var (isAsyncFrame, _) = TryParseAsyncStateMachineFrame(frameTypeName, frameMethodName);
+
+            if (isAsyncFrame)
             {
-                var locals = GetLocals(ilFrame);
-                variables.AddRange(locals);
+                // For async frames, read state machine fields via 'this' instead of IL locals.
+                // IL locals in MoveNext are compiler temporaries; the real locals are hoisted to fields.
+                if (scope == "all" || scope == "locals")
+                {
+                    var smLocals = GetAsyncStateMachineLocals(ilFrame);
+                    variables.AddRange(smLocals);
+                }
+            }
+            else
+            {
+                // Get locals
+                if (scope == "all" || scope == "locals")
+                {
+                    var locals = GetLocals(ilFrame);
+                    variables.AddRange(locals);
+                }
             }
 
-            // Get arguments
-            if (scope == "all" || scope == "arguments")
+            // Get arguments (skip for async frames — state machines don't have meaningful arguments)
+            if (!isAsyncFrame && (scope == "all" || scope == "arguments"))
             {
                 var args = GetArguments(ilFrame);
                 variables.AddRange(args);
@@ -1750,7 +1796,29 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var modulePath = module.Name ?? "Unknown";
             var methodName = GetMethodName(function);
 
-            // Determine if external (no source available)
+            // Detect async state machine frames
+            var frameKind = "sync";
+            string? logicalFunction = null;
+            var (typeName, rawMethodName) = GetTypeAndMethodName(function);
+            var (isAsync, originalMethodName) = TryParseAsyncStateMachineFrame(typeName, rawMethodName);
+            if (isAsync)
+            {
+                frameKind = "async";
+                logicalFunction = originalMethodName;
+                // Replace MoveNext with the logical method name
+                // Get the declaring type's parent (the type that contains the original method)
+                var declaringTypeName = GetDeclaringTypeName(function);
+                if (declaringTypeName != null)
+                {
+                    methodName = $"{declaringTypeName}.{originalMethodName}()";
+                }
+                else
+                {
+                    methodName = $"{originalMethodName}()";
+                }
+            }
+
+            // Determine if external (no source available, or framework async internals)
             var isExternal = true;
             SourceLocation? location = null;
 
@@ -1801,13 +1869,19 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 // Arguments not available
             }
 
+            // Framework async internals are always external, even with source
+            if (IsFrameworkAsyncInternal(typeName))
+                isExternal = true;
+
             return new Models.Inspection.StackFrame(
                 Index: index,
                 Function: methodName,
                 Module: Path.GetFileName(modulePath),
                 IsExternal: isExternal,
                 Location: location,
-                Arguments: arguments.Count > 0 ? arguments : null
+                Arguments: arguments.Count > 0 ? arguments : null,
+                FrameKind: frameKind,
+                LogicalFunction: logicalFunction
             );
         }
         catch (Exception ex)
@@ -1815,6 +1889,23 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             _logger.LogDebug(ex, "Error creating stack frame at index {Index}", index);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Detects whether a frame belongs to a compiler-generated async state machine.
+    /// The C# compiler generates types like <![CDATA[<MethodName>d__N]]> with a MoveNext() method.
+    /// </summary>
+    internal static (bool IsAsync, string? OriginalMethodName) TryParseAsyncStateMachineFrame(
+        string typeName, string methodName)
+    {
+        if (methodName != "MoveNext")
+            return (false, null);
+
+        var match = System.Text.RegularExpressions.Regex.Match(typeName, @"^<(.+?)>d__\d+$");
+        if (!match.Success)
+            return (false, null);
+
+        return (true, match.Groups[1].Value);
     }
 
     private string GetMethodName(CorDebugFunction function)
@@ -1840,6 +1931,225 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             return $"0x{function.Token:X8}";
         }
+    }
+
+    /// <summary>
+    /// Returns the type name and method name separately for a function.
+    /// </summary>
+    private (string TypeName, string MethodName) GetTypeAndMethodName(CorDebugFunction function)
+    {
+        try
+        {
+            var module = function.Module;
+            var metaImport = module.GetMetaDataInterface<ClrDebug.MetaDataImport>();
+            var methodToken = (int)function.Token;
+
+            var methodProps = metaImport.GetMethodProps(methodToken);
+            var methodName = methodProps.szMethod ?? $"0x{methodToken:X8}";
+
+            var typeToken = (int)methodProps.pClass;
+            var typeProps = metaImport.GetTypeDefProps(typeToken);
+            var typeName = typeProps.szTypeDef ?? "Unknown";
+
+            return (typeName, methodName);
+        }
+        catch
+        {
+            return ("Unknown", $"0x{function.Token:X8}");
+        }
+    }
+
+    /// <summary>
+    /// Gets the declaring (parent) type name for a nested type.
+    /// For async state machines, the parent type contains the original async method.
+    /// </summary>
+    private string? GetDeclaringTypeName(CorDebugFunction function)
+    {
+        try
+        {
+            var module = function.Module;
+            var metaImport = module.GetMetaDataInterface<ClrDebug.MetaDataImport>();
+            var methodToken = (int)function.Token;
+
+            var methodProps = metaImport.GetMethodProps(methodToken);
+            var typeToken = (int)methodProps.pClass;
+
+            // Get the enclosing type (parent of the nested state machine type)
+            try
+            {
+                var enclosingToken = metaImport.GetNestedClassProps(typeToken);
+                var enclosingProps = metaImport.GetTypeDefProps((int)enclosingToken);
+                return enclosingProps.szTypeDef;
+            }
+            catch
+            {
+                // Type is not nested — return null
+                return null;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a type is a framework async infrastructure type that should be marked external.
+    /// </summary>
+    private static bool IsFrameworkAsyncInternal(string typeName)
+    {
+        return typeName.StartsWith("System.Runtime.CompilerServices.AsyncMethodBuilderCore", StringComparison.Ordinal)
+            || typeName.StartsWith("System.Runtime.CompilerServices.AsyncTaskMethodBuilder", StringComparison.Ordinal)
+            || typeName.StartsWith("System.Runtime.CompilerServices.AsyncValueTaskMethodBuilder", StringComparison.Ordinal)
+            || typeName.StartsWith("System.Threading.ExecutionContext", StringComparison.Ordinal)
+            || typeName.StartsWith("System.Threading.ThreadPoolWorkQueue", StringComparison.Ordinal)
+            || typeName.StartsWith("System.Threading.Tasks.Task", StringComparison.Ordinal)
+            || typeName.StartsWith("System.Threading.QueueUserWorkItemCallback", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Extracts the Task value from an async state machine frame's this reference.
+    /// Reads: this (arg0) → <>t__builder → m_task
+    /// </summary>
+    private CorDebugValue? GetTaskValueFromAsyncFrame(CorDebugFrame frame)
+    {
+        try
+        {
+            var ilFrame = frame as CorDebugILFrame;
+            if (ilFrame == null)
+                return null;
+
+            // Get 'this' raw CorDebugValue (first argument for instance methods)
+            var argValues = ilFrame.EnumerateArguments().ToList();
+            if (argValues.Count == 0)
+                return null;
+
+            var thisValue = argValues[0];
+
+            // Read <>t__builder from the state machine
+            var builder = TryGetFieldValue(thisValue, "<>t__builder");
+            if (builder == null)
+                return null;
+
+            // Read m_task from the builder
+            return TryGetFieldValue(builder, "m_task");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error extracting Task value from async frame");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the type name from a CorDebugValue (for async chain type identification).
+    /// </summary>
+    private string? GetTypeNameFromValue(CorDebugValue value)
+    {
+        try
+        {
+            // Dereference if reference value
+            if (value is CorDebugReferenceValue refValue)
+            {
+                if (refValue.IsNull) return null;
+                value = refValue.Dereference();
+                if (value == null) return null;
+            }
+
+            // Handle boxed values
+            if (value is CorDebugBoxValue boxValue)
+            {
+                value = boxValue.Object;
+            }
+
+            if (value is CorDebugObjectValue objValue)
+            {
+                var classValue = objValue.Class;
+                var module = classValue.Module;
+                var metaImport = module.GetMetaDataInterface<ClrDebug.MetaDataImport>();
+                var typeProps = metaImport.GetTypeDefProps((int)classValue.Token);
+                return typeProps.szTypeDef;
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets local variables from an async state machine by reading fields on 'this'.
+    /// Applies name stripping to convert compiler-generated names to original source names.
+    /// </summary>
+    private List<Variable> GetAsyncStateMachineLocals(CorDebugILFrame ilFrame)
+    {
+        var locals = new List<Variable>();
+
+        try
+        {
+            // Get 'this' (the state machine instance)
+            var argValues = ilFrame.EnumerateArguments().ToList();
+            if (argValues.Count == 0) return locals;
+
+            var thisValue = argValues[0];
+
+            // Dereference if reference
+            if (thisValue is CorDebugReferenceValue refValue)
+            {
+                if (refValue.IsNull) return locals;
+                thisValue = refValue.Dereference();
+                if (thisValue == null) return locals;
+            }
+
+            if (thisValue is CorDebugBoxValue boxValue)
+                thisValue = boxValue.Object;
+
+            if (thisValue is CorDebugObjectValue objValue)
+            {
+                var classValue = objValue.Class;
+                var module = classValue.Module;
+                var metaImport = module.GetMetaDataInterface<ClrDebug.MetaDataImport>();
+
+                // Enumerate fields of the state machine
+                foreach (var fieldToken in metaImport.EnumFields((int)classValue.Token))
+                {
+                    try
+                    {
+                        var fieldProps = metaImport.GetFieldProps(fieldToken);
+                        var rawName = fieldProps.szField;
+                        if (string.IsNullOrEmpty(rawName)) continue;
+
+                        // Skip internal compiler fields that aren't useful to the user
+                        if (rawName == "<>1__state" || rawName == "<>t__builder" || rawName == "<>u__1")
+                            continue;
+
+                        var displayName = AsyncStackTraceService.StripStateMachineFieldName(rawName);
+
+                        // Use TryGetFieldValue which handles dereferencing, boxing, etc.
+                        var fieldValue = TryGetFieldValue(argValues[0], rawName);
+                        if (fieldValue == null) continue;
+
+                        var variable = CreateVariable(displayName, fieldValue, VariableScope.Local);
+                        if (variable != null)
+                        {
+                            locals.Add(variable);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Error reading state machine field");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error getting async state machine locals");
+        }
+
+        return locals;
     }
 
     private List<Variable> GetLocals(CorDebugILFrame ilFrame)
@@ -3802,7 +4112,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         return null;
     }
 
-    private CorDebugValue? TryGetFieldValue(CorDebugValue parentValue, string fieldName)
+    internal CorDebugValue? TryGetFieldValue(CorDebugValue parentValue, string fieldName)
     {
         try
         {

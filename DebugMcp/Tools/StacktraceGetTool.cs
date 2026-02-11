@@ -36,7 +36,8 @@ public sealed class StacktraceGetTool
     public string GetStackTrace(
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Start from frame N (for pagination)")] int start_frame = 0,
-        [Description("Maximum frames to return")] int max_frames = 20)
+        [Description("Maximum frames to return")] int max_frames = 20,
+        [Description("Include raw physical frames alongside logical frames")] bool include_raw = false)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("stacktrace_get",
@@ -87,13 +88,22 @@ public sealed class StacktraceGetTool
             _logger.LogInformation("Retrieved {FrameCount} stack frames (total: {TotalFrames}) for thread {ThreadId}",
                 frames.Count, totalFrames, actualThreadId);
 
-            return JsonSerializer.Serialize(new
+            var response = new Dictionary<string, object?>
             {
-                success = true,
-                thread_id = actualThreadId,
-                total_frames = totalFrames,
-                frames = frames.Select(f => BuildFrameResponse(f))
-            }, new JsonSerializerOptions { WriteIndented = true });
+                ["success"] = true,
+                ["thread_id"] = actualThreadId,
+                ["total_frames"] = totalFrames,
+                ["frames"] = frames.Select(f => BuildFrameResponse(f)).ToList()
+            };
+
+            if (include_raw)
+            {
+                // Raw frames show the physical stack without logical async reconstruction.
+                // Currently identical to frames since continuation chain (US2) isn't implemented yet.
+                response["raw_frames"] = frames.Select(f => BuildRawFrameResponse(f)).ToList();
+            }
+
+            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
@@ -140,8 +150,15 @@ public sealed class StacktraceGetTool
             ["index"] = frame.Index,
             ["function"] = frame.Function,
             ["module"] = frame.Module,
-            ["is_external"] = frame.IsExternal
+            ["is_external"] = frame.IsExternal,
+            ["frame_kind"] = frame.FrameKind,
+            ["is_awaiting"] = frame.IsAwaiting
         };
+
+        if (frame.LogicalFunction != null)
+        {
+            response["logical_function"] = frame.LogicalFunction;
+        }
 
         if (frame.Location != null)
         {
@@ -165,6 +182,34 @@ public sealed class StacktraceGetTool
                 has_children = arg.HasChildren,
                 children_count = arg.ChildrenCount
             });
+        }
+
+        return response;
+    }
+
+    /// <summary>
+    /// Builds a raw frame response showing physical stack frame data without logical async transformations.
+    /// </summary>
+    private static object BuildRawFrameResponse(Models.Inspection.StackFrame frame)
+    {
+        var response = new Dictionary<string, object?>
+        {
+            ["index"] = frame.Index,
+            ["function"] = frame.Function,
+            ["module"] = frame.Module,
+            ["is_external"] = frame.IsExternal,
+            ["frame_kind"] = frame.FrameKind
+        };
+
+        if (frame.Location != null)
+        {
+            response["location"] = new
+            {
+                file = frame.Location.File,
+                line = frame.Location.Line,
+                column = frame.Location.Column,
+                function = frame.Location.FunctionName
+            };
         }
 
         return response;

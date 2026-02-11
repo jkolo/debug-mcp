@@ -110,6 +110,9 @@ rootCommand.SetAction(async parseResult =>
     // Register exception autopsy service (022-exception-autopsy)
     builder.Services.AddSingleton<IExceptionAutopsyService, ExceptionAutopsyService>();
 
+    // Register async stack trace service (026-async-stack-traces)
+    builder.Services.AddSingleton<IAsyncStackTraceService, AsyncStackTraceService>();
+
     // Register resource services (019-mcp-resources)
     builder.Services.AddSingleton<ThreadSnapshotCache>();
     builder.Services.AddSingleton<AllowedSourcePaths>();
