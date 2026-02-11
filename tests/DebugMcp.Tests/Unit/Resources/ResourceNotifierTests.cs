@@ -20,6 +20,13 @@ public class ResourceNotifierTests
         _notifier.ListChanged += () => _listChangedCount++;
     }
 
+    private async Task WaitForCondition(Func<bool> condition, int timeoutMs = 2000, int pollIntervalMs = 25)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!condition() && DateTime.UtcNow < deadline)
+            await Task.Delay(pollIntervalMs);
+    }
+
     [Fact]
     public void Subscribe_TracksUri()
     {
@@ -48,8 +55,8 @@ public class ResourceNotifierTests
         // Should not fire immediately
         _updatedUris.Should().BeEmpty();
 
-        // Wait for debounce
-        await Task.Delay(100);
+        // Wait for debounce with generous timeout for slow CI
+        await WaitForCondition(() => _updatedUris.Count >= 1);
 
         _updatedUris.Should().ContainSingle().Which.Should().Be("debugger://session");
     }
@@ -93,7 +100,8 @@ public class ResourceNotifierTests
         _notifier.NotifyResourceUpdated("debugger://session");
         _notifier.NotifyResourceUpdated("debugger://breakpoints");
 
-        await Task.Delay(100);
+        // Wait for debounce with generous timeout for slow CI
+        await WaitForCondition(() => _updatedUris.Count >= 2);
 
         _updatedUris.Should().HaveCount(2);
         _updatedUris.Should().Contain("debugger://session");
