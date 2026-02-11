@@ -1,65 +1,152 @@
-# DebugMcp Development Guidelines
+# CLAUDE.md
 
-Auto-generated from all feature plans. Last updated: 2026-01-17
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Active Technologies
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, (002-breakpoint-ops)
-- N/A (in-memory breakpoint registry within session) (002-breakpoint-ops)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Reflection.Metadata (PDB reading) (002-breakpoint-ops)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Reflection.Metadata (in-box for PDB reading) (002-breakpoint-ops)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK + ClrDebug (for ICorDebug APIs), System.Reflection.Metadata (for PDB parsing), (003-inspection-ops)
-- N/A (in-memory state within debug session) (003-inspection-ops)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK + ClrDebug (for ICorDebug APIs), System.Reflection.Metadata (for metadata), (004-memory-ops)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK + ClrDebug (for ICorDebug APIs), System.Reflection.Metadata (for metadata reading), (005-module-ops)
-- N/A (in-memory, reads module metadata on demand) (005-module-ops)
-- N/A (in-memory debug session state) (006-fix-debugger-bugs)
-- C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Diagnostics.DbgShim.linux-x64 9.0.661903 (007-debug-launch)
-- C# / .NET 10.0 + Reqnroll 3.3.2, Reqnroll.xUnit, Reqnroll.Tools.MsBuild.Generation, FluentAssertions 8.0.0 (008-reqnroll-e2e-tests)
-- N/A (test-only feature) (008-reqnroll-e2e-tests)
-- C# / .NET 10.0 + Reqnroll 3.3.3, Reqnroll.xUnit, FluentAssertions 8.0.0, xUnit (009-comprehensive-e2e-coverage)
-- C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, ClrDebug 0.3.4, Microsoft.Diagnostics.DbgShim.linux-x64 9.0.661903 (010-dotnet-tool-packaging)
-- C# / .NET 10.0 (pinned via `global.json`) + GitHub Actions, `dotnet` CLI, NuGet.org, GitHub Packages (011-ci-cd-pipeline)
-- TypeScript (Docusaurus 3), Markdown/MDX + Docusaurus 3, @docusaurus/theme-mermaid, asciinema-player (npm), asciinema CLI (for recording) (012-docs-improvement)
-- Static files (cast files, markdown) in repository (012-docs-improvement)
-- C# / .NET 10.0 + ClrDebug 0.3.4 (ICorDebug wrappers), System.Reflection.Metadata (PDB reading), ModelContextProtocol SDK 0.1.0-preview.13 (013-cleanup-and-bugfixes)
-- C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, Microsoft.Extensions.Logging, System.CommandLine (014-mcp-logging)
-- N/A (in-memory log level state) (014-mcp-logging)
-- C# / .NET 10.0 + Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.Build.Locator, ModelContextProtocol SDK (015-roslyn-code-analysis)
-- N/A (in-memory workspace per session) (015-roslyn-code-analysis)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers) + ModelContextProtocol SDK 0.1.0-preview.13, ClrDebug 0.3.4 (016-breakpoint-notifications)
-- N/A (in-memory breakpoint/tracepoint registry within session) (016-breakpoint-notifications)
-- C# / .NET 10.0 + ModelContextProtocol SDK 0.1.0-preview.13, ClrDebug 0.3.4 (ICorDebug wrappers), System.Reflection.Metadata (PDB reading) (019-mcp-resources)
-- C# / .NET 10.0 + ModelContextProtocol SDK 0.7.0-preview.1, ClrDebug 0.3.4 (ICorDebug wrappers) (020-mcp-completions)
-- N/A (in-memory, uses existing debugger state) (020-mcp-completions)
-- C# / .NET 10.0 + System.Reflection.Metadata (in-box), System.Reflection.PortableExecutable (in-box), System.Net.Http (in-box), System.IO.Compression (in-box for DeflateStream) (021-symbol-server)
-- Persistent file-based symbol cache at `~/.debug-mcp/symbols/{pdbFileName}/{signature}/{pdbFileName}` (021-symbol-server)
-- C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Text.Json (022-exception-autopsy)
-- N/A (in-memory, reads existing debugger state) (022-exception-autopsy)
-- TypeScript (Docusaurus 3.9.2), Markdown/MDX + Docusaurus 3.9.2, React 19, asciinema-player 3.14.0, @docusaurus/theme-mermaid (023-docs-site-update)
-- Static files (Markdown, JSON examples) (023-docs-site-update)
+## What This Is
 
-- C# / .NET 10.0 + Microsoft.Diagnostics.Runtime (ClrMD), System.Text.Json, (001-debug-session)
+debug-mcp is an MCP server that exposes .NET debugging as 34 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
 
-## Project Structure
+## Build & Test Commands
 
-```text
-src/
-tests/
+```bash
+dotnet build                    # Build everything (0 errors, 0 warnings expected)
+dotnet build -c Release         # Release build
+
+# Reliable tests only (unit + contract — use this for development)
+dotnet test tests/DebugMcp.Tests --no-build --filter "FullyQualifiedName~Unit|FullyQualifiedName~Contract"
+
+# Run a single test class
+dotnet test tests/DebugMcp.Tests --no-build --filter "FullyQualifiedName~ToolAnnotationTests"
+
+# Run a single test method
+dotnet test tests/DebugMcp.Tests --no-build --filter "FullyQualifiedName~ToolAnnotationTests.Tool_Title_MatchesSpec"
+
+# Run the tool locally
+dotnet run --project DebugMcp
 ```
 
-## Commands
+**Do NOT run** integration or performance tests without reason — they require a live debugger and are timing-sensitive:
+- `ReattachmentTests.ReattachAfterProcessTermination_ShouldSucceed` — flaky
+- `TerminateLaunchedProcessTests.GetLoadedModules_OnRunningLaunchedProcess_ShouldNotHang` — timing-dependent
+- `ModulePerformanceTests.GetTypesAsync_WithPagination_ReturnsWithin2Seconds` — performance flaky
 
-# Add commands for C# / .NET 10.0
+## Tech Stack
 
-## Code Style
+- **Runtime**: .NET 10.0 (pinned in `global.json`), C#, cross-platform (Windows/macOS/Linux, x64/arm64)
+- **Debugging**: ClrDebug 0.3.4 (ICorDebug wrappers), DbgShim 9.0
+- **MCP SDK**: ModelContextProtocol 0.7.0-preview.1
+- **Code Analysis**: Roslyn (Microsoft.CodeAnalysis 5.0.0)
+- **Tests**: xUnit + FluentAssertions + Moq
+- **E2E**: Reqnroll (Gherkin BDD) in `tests/DebugMcp.E2E/`
+- **Docs site**: Docusaurus 3.9.2 in `website/`
 
-C# / .NET 10.0: Follow standard conventions
+## Architecture
+
+### Layer Diagram
+
+```
+MCP Client (Claude, GPT, etc.)
+    ↓ stdio (JSON-RPC)
+Program.cs — DI container, MCP server setup, CLI options
+    ↓
+Tools/ (34 tools)          Resources/ (4 resources)       Completions/
+    ↓                           ↓                              ↓
+Services/
+├── DebugSessionManager    — Session lifecycle (launch/attach/disconnect)
+├── ProcessDebugger        — Low-level ICorDebug, callbacks, locking
+├── Breakpoints/
+│   ├── BreakpointManager  — Hit logic, condition eval, exception matching
+│   ├── BreakpointRegistry — In-memory store (thread-safe)
+│   ├── BreakpointNotifier — Channel<T> async notification queue
+│   └── PdbSymbolReader    — Source location resolution from PDB
+├── ExceptionAutopsyService — Full exception chain analysis
+├── CodeAnalysis/          — Roslyn workspace (go-to-def, find usages)
+└── Symbols/               — SSQP symbol server client + disk cache
+    ↓
+ClrDebug (ICorDebug) → .NET Runtime
+```
+
+### ICorDebug Callback Threading (Critical)
+
+ProcessDebugger uses **two locks** — getting this wrong causes deadlocks:
+
+- **`_lock`** — protects user API calls (Launch, Continue, Stop, etc.)
+- **`_stateLock`** — protects state fields updated by ICorDebug callbacks
+
+**Lock ordering invariant**: `_lock` → `_stateLock` is OK. **Reverse is FORBIDDEN.** ICorDebug callbacks fire synchronously on the ICorDebug thread while other code may hold `_lock` during `Stop()` or `Continue()`. Callbacks must never acquire `_lock`.
+
+### Event Flow: Breakpoint Hit
+
+```
+ICorDebug thread → OnBreakpoint callback
+  → UpdateState(Paused) under _stateLock only
+  → Fire BreakpointHit event
+    → BreakpointManager.OnBreakpointHit
+      → Resolve location from PDB
+      → Evaluate condition (if any)
+      → If tracepoint: queue notification via Channel<T>
+      → Set ShouldContinue flag on EventArgs
+  → If ShouldContinue: call Continue(false) and UpdateState(Running)
+  → If !ShouldContinue: stay paused (session manager signals waiters)
+```
+
+### Tool Registration
+
+Tools are discovered via reflection: classes with `[McpServerToolType]`, methods with `[McpServerTool]`. Each tool receives dependencies via constructor DI. Tools return JSON strings with `{success: true/false, ...}` structure.
+
+### Key Model Conventions
+
+- **Positional records** for all models: `record Breakpoint(string Id, BreakpointLocation Location, ...)`
+- **Immutable state** via `with` expressions: `var updated = bp with { HitCount = bp.HitCount + 1 };`
+- **DateTimeOffset everywhere** — never use `DateTime`
+- **ID prefixes**: breakpoints `bp-{guid}`, tracepoints `tp-{guid}`, exception breakpoints `ebp-{guid}`
+
+## Project Layout
+
+```
+DebugMcp/                        # Main project (packaged as dotnet tool)
+├── Program.cs                   # Entry point, DI, MCP server config
+├── Tools/                       # 34 MCP tool classes
+├── Services/                    # Core business logic
+├── Models/                      # Positional records (Breakpoints/, Inspection/, Memory/, Modules/)
+└── Infrastructure/              # Logging, MCP logger provider
+
+tests/
+├── DebugMcp.Tests/              # Main test project
+│   ├── Unit/                    # Unit tests (mock-based)
+│   ├── Contract/                # Contract tests (reflection, schema validation)
+│   ├── Integration/             # Live debugger tests (flaky, skip in dev)
+│   └── Performance/             # Benchmarks (flaky, skip in dev)
+├── DebugMcp.E2E/                # Reqnroll BDD tests
+├── DebugTestApp/                # Test target application
+└── TestTargetApp/               # Another test target with sub-libraries
+
+specs/                           # Feature specifications (001–024)
+website/                         # Docusaurus docs site
+```
+
+## Feature Specification Workflow
+
+Features are developed using the `speckit` workflow. Each feature gets a numbered directory under `specs/` (e.g., `specs/024-mcp-best-practices/`) containing:
+
+- `spec.md` — requirements, user stories, acceptance criteria
+- `plan.md` — implementation design
+- `research.md` — technical investigation
+- `tasks.md` — ordered task breakdown
+- `quickstart.md` — verification steps
+- `checklists/` — quality gates
+
+Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
+
+## ClrDebug API Pitfalls
+
+- `CorDebugStringValue`: use `stringValue.GetString((int)stringValue.Length)` — there is no `.String` property
+- `IMcpServer.SendNotificationAsync` is an **extension method** — cannot be mocked with Moq
+- Module cache uses a separate `_moduleCacheLock` to avoid deadlock between callback thread and module enumeration
+- `TestProcessIoManager.Instance` is the singleton used in tests as the 3rd param to ProcessDebugger constructor
+
+## Active Technologies
+- C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants) (025-cross-platform)
 
 ## Recent Changes
-- 023-docs-site-update: Added TypeScript (Docusaurus 3.9.2), Markdown/MDX + Docusaurus 3.9.2, React 19, asciinema-player 3.14.0, @docusaurus/theme-mermaid
-- 022-exception-autopsy: Added C# / .NET 10.0 + ClrDebug (ICorDebug wrappers), ModelContextProtocol SDK, System.Text.Json
-- 021-symbol-server: Added C# / .NET 10.0 + System.Reflection.Metadata (in-box), System.Reflection.PortableExecutable (in-box), System.Net.Http (in-box), System.IO.Compression (in-box for DeflateStream)
-
-
-<!-- MANUAL ADDITIONS START -->
-<!-- MANUAL ADDITIONS END -->
+- 025-cross-platform: Added C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants)

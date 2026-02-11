@@ -774,26 +774,43 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         string runtimePath;
         string libraryName;
 
+        var arch = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.X64 => "x64",
+            Architecture.Arm64 => "arm64",
+            _ => null
+        };
+
+        if (arch == null)
+        {
+            _logger.LogWarning("Unsupported process architecture: {Architecture}", RuntimeInformation.ProcessArchitecture);
+            return null;
+        }
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            packageName = "microsoft.diagnostics.dbgshim.win-x64";
-            runtimePath = Path.Combine("runtimes", "win-x64", "native");
+            var rid = $"win-{arch}";
+            packageName = $"microsoft.diagnostics.dbgshim.{rid}";
+            runtimePath = Path.Combine("runtimes", rid, "native");
             libraryName = "dbgshim.dll";
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            packageName = "microsoft.diagnostics.dbgshim.linux-x64";
-            runtimePath = Path.Combine("runtimes", "linux-x64", "native");
+            var rid = $"linux-{arch}";
+            packageName = $"microsoft.diagnostics.dbgshim.{rid}";
+            runtimePath = Path.Combine("runtimes", rid, "native");
             libraryName = "libdbgshim.so";
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            packageName = "microsoft.diagnostics.dbgshim.osx-x64";
-            runtimePath = Path.Combine("runtimes", "osx-x64", "native");
+            var rid = $"osx-{arch}";
+            packageName = $"microsoft.diagnostics.dbgshim.{rid}";
+            runtimePath = Path.Combine("runtimes", rid, "native");
             libraryName = "libdbgshim.dylib";
         }
         else
         {
+            _logger.LogWarning("Unsupported operating system");
             return null;
         }
 
@@ -2444,7 +2461,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     /// </summary>
     private void ReapLaunchedChild()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || _launchPid <= 0 || _launchPidReaped)
+        if (!(RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) || _launchPid <= 0 || _launchPidReaped)
             return;
 
         _launchPidReaped = true;

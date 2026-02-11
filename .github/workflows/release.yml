@@ -34,7 +34,7 @@ jobs:
         run: dotnet build -c Release --no-restore -p:Version=${{ steps.version.outputs.VERSION }}
 
       - name: Test
-        run: dotnet test -c Release --no-build --filter "FullyQualifiedName~Unit"
+        run: dotnet test -c Release --no-build --filter "FullyQualifiedName~Unit|FullyQualifiedName~Contract"
 
       - name: Pack
         run: dotnet pack DebugMcp/DebugMcp.csproj -c Release -p:Version=${{ steps.version.outputs.VERSION }} -o ./nupkg --no-build
