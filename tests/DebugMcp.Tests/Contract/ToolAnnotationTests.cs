@@ -12,7 +12,7 @@ namespace DebugMcp.Tests.Contract;
 public class ToolAnnotationTests
 {
     /// <summary>
-    /// Expected annotation values for all 38 tools, matching the spec classification table.
+    /// Expected annotation values for all 40 tools, matching the spec classification table.
     /// </summary>
     private static readonly Dictionary<string, ExpectedAnnotation> ExpectedAnnotations = new()
     {
@@ -38,6 +38,8 @@ public class ToolAnnotationTests
         ["code_find_usages"] = new("Find Usages", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["code_find_assignments"] = new("Find Assignments", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["code_get_diagnostics"] = new("Get Diagnostics", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
+        ["collection_analyze"] = new("Analyze Collection", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
+        ["object_summarize"] = new("Summarize Object", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
 
         // State-Modifying Non-Destructive Tools (8): ReadOnly=false, Destructive=false
         ["breakpoint_set"] = new("Set Breakpoint", ReadOnly: false, Destructive: false, Idempotent: false, OpenWorld: false),
@@ -173,8 +175,8 @@ public class ToolAnnotationTests
     [Fact]
     public void ExpectedAnnotations_Covers34Tools()
     {
-        ExpectedAnnotations.Should().HaveCount(38,
-            "The spec defines exactly 38 tools (23 read-only + 9 state-modifying + 6 destructive)");
+        ExpectedAnnotations.Should().HaveCount(40,
+            "The spec defines exactly 40 tools (23 read-only + 2 collection/object + 9 state-modifying + 6 destructive)");
     }
 
     // ── Description content tests for 10 enhanced tools (FR-008, FR-009) ──

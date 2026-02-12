@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-debug-mcp is an MCP server that exposes .NET debugging as 34 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
+debug-mcp is an MCP server that exposes .NET debugging as 36 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
 
 ## Build & Test Commands
 
@@ -49,7 +49,7 @@ MCP Client (Claude, GPT, etc.)
     ↓ stdio (JSON-RPC)
 Program.cs — DI container, MCP server setup, CLI options
     ↓
-Tools/ (34 tools)          Resources/ (4 resources)       Completions/
+Tools/ (36 tools)          Resources/ (4 resources)       Completions/
     ↓                           ↓                              ↓
 Services/
 ├── DebugSessionManager    — Session lifecycle (launch/attach/disconnect)
@@ -106,7 +106,7 @@ Tools are discovered via reflection: classes with `[McpServerToolType]`, methods
 ```
 DebugMcp/                        # Main project (packaged as dotnet tool)
 ├── Program.cs                   # Entry point, DI, MCP server config
-├── Tools/                       # 34 MCP tool classes
+├── Tools/                       # 36 MCP tool classes
 ├── Services/                    # Core business logic
 ├── Models/                      # Positional records (Breakpoints/, Inspection/, Memory/, Modules/)
 └── Infrastructure/              # Logging, MCP logger provider
@@ -150,6 +150,8 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4 (ICorDebug wrappers), ModelContextProtocol 0.7.0-preview.1, System.Reflection.Metadata (PDB reading) (026-async-stack-traces)
 - C# / .NET 10.0 + ModelContextProtocol SDK 0.7.0-preview.1, ClrDebug 0.3.4 (ICorDebug) (027-state-snapshot-diff)
 - In-memory only (ConcurrentDictionary), session-scoped (027-state-snapshot-diff)
+- C# / .NET 10.0 (pinned in global.json) + ClrDebug 0.3.4 (ICorDebug), ModelContextProtocol 0.7.0-preview.1 (028-collection-object-summarizer)
+- In-memory only (no persistence, session-scoped) (028-collection-object-summarizer)
 
 ## Recent Changes
 - 025-cross-platform: Added C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants)

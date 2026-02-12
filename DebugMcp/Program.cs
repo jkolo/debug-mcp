@@ -5,6 +5,7 @@ using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
 using DebugMcp.Services.Completions;
+using DebugMcp.Services.Inspection;
 using DebugMcp.Services.Resources;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Services.Symbols;
@@ -117,6 +118,10 @@ rootCommand.SetAction(async parseResult =>
     // Register snapshot services (027-state-snapshot-diff)
     builder.Services.AddSingleton<ISnapshotStore, SnapshotStore>();
     builder.Services.AddSingleton<ISnapshotService, SnapshotService>();
+
+    // Register collection & object summarizer services (028-collection-object-summarizer)
+    builder.Services.AddSingleton<ICollectionAnalyzer, CollectionAnalyzer>();
+    builder.Services.AddSingleton<IObjectSummarizer, ObjectSummarizer>();
 
     // Register resource services (019-mcp-resources)
     builder.Services.AddSingleton<ThreadSnapshotCache>();
