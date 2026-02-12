@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "dotnet-debugger": {
-      "command": "dotnet",
-      "args": ["DebugMcp/bin/Release/net10.0/linux-x64/DebugMcp.dll"]
-    }
-  }
-}

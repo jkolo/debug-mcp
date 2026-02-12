@@ -34,6 +34,9 @@ appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
 
+# MCP local config (may contain tokens)
+.mcp.json
+
 # OS
 .DS_Store
 Thumbs.db
