@@ -26,21 +26,17 @@
 | 020 | MCP Completions | v0.6.0 | Argument auto-complete for all tools |
 | 021 | Symbol Server Integration | v0.7.0 | Automatic PDB download from NuGet/Microsoft symbol servers |
 | 022 | Exception Autopsy | v0.8.0 | One-shot `exception_get_context`: exception chain, stack frames, locals, source — replaces 3-4 tool calls |
-| 024 | MCP Tool Annotations | v0.9.0 | Tool annotations (readOnlyHint, destructiveHint, idempotentHint), enhanced descriptions for all 34 tools |
+| 024 | MCP Tool Annotations | v0.9.0 | Tool annotations (readOnlyHint, destructiveHint, idempotentHint), enhanced descriptions for all tools |
 | 025 | Cross-Platform Support | v0.10.0 | Windows, macOS, Linux (x64 + ARM64), dynamic DbgShim discovery, CI matrix on 3 OSes |
 | 026 | Async Stack Traces | v0.11.0 | Resolve `MoveNext()` to logical names, walk `Task.m_continuationObject` chains, strip state machine variable names |
+| 027 | State Snapshot & Diff | v0.11.0 | Capture debug state snapshots and diff two snapshots to track state evolution |
+| 028 | Collection & Object Summarizer | v0.12.0 | `collection_analyze` and `object_summarize` tools — single-call collection/object inspection with stats, anomaly detection |
 
 ## Proposed Features
 
 ### Tier 1 — AI-Native Debugging (highest ROI)
 
 Features that fundamentally change how AI agents interact with the debugger — reducing round-trips, token usage, and enabling autonomous debugging loops.
-
-#### 027 - State Snapshot & Diff
-Capture debug state (variables, threads, memory regions) at arbitrary points and diff two snapshots. Tools: `snapshot_create(label)` and `snapshot_diff(id1, id2)` returning structured changes (e.g., "field `_retryCount` changed from 2 to 3"). Enables agents to track state evolution without re-reading entire scope.
-
-#### 028 - Collection & Object Summarizer
-Smart inspection for large objects: `collection_analyze(variable)` returns count, min, max, average for primitives; common types, null count, first/last N items for objects. `object_summarize` returns key fields, sizes, interesting flags (nulls, defaults, NaNs, empty strings). Prevents token blowup on large object graphs.
 
 #### 029 - Safe Evaluation Mode
 `evaluate_pure` that restricts to member access, arithmetic, comparisons — blocking method calls with side effects. Configurable allowlist of known-pure methods. Essential guardrail for autonomous agents that might otherwise execute destructive code (DB drops, file deletes) inside the debugged process.
