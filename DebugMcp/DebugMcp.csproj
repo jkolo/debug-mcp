@@ -36,26 +36,27 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="ModelContextProtocol" Version="0.7.0-preview.1" />
-        <PackageReference Include="ClrDebug" Version="0.3.4" />
-        <PackageReference Include="Microsoft.Diagnostics.DbgShim.linux-x64" Version="9.0.661903" />
-        <PackageReference Include="Microsoft.Diagnostics.DbgShim.linux-arm64" Version="9.0.661903" />
-        <PackageReference Include="Microsoft.Diagnostics.DbgShim.win-x64" Version="9.0.661903" />
-        <PackageReference Include="Microsoft.Diagnostics.DbgShim.win-arm64" Version="9.0.661903" />
-        <PackageReference Include="Microsoft.Diagnostics.DbgShim.osx-x64" Version="9.0.661903" />
-        <PackageReference Include="Microsoft.Diagnostics.DbgShim.osx-arm64" Version="9.0.661903" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.2" />
-        <PackageReference Include="ModelContextProtocol.Core" Version="0.7.0-preview.1" />
-        <PackageReference Include="System.CommandLine" Version="2.0.2" />
+        <PackageReference Include="ModelContextProtocol" />
+        <PackageReference Include="ClrDebug" />
+        <PackageReference Include="Microsoft.Diagnostics.DbgShim.linux-x64" />
+        <PackageReference Include="Microsoft.Diagnostics.DbgShim.linux-arm64" />
+        <PackageReference Include="Microsoft.Diagnostics.DbgShim.win-x64" />
+        <PackageReference Include="Microsoft.Diagnostics.DbgShim.win-arm64" />
+        <PackageReference Include="Microsoft.Diagnostics.DbgShim.osx-x64" />
+        <PackageReference Include="Microsoft.Diagnostics.DbgShim.osx-arm64" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+        <PackageReference Include="ModelContextProtocol.Core" />
+        <PackageReference Include="System.CommandLine" />
 
         <!-- Roslyn Code Analysis (015-roslyn-code-analysis) -->
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
-        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
-        <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
+        <PackageReference Include="Microsoft.Build.Locator" />
         <!-- CRITICAL: Exclude runtime to avoid assembly conflicts with MSBuildWorkspace -->
-        <PackageReference Include="Microsoft.Build" Version="17.*" ExcludeAssets="runtime" />
-        <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" />
+        <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Tasks.Core" ExcludeAssets="runtime" />
     </ItemGroup>
 
 </Project>

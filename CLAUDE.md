@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-debug-mcp is an MCP server that exposes .NET debugging as 36 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
+debug-mcp is an MCP server that exposes .NET debugging as 40 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
 
 ## Build & Test Commands
 
@@ -34,8 +34,8 @@ dotnet run --project DebugMcp
 
 - **Runtime**: .NET 10.0 (pinned in `global.json`), C#, cross-platform (Windows/macOS/Linux, x64/arm64)
 - **Debugging**: ClrDebug 0.3.4 (ICorDebug wrappers), DbgShim 9.0
-- **MCP SDK**: ModelContextProtocol 0.7.0-preview.1
-- **Code Analysis**: Roslyn (Microsoft.CodeAnalysis 5.0.0)
+- **MCP SDK**: ModelContextProtocol 1.2.0
+- **Code Analysis**: Roslyn (Microsoft.CodeAnalysis 5.3.0)
 - **Tests**: xUnit + FluentAssertions + Moq
 - **E2E**: Reqnroll (Gherkin BDD) in `tests/DebugMcp.E2E/`
 - **Docs site**: Docusaurus 3.9.2 in `website/`
@@ -49,7 +49,7 @@ MCP Client (Claude, GPT, etc.)
     ↓ stdio (JSON-RPC)
 Program.cs — DI container, MCP server setup, CLI options
     ↓
-Tools/ (36 tools)          Resources/ (4 resources)       Completions/
+Tools/ (40 tools)          Resources/ (4 resources)       Completions/
     ↓                           ↓                              ↓
 Services/
 ├── DebugSessionManager    — Session lifecycle (launch/attach/disconnect)
@@ -121,7 +121,7 @@ tests/
 ├── DebugTestApp/                # Test target application
 └── TestTargetApp/               # Another test target with sub-libraries
 
-specs/                           # Feature specifications (001–024)
+specs/                           # Feature specifications (001–028)
 website/                         # Docusaurus docs site
 ```
 
@@ -145,13 +145,3 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - Module cache uses a separate `_moduleCacheLock` to avoid deadlock between callback thread and module enumeration
 - `TestProcessIoManager.Instance` is the singleton used in tests as the 3rd param to ProcessDebugger constructor
 
-## Active Technologies
-- C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants) (025-cross-platform)
-- C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4 (ICorDebug wrappers), ModelContextProtocol 0.7.0-preview.1, System.Reflection.Metadata (PDB reading) (026-async-stack-traces)
-- C# / .NET 10.0 + ModelContextProtocol SDK 0.7.0-preview.1, ClrDebug 0.3.4 (ICorDebug) (027-state-snapshot-diff)
-- In-memory only (ConcurrentDictionary), session-scoped (027-state-snapshot-diff)
-- C# / .NET 10.0 (pinned in global.json) + ClrDebug 0.3.4 (ICorDebug), ModelContextProtocol 0.7.0-preview.1 (028-collection-object-summarizer)
-- In-memory only (no persistence, session-scoped) (028-collection-object-summarizer)
-
-## Recent Changes
-- 025-cross-platform: Added C# / .NET 10.0 (global.json pins 10.0.102) + ClrDebug 0.3.4, ModelContextProtocol 0.7.0-preview.1, Microsoft.Diagnostics.DbgShim 9.0.x (6 RID variants)

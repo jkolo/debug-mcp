@@ -7,6 +7,7 @@ using DebugMcp.Services.CodeAnalysis;
 using DebugMcp.Services.Completions;
 using DebugMcp.Services.Inspection;
 using DebugMcp.Services.Resources;
+using DebugMcp.Prompts;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Services.Symbols;
 using Microsoft.Extensions.DependencyInjection;
@@ -158,6 +159,15 @@ rootCommand.SetAction(async parseResult =>
     builder.Services
         .AddMcpServer(options =>
         {
+            options.ServerInfo = new()
+            {
+                Name = "debug-mcp",
+                Version = typeof(Program).Assembly
+                    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                    ?? typeof(Program).Assembly.GetName().Version?.ToString(3)
+                    ?? "0.0.0"
+            };
+            options.ServerInstructions = DebuggingPrompts.ServerInstruction;
             options.Capabilities ??= new();
             options.Capabilities.Logging = new();
             options.Capabilities.Tools = new()
@@ -170,6 +180,7 @@ rootCommand.SetAction(async parseResult =>
                 ListChanged = true
             };
             options.Capabilities.Completions = new();
+            options.Capabilities.Prompts = new();
         })
         .WithStdioServerTransport()
         .WithResources<DebuggerResourceProvider>()
@@ -192,6 +203,7 @@ rootCommand.SetAction(async parseResult =>
             return new ValueTask<EmptyResult>(new EmptyResult());
         })
         .WithTools(toolTypes)
+        .WithPrompts<DebuggingPrompts>()
         .WithCompleteHandler(async (request, ct) =>
         {
             var provider = request.Services!.GetRequiredService<ExpressionCompletionProvider>();
