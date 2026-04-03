@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Module Enumeration", "    As a debugger user\n    I want to list all loaded modules after attaching to a" +
-                " process\n    So that I can set breakpoints in any loaded assembly", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Module Enumeration", "    As a debugger user\r\n    I want to list all loaded modules after attaching to " +
+                "a process\r\n    So that I can set breakpoints in any loaded assembly", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Stack Trace", "    As a debugger user\n    I want to view the call stack\n    So that I can unders" +
-                "tand the execution path to the current point", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Stack Trace", "    As a debugger user\r\n    I want to view the call stack\r\n    So that I can unde" +
+                "rstand the execution path to the current point", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

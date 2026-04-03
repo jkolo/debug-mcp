@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features.CodeAnalysis
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Go To Definition", "    As an LLM agent analyzing code\n    I want to navigate to symbol definitions\n " +
-                "   So that I can understand where types, methods, and properties are declared", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Go To Definition", "    As an LLM agent analyzing code\r\n    I want to navigate to symbol definitions\r" +
+                "\n    So that I can understand where types, methods, and properties are declared", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

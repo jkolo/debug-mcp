@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features.CodeAnalysis
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Get Diagnostics", "    As an LLM agent analyzing code\n    I want to retrieve compilation diagnostics" +
-                "\n    So that I can identify errors and warnings in the codebase", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Get Diagnostics", "    As an LLM agent analyzing code\r\n    I want to retrieve compilation diagnostic" +
+                "s\r\n    So that I can identify errors and warnings in the codebase", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

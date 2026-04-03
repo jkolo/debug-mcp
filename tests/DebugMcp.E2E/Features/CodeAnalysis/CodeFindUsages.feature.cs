@@ -24,9 +24,9 @@ namespace DebugMcp.E2E.Features.CodeAnalysis
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Find Usages", "    As an LLM agent analyzing code\n    I want to find all usages of a symbol acro" +
-                "ss the codebase\n    So that I can understand how types, methods, and variables a" +
-                "re used", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Find Usages", "    As an LLM agent analyzing code\r\n    I want to find all usages of a symbol acr" +
+                "oss the codebase\r\n    So that I can understand how types, methods, and variables" +
+                " are used", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         
