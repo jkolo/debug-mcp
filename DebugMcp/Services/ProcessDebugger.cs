@@ -271,8 +271,6 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         // Step 1: Create process with redirected I/O using Process.Start
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet",
-            Arguments = BuildDotnetArguments(program, args),
             WorkingDirectory = cwd,
             UseShellExecute = false,
             RedirectStandardInput = true,
@@ -280,6 +278,17 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+
+        if (program.EndsWith(".exe"))
+        {
+            startInfo.FileName = program;
+            startInfo.Arguments = args != null ? string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a)) : "";
+        }
+        else
+        {
+            startInfo.FileName = "dotnet";
+            startInfo.Arguments = BuildDotnetArguments(program, args);
+        }
 
         // Add environment variables
         if (env != null)
