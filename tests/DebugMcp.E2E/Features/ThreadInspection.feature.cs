@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Thread Inspection", "    As a debugger user\r\n    I want to list and inspect managed threads\r\n    So th" +
-                "at I can understand thread state in my application", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Thread Inspection", "    As a debugger user\n    I want to list and inspect managed threads\n    So that" +
+                " I can understand thread state in my application", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

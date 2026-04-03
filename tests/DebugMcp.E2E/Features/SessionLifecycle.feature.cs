@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Session Lifecycle", "    As a debugger user\r\n    I want to attach to, launch, and detach from processe" +
-                "s\r\n    So that I can control the debug session lifecycle", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Session Lifecycle", "    As a debugger user\n    I want to attach to, launch, and detach from processes" +
+                "\n    So that I can control the debug session lifecycle", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

@@ -24,9 +24,9 @@ namespace DebugMcp.E2E.Features.CodeAnalysis
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Load", "    As an LLM agent starting code analysis\r\n    I want to load a solution or proj" +
-                "ect file\r\n    So that Roslyn can parse and understand the codebase for subsequen" +
-                "t queries", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Load", "    As an LLM agent starting code analysis\n    I want to load a solution or proje" +
+                "ct file\n    So that Roslyn can parse and understand the codebase for subsequent " +
+                "queries", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

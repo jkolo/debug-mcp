@@ -24,8 +24,8 @@ namespace DebugMcp.E2E.Features
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Breakpoints", "    As a debugger user\r\n    I want to set and manage breakpoints\r\n    So that I c" +
-                "an pause execution at specific code locations", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Breakpoints", "    As a debugger user\n    I want to set and manage breakpoints\n    So that I can" +
+                " pause execution at specific code locations", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         

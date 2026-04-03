@@ -24,9 +24,9 @@ namespace DebugMcp.E2E.Features.CodeAnalysis
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Find Assignments", "    As an LLM agent analyzing code\r\n    I want to find all assignments to a varia" +
-                "ble, field, or property\r\n    So that I can understand where values are being wri" +
-                "tten", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/CodeAnalysis", "Code Find Assignments", "    As an LLM agent analyzing code\n    I want to find all assignments to a variab" +
+                "le, field, or property\n    So that I can understand where values are being writt" +
+                "en", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         
