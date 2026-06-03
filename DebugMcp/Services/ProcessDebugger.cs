@@ -2388,7 +2388,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             if (value is CorDebugStringValue stringValue)
             {
                 var len = stringValue.Length;
-                var str = stringValue.GetString((int)len) ?? "";
+                // Pass len+1 as buffer size: ICorDebugStringValue::GetStringChars returns
+                // pcchString=0 (empty) when cchString==len==1, presumably reserving a slot
+                // for a null terminator. Adding 1 ensures single-char strings like "a" are
+                // returned correctly. Longer strings are unaffected (pcchString=actual length).
+                var str = stringValue.GetString((int)len + 1) ?? "";
                 // Truncate long strings
                 if (str.Length > 100)
                 {
@@ -3472,7 +3476,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             if (fieldValue is CorDebugStringValue stringValue)
             {
                 var len = stringValue.Length;
-                return stringValue.GetString((int)len) ?? "";
+                return stringValue.GetString((int)len + 1) ?? "";
             }
 
             return "";
@@ -4561,7 +4565,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         if (value is CorDebugStringValue stringValue)
         {
             var len = stringValue.Length;
-            var str = stringValue.GetString((int)len) ?? "";
+            var str = stringValue.GetString((int)len + 1) ?? "";
             if (str.Length > 1000)
             {
                 str = str.Substring(0, 1000) + "...";
