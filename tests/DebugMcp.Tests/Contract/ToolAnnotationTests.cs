@@ -21,6 +21,7 @@ public class ToolAnnotationTests
         ["breakpoint_wait"] = new("Wait for Breakpoint Hit", ReadOnly: true, Destructive: false, Idempotent: false, OpenWorld: false),
         ["debug_state"] = new("Get Debug State", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["evaluate"] = new("Evaluate Expression", ReadOnly: true, Destructive: false, Idempotent: false, OpenWorld: false),
+        ["evaluate_safe"] = new("Evaluate Expression (Safe Mode)", ReadOnly: true, Destructive: false, Idempotent: false, OpenWorld: false),
         ["object_inspect"] = new("Inspect Object", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["variables_get"] = new("Get Variables", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["stacktrace_get"] = new("Get Stack Trace", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
@@ -175,8 +176,8 @@ public class ToolAnnotationTests
     [Fact]
     public void ExpectedAnnotations_Covers34Tools()
     {
-        ExpectedAnnotations.Should().HaveCount(40,
-            "The spec defines exactly 40 tools (23 read-only + 2 collection/object + 9 state-modifying + 6 destructive)");
+        ExpectedAnnotations.Should().HaveCount(41,
+            "The spec defines 41 tools (40 original + evaluate_safe from feature 029)");
     }
 
     // ── Description content tests for 10 enhanced tools (FR-008, FR-009) ──

@@ -31,15 +31,13 @@
 | 026 | Async Stack Traces | v0.11.0 | Resolve `MoveNext()` to logical names, walk `Task.m_continuationObject` chains, strip state machine variable names |
 | 027 | State Snapshot & Diff | v0.11.0 | Capture debug state snapshots and diff two snapshots to track state evolution |
 | 028 | Collection & Object Summarizer | v0.12.0 | `collection_analyze` and `object_summarize` tools — single-call collection/object inspection with stats, anomaly detection |
+| 029 | Safe Evaluation Mode | TBD | `evaluate_safe` tool with Roslyn AST safety gate — blocks method calls, object construction, assignments before execution; configurable allowlist of known-pure methods; essential guardrail for autonomous agents |
 
 ## Proposed Features
 
 ### Tier 1 — AI-Native Debugging (highest ROI)
 
 Features that fundamentally change how AI agents interact with the debugger — reducing round-trips, token usage, and enabling autonomous debugging loops.
-
-#### 029 - Safe Evaluation Mode
-`evaluate_pure` that restricts to member access, arithmetic, comparisons — blocking method calls with side effects. Configurable allowlist of known-pure methods. Essential guardrail for autonomous agents that might otherwise execute destructive code (DB drops, file deletes) inside the debugged process.
 
 #### 030 - Batch Evaluate & Hypothesis Runner
 Run N micro-experiments in one call: set breakpoints/tracepoints, run to events, collect variables/stack/memory snapshots, output structured summary. Agents can request 5-20 experiments instead of slow sequential single-stepping. Enables parallel hypothesis testing.

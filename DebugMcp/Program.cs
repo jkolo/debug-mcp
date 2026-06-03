@@ -42,6 +42,12 @@ var symbolServersOption = new Option<string?>("--symbol-servers")
 };
 rootCommand.Options.Add(symbolServersOption);
 
+var safeEvalAllowlistOption = new Option<string?>("--safe-eval-allowlist")
+{
+    Description = "Comma-separated method patterns to add to the safe-eval allowlist (e.g. 'Math.*,String.Format')"
+};
+rootCommand.Options.Add(safeEvalAllowlistOption);
+
 var symbolCacheOption = new Option<string?>("--symbol-cache")
 {
     Description = "Directory path for persistent PDB symbol cache (default: ~/.debug-mcp/symbols)"
@@ -69,6 +75,7 @@ rootCommand.SetAction(async parseResult =>
     var symbolCache = parseResult.GetValue(symbolCacheOption);
     var symbolTimeout = parseResult.GetValue(symbolTimeoutOption);
     var symbolMaxSize = parseResult.GetValue(symbolMaxSizeOption);
+    var safeEvalAllowlistArg = parseResult.GetValue(safeEvalAllowlistOption);
 
     var builder = Host.CreateApplicationBuilder([]);
 
@@ -123,6 +130,14 @@ rootCommand.SetAction(async parseResult =>
     // Register collection & object summarizer services (028-collection-object-summarizer)
     builder.Services.AddSingleton<ICollectionAnalyzer, CollectionAnalyzer>();
     builder.Services.AddSingleton<IObjectSummarizer, ObjectSummarizer>();
+
+    // Register safe eval services (029-safe-eval-mode)
+    var extraPatterns = safeEvalAllowlistArg?
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var safeEvalAllowlist = new DebugMcp.Services.SafeEval.SafeEvalAllowlist(extraPatterns);
+    builder.Services.AddSingleton(safeEvalAllowlist);
+    builder.Services.AddSingleton<DebugMcp.Services.SafeEval.ISafeExpressionAnalyzer,
+        DebugMcp.Services.SafeEval.SafeExpressionAnalyzer>();
 
     // Register resource services (019-mcp-resources)
     builder.Services.AddSingleton<ThreadSnapshotCache>();
