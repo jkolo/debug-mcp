@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DebugMcp.Services.Resources;
 using FluentAssertions;
 
@@ -10,21 +11,27 @@ namespace DebugMcp.Tests.Unit.Resources;
 public class ResourceNotifierTests
 {
     private readonly TestResourceNotifier _notifier;
-    private readonly List<string> _updatedUris = new();
+    private readonly ConcurrentBag<string> _updatedUris = new();
+    private readonly SemaphoreSlim _updateSignal = new(0);
     private int _listChangedCount;
 
     public ResourceNotifierTests()
     {
         _notifier = new TestResourceNotifier(debounceMs: 50);
-        _notifier.ResourceUpdated += uri => _updatedUris.Add(uri);
+        _notifier.ResourceUpdated += uri =>
+        {
+            _updatedUris.Add(uri);
+            _updateSignal.Release();
+        };
         _notifier.ListChanged += () => _listChangedCount++;
     }
 
-    private async Task WaitForCondition(Func<bool> condition, int timeoutMs = 2000, int pollIntervalMs = 25)
+    // Waits for exactly `count` notifications via semaphore — no polling, no thread pool competition.
+    private async Task WaitForUpdates(int count, int timeoutMs = 2000)
     {
-        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        while (!condition() && DateTime.UtcNow < deadline)
-            await Task.Delay(pollIntervalMs);
+        for (int i = 0; i < count; i++)
+            (await _updateSignal.WaitAsync(timeoutMs)).Should().BeTrue(
+                $"notification {i + 1} of {count} should fire within {timeoutMs}ms");
     }
 
     [Fact]
@@ -55,8 +62,7 @@ public class ResourceNotifierTests
         // Should not fire immediately
         _updatedUris.Should().BeEmpty();
 
-        // Wait for debounce with generous timeout for slow CI
-        await WaitForCondition(() => _updatedUris.Count >= 1);
+        await WaitForUpdates(1);
 
         _updatedUris.Should().ContainSingle().Which.Should().Be("debugger://session");
     }
@@ -84,8 +90,11 @@ public class ResourceNotifierTests
             _notifier.NotifyResourceUpdated("debugger://session");
         }
 
-        // Wait well beyond debounce window (50ms) for the single coalesced callback
-        await Task.Delay(300);
+        // Wait for the single coalesced notification
+        await WaitForUpdates(1);
+
+        // Brief extra wait to verify no second notification fires
+        await Task.Delay(150);
 
         // Should coalesce to a single notification
         _updatedUris.Should().HaveCount(1);
@@ -100,8 +109,7 @@ public class ResourceNotifierTests
         _notifier.NotifyResourceUpdated("debugger://session");
         _notifier.NotifyResourceUpdated("debugger://breakpoints");
 
-        // Wait for debounce with generous timeout for slow CI
-        await WaitForCondition(() => _updatedUris.Count >= 2);
+        await WaitForUpdates(2);
 
         _updatedUris.Should().HaveCount(2);
         _updatedUris.Should().Contain("debugger://session");
