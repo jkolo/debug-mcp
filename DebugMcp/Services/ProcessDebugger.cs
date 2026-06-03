@@ -269,10 +269,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         _logger.LogDebug("Launch command line: {CommandLine}", commandLine);
 
         // Step 1: Create process with redirected I/O using Process.Start
+        var isNativeExe = program.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet",
-            Arguments = BuildDotnetArguments(program, args),
+            FileName = isNativeExe ? program : "dotnet",
+            Arguments = isNativeExe ? BuildNativeArguments(args) : BuildDotnetArguments(program, args),
             WorkingDirectory = cwd,
             UseShellExecute = false,
             RedirectStandardInput = true,
@@ -388,6 +389,24 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             }
         }
 
+        return sb.ToString();
+    }
+
+    // Arguments for a native .exe — program name is in FileName, not in Arguments
+    private static string BuildNativeArguments(string[]? args)
+    {
+        if (args is not { Length: > 0 })
+            return string.Empty;
+
+        var sb = new StringBuilder();
+        foreach (var arg in args)
+        {
+            if (sb.Length > 0) sb.Append(' ');
+            if (arg.Contains(' '))
+                sb.Append('"').Append(arg).Append('"');
+            else
+                sb.Append(arg);
+        }
         return sb.ToString();
     }
 
@@ -2391,7 +2410,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             // Handle array values
             if (value is CorDebugArrayValue arrayValue)
             {
-                var elementType = GetTypeName(value);
+                var elementType = GetArrayElementTypeName(arrayValue);
                 var count = (int)arrayValue.Count;
                 var displayCount = count > 100 ? "100+" : count.ToString();
                 return ($"{elementType}[{displayCount}]", elementType + "[]", count > 0, count);
