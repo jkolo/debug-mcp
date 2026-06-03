@@ -145,3 +145,10 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - Module cache uses a separate `_moduleCacheLock` to avoid deadlock between callback thread and module enumeration
 - `TestProcessIoManager.Instance` is the singleton used in tests as the 3rd param to ProcessDebugger constructor
 
+
+## Active Technologies
+- C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax` (029-safe-eval-mode)
+- N/A — stateless per-call analysis; `SafeEvalAllowlist` singleton constructed once at startup (029-safe-eval-mode)
+
+## Recent Changes
+- 029-safe-eval-mode: Added C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax`
