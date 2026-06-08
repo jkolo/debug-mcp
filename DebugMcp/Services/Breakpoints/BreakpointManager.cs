@@ -18,10 +18,6 @@ public sealed class BreakpointManager : IBreakpointManager
     private readonly LogMessageEvaluator? _logMessageEvaluator;
     private readonly ILogger<BreakpointManager> _logger;
 
-    private readonly Lock _hitLock = new();
-    private BreakpointHit? _pendingHit;
-    private TaskCompletionSource<BreakpointHit?>? _hitWaiter;
-
     /// <summary>
     /// Event raised when a breakpoint's state changes (Pending→Bound or Bound→Pending).
     /// </summary>
@@ -470,51 +466,6 @@ public sealed class BreakpointManager : IBreakpointManager
     }
 
     /// <inheritdoc />
-    public async Task<BreakpointHit?> WaitForBreakpointAsync(
-        TimeSpan timeout,
-        CancellationToken cancellationToken = default)
-    {
-        TaskCompletionSource<BreakpointHit?> waiter;
-
-        lock (_hitLock)
-        {
-            if (_pendingHit != null)
-            {
-                var hit = _pendingHit;
-                _pendingHit = null;
-                return hit;
-            }
-
-            waiter = new TaskCompletionSource<BreakpointHit?>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _hitWaiter = waiter;
-        }
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout);
-
-        try
-        {
-            await waiter.Task.WaitAsync(timeoutCts.Token);
-
-            lock (_hitLock)
-            {
-                var hit = _pendingHit;
-                _pendingHit = null;
-                _hitWaiter = null;
-                return hit;
-            }
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            lock (_hitLock)
-            {
-                _hitWaiter = null;
-            }
-            return null;
-        }
-    }
-
-    /// <inheritdoc />
     public Task<Breakpoint?> SetBreakpointEnabledAsync(
         string breakpointId,
         bool enabled,
@@ -720,16 +671,6 @@ public sealed class BreakpointManager : IBreakpointManager
             return false; // Don't pause
         }
 
-        // Signal the hit for waiting clients (blocking breakpoints only)
-        lock (_hitLock)
-        {
-            _pendingHit = hit;
-            if (_hitWaiter is { Task.IsCompleted: false } waiter)
-            {
-                waiter.TrySetResult(hit);
-            }
-        }
-
         _logger.LogDebug("Breakpoint {Id} hit on thread {ThreadId}", hit.BreakpointId, hit.ThreadId);
         return true; // Pause execution
     }
@@ -854,16 +795,6 @@ public sealed class BreakpointManager : IBreakpointManager
             LogMessage: null,
             ExceptionInfo: exceptionInfo);
         _ = _notifier.SendBreakpointHitAsync(notification);
-
-        // Signal the hit for waiting clients
-        lock (_hitLock)
-        {
-            _pendingHit = hit;
-            if (_hitWaiter is { Task.IsCompleted: false } waiter)
-            {
-                waiter.TrySetResult(hit);
-            }
-        }
 
         _logger.LogInformation("Exception breakpoint {Id} hit: {ExceptionType} on thread {ThreadId}",
             exBp.Id, e.ExceptionType, e.ThreadId);

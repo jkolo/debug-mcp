@@ -186,7 +186,7 @@ public class PauseTests : IAsyncLifetime
         var sourceFile = TestTargetProcess.GetSourceFilePath("NestedTarget.cs");
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32); // Level3
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - try to get threads and stack
         var threads = _processDebugger.GetThreads();

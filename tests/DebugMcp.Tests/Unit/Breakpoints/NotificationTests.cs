@@ -125,42 +125,6 @@ public class NotificationTests
     }
 
     /// <summary>
-    /// T007: Both the MCP notification is sent AND breakpoint_wait returns
-    /// the result (they are not mutually exclusive).
-    /// </summary>
-    [Fact]
-    public async Task SendNotification_WithBreakpointWait_BothWork()
-    {
-        // Arrange
-        _processDebuggerMock.Setup(x => x.IsAttached).Returns(false);
-        var breakpoint = await _manager.SetBreakpointAsync("/app/Program.cs", 42);
-
-        var hit = new BreakpointHit(
-            BreakpointId: breakpoint.Id,
-            ThreadId: 1,
-            Timestamp: DateTimeOffset.UtcNow,
-            Location: breakpoint.Location,
-            HitCount: 1);
-
-        // Start waiting for breakpoint hit
-        var waitTask = _manager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
-
-        // Act - simulate hit after short delay
-        await Task.Delay(10);
-        _manager.OnBreakpointHit(hit);
-
-        var waitResult = await waitTask;
-
-        // Assert - both notification sent AND wait returned result
-        _notifierMock.Verify(n => n.SendBreakpointHitAsync(
-            It.Is<BreakpointNotification>(notif => notif.BreakpointId == breakpoint.Id)),
-            Times.Once);
-
-        waitResult.Should().NotBeNull();
-        waitResult!.BreakpointId.Should().Be(breakpoint.Id);
-    }
-
-    /// <summary>
     /// BreakpointNotifier queues notification without throwing - fire-and-forget semantics.
     /// </summary>
     [Fact]

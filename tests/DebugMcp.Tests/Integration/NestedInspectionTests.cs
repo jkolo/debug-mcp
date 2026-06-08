@@ -94,10 +94,10 @@ public class NestedInspectionTests : IAsyncLifetime
         await _targetProcess!.SendCommandAsync("object");
 
         // Wait for breakpoint to be hit
-        var hit = await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(10));
-        hit.Should().NotBeNull("Breakpoint should be hit within timeout");
+        var threadId = await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(10));
+        threadId.Should().NotBeNull("Breakpoint should be hit within timeout");
 
-        return hit!.ThreadId;
+        return threadId!.Value;
     }
 
     /// <summary>
@@ -270,9 +270,7 @@ public class NestedInspectionTests : IAsyncLifetime
         await _targetProcess.SendCommandAsync("deep");
 
         // Wait for breakpoint to be hit
-        var hit = await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(10));
-        hit.Should().NotBeNull("Breakpoint should be hit within timeout");
-        var threadId = hit!.ThreadId;
+        var threadId = (await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(10)))!.Value;
 
         // Act - Inspect 5-level deep path: this._company.Department.Team.Manager.Contact.Email
         var result = await _processDebugger.InspectObjectAsync(
@@ -309,9 +307,7 @@ public class NestedInspectionTests : IAsyncLifetime
         await _targetProcess.SendCommandAsync("deep");
 
         // Wait for breakpoint to be hit
-        var hit = await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(10));
-        hit.Should().NotBeNull("Breakpoint should be hit within timeout");
-        var threadId = hit!.ThreadId;
+        var threadId = (await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(10)))!.Value;
 
         // Act - Inspect path with inherited property: Manager.Id (inherited from BaseEntity)
         var result = await _processDebugger.EvaluateAsync(
