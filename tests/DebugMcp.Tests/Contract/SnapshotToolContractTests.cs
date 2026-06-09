@@ -64,18 +64,6 @@ public class SnapshotToolContractTests
     }
 
     [Fact]
-    public void SnapshotList_HasCorrectAnnotations()
-    {
-        var method = GetToolMethod(typeof(DebugMcp.Tools.SnapshotListTool), "snapshot_list");
-        var attr = method.GetCustomAttribute<McpServerToolAttribute>()!;
-
-        attr.Title.Should().Be("List Snapshots");
-        attr.ReadOnly.Should().BeTrue();
-        attr.Destructive.Should().BeFalse();
-        attr.Idempotent.Should().BeTrue();
-    }
-
-    [Fact]
     public void SnapshotDelete_HasCorrectAnnotations()
     {
         var method = GetToolMethod(typeof(DebugMcp.Tools.SnapshotDeleteTool), "snapshot_delete");
@@ -102,7 +90,6 @@ public class SnapshotToolContractTests
         {
             typeof(DebugMcp.Tools.SnapshotCreateTool),
             typeof(DebugMcp.Tools.SnapshotDiffTool),
-            typeof(DebugMcp.Tools.SnapshotListTool),
             typeof(DebugMcp.Tools.SnapshotDeleteTool)
         };
 

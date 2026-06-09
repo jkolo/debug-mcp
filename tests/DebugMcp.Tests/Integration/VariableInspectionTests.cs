@@ -101,7 +101,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 14); // Add method
 
         await _targetProcess.SendCommandAsync("method");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var variables = _processDebugger.GetVariables();
@@ -126,7 +126,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 14);
 
         await _targetProcess.SendCommandAsync("method");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var variables = _processDebugger.GetVariables(scope: "arguments");
@@ -153,7 +153,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 17); // Inside loop with local vars
 
         await _targetProcess.SendCommandAsync("loop");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var variables = _processDebugger.GetVariables(scope: "locals");
@@ -179,7 +179,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32); // Level3 (static method - no 'this')
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var variables = _processDebugger.GetVariables(scope: "this");
@@ -205,7 +205,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 14);
 
         await _targetProcess.SendCommandAsync("method");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var allVariables = _processDebugger.GetVariables(scope: "all");
@@ -233,7 +233,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 14);
 
         await _targetProcess.SendCommandAsync("method");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var variables = _processDebugger.GetVariables();
@@ -260,7 +260,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32); // Level3
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var variables = _processDebugger.GetVariables(scope: "this");
@@ -285,7 +285,7 @@ public class VariableInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32); // Level3
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - get variables from frame 0 and frame 1
         var frame0Vars = _processDebugger.GetVariables(frameIndex: 0);

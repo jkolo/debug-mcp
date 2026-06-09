@@ -16,17 +16,12 @@ public class ToolAnnotationTests
     /// </summary>
     private static readonly Dictionary<string, ExpectedAnnotation> ExpectedAnnotations = new()
     {
-        // Read-Only Tools (21): ReadOnly=true, Destructive=false
-        ["breakpoint_list"] = new("List Breakpoints", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
-        ["breakpoint_wait"] = new("Wait for Breakpoint Hit", ReadOnly: true, Destructive: false, Idempotent: false, OpenWorld: false),
-        ["debug_state"] = new("Get Debug State", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
+        // Read-Only Tools: ReadOnly=true, Destructive=false
         ["evaluate"] = new("Evaluate Expression", ReadOnly: true, Destructive: false, Idempotent: false, OpenWorld: false),
         ["evaluate_safe"] = new("Evaluate Expression (Safe Mode)", ReadOnly: true, Destructive: false, Idempotent: false, OpenWorld: false),
         ["object_inspect"] = new("Inspect Object", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["variables_get"] = new("Get Variables", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["stacktrace_get"] = new("Get Stack Trace", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
-        ["threads_list"] = new("List Threads", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
-        ["modules_list"] = new("List Modules", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["modules_search"] = new("Search Modules", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["types_get"] = new("Get Types", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["members_get"] = new("Get Type Members", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
@@ -62,7 +57,6 @@ public class ToolAnnotationTests
         // Snapshot Tools (4)
         ["snapshot_create"] = new("Create State Snapshot", ReadOnly: false, Destructive: false, Idempotent: false, OpenWorld: false),
         ["snapshot_diff"] = new("Compare Two Snapshots", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
-        ["snapshot_list"] = new("List Snapshots", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["snapshot_delete"] = new("Delete Snapshot(s)", ReadOnly: false, Destructive: true, Idempotent: false, OpenWorld: false),
     };
 
@@ -71,7 +65,7 @@ public class ToolAnnotationTests
     /// </summary>
     private static readonly HashSet<string> EnhancedDescriptionTools =
     [
-        "debug_launch", "breakpoint_set", "breakpoint_wait", "debug_continue", "debug_step",
+        "debug_launch", "breakpoint_set", "debug_continue", "debug_step",
         "variables_get", "evaluate", "stacktrace_get", "exception_get_context", "debug_disconnect"
     ];
 
@@ -174,10 +168,10 @@ public class ToolAnnotationTests
     }
 
     [Fact]
-    public void ExpectedAnnotations_Covers34Tools()
+    public void ExpectedAnnotations_Covers35Tools()
     {
-        ExpectedAnnotations.Should().HaveCount(41,
-            "The spec defines 41 tools (40 original + evaluate_safe from feature 029)");
+        ExpectedAnnotations.Should().HaveCount(35,
+            "The spec defines 35 tools (41 original - 6 removed in feature 030)");
     }
 
     // ── Description content tests for 10 enhanced tools (FR-008, FR-009) ──

@@ -100,7 +100,7 @@ public class ThreadInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var threads = _processDebugger.GetThreads();
@@ -125,7 +125,7 @@ public class ThreadInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var threads = _processDebugger.GetThreads();
@@ -151,7 +151,7 @@ public class ThreadInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var threads = _processDebugger.GetThreads();
@@ -176,7 +176,7 @@ public class ThreadInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var threads = _processDebugger.GetThreads();
@@ -203,7 +203,7 @@ public class ThreadInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var threads = _processDebugger.GetThreads();
@@ -230,7 +230,7 @@ public class ThreadInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var threads = _processDebugger.GetThreads();

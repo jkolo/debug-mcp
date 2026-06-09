@@ -52,16 +52,6 @@ public interface IBreakpointManager
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Waits for any breakpoint to be hit.
-    /// </summary>
-    /// <param name="timeout">Maximum time to wait.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Hit information if a breakpoint was hit, null on timeout.</returns>
-    Task<BreakpointHit?> WaitForBreakpointAsync(
-        TimeSpan timeout,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Enables or disables a breakpoint.
     /// </summary>
     /// <param name="breakpointId">ID of the breakpoint.</param>

@@ -1,6 +1,7 @@
 using DebugMcp.E2E.Support;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Tests.Helpers;
+using DebugMcp.Tests.Support;
 using FluentAssertions;
 
 namespace DebugMcp.E2E.StepDefinitions;
@@ -76,9 +77,15 @@ public sealed class BreakpointSteps
     [When("I wait for a breakpoint hit")]
     public async Task WhenIWaitForABreakpointHit()
     {
-        _ctx.LastBreakpointHit = await _ctx.BreakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromSeconds(10), CancellationToken.None);
-        _ctx.LastBreakpointHit.Should().NotBeNull("breakpoint should have been hit");
+        var threadId = await _ctx.ProcessDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(10));
+        threadId.Should().NotBeNull("breakpoint should have been hit");
+        var location = _ctx.ProcessDebugger.CurrentLocation;
+        _ctx.LastBreakpointHit = new BreakpointHit(
+            BreakpointId: "",
+            ThreadId: threadId!.Value,
+            Timestamp: DateTimeOffset.UtcNow,
+            Location: location is null ? null : new BreakpointLocation(location.File, location.Line),
+            HitCount: 1);
     }
 
     [When("I remove the breakpoint")]
@@ -109,9 +116,13 @@ public sealed class BreakpointSteps
     [Then(@"the debugger should not pause within (\d+) seconds")]
     public async Task ThenTheDebuggerShouldNotPauseWithinSeconds(int seconds)
     {
-        var hit = await _ctx.BreakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromSeconds(seconds), CancellationToken.None);
-        hit.Should().BeNull("no breakpoint should have been hit");
+        int? threadId = null;
+        try
+        {
+            threadId = await _ctx.ProcessDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(seconds));
+        }
+        catch (TimeoutException) { }
+        threadId.Should().BeNull("no breakpoint should have been hit");
     }
 
     // --- Exception Breakpoints ---

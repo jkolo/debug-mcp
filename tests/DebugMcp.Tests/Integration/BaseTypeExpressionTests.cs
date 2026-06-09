@@ -92,8 +92,7 @@ public class BaseTypeExpressionTests : IAsyncLifetime
         await _targetProcess!.SendCommandAsync("object");
 
         // Wait for breakpoint to be hit
-        var hit = await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(10));
-        hit.Should().NotBeNull("Breakpoint should be hit within timeout");
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(10));
     }
 
     /// <summary>

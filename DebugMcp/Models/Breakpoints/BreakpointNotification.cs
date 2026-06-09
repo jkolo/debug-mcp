@@ -11,6 +11,8 @@ namespace DebugMcp.Models.Breakpoints;
 /// <param name="HitCount">Total times this breakpoint has been hit.</param>
 /// <param name="LogMessage">Evaluated log message (tracepoints only).</param>
 /// <param name="ExceptionInfo">For exception breakpoints.</param>
+/// <param name="Locals">Local variables from the top frame at hit time (blocking breakpoints only).</param>
+/// <param name="LocalsError">"timeout" or "unavailable" when locals could not be fetched.</param>
 public record BreakpointNotification(
     string BreakpointId,
     BreakpointType Type,
@@ -19,7 +21,9 @@ public record BreakpointNotification(
     DateTimeOffset Timestamp,
     int HitCount,
     string? LogMessage = null,
-    ExceptionInfo? ExceptionInfo = null);
+    ExceptionInfo? ExceptionInfo = null,
+    IReadOnlyList<VariableSummary>? Locals = null,
+    string? LocalsError = null);
 
 /// <summary>
 /// Location information included in breakpoint notifications.

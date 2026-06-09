@@ -32,10 +32,9 @@ public sealed class ProcessWriteInputTool
     [McpServerTool(Name = "process_write_input", Title = "Write Process Input",
         ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Write data to the debugged process's stdin")]
-    public Task<string> WriteInputAsync(
+    public string WriteInput(
         [Description("Data to write to stdin")] string data,
-        [Description("Close stdin after writing (send EOF)")] bool close_after = false,
-        CancellationToken cancellationToken = default)
+        [Description("Close stdin after writing (send EOF)")] bool close_after = false)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("process_write_input", JsonSerializer.Serialize(new
@@ -50,18 +49,18 @@ public sealed class ProcessWriteInputTool
             if (!_ioManager.HasProcess)
             {
                 _logger.ToolError("process_write_input", ErrorCodes.NoSession);
-                return Task.FromResult(CreateErrorResponse(
+                return CreateErrorResponse(
                     ErrorCodes.NoSession,
-                    "No process attached. Use debug_launch first."));
+                    "No process attached. Use debug_launch first.");
             }
 
             // Validate data
             if (data == null)
             {
                 _logger.ToolError("process_write_input", ErrorCodes.InvalidParameter);
-                return Task.FromResult(CreateErrorResponse(
+                return CreateErrorResponse(
                     ErrorCodes.InvalidParameter,
-                    "Data cannot be null"));
+                    "Data cannot be null");
             }
 
             // Write to stdin
@@ -77,25 +76,25 @@ public sealed class ProcessWriteInputTool
             _logger.ToolCompleted("process_write_input", stopwatch.ElapsedMilliseconds);
             _logger.LogDebug("Wrote {Bytes} bytes to stdin, closed={Closed}", bytesWritten, close_after);
 
-            return Task.FromResult(JsonSerializer.Serialize(new
+            return JsonSerializer.Serialize(new
             {
                 success = true,
                 bytesWritten,
                 stdinClosed = close_after
-            }, new JsonSerializerOptions { WriteIndented = true }));
+            }, new JsonSerializerOptions { WriteIndented = true });
         }
         catch (InvalidOperationException ex)
         {
             var errorCode = ex.Message.Contains("closed") ? ErrorCodes.StdinClosed : ErrorCodes.NoSession;
             _logger.ToolError("process_write_input", errorCode);
-            return Task.FromResult(CreateErrorResponse(errorCode, ex.Message));
+            return CreateErrorResponse(errorCode, ex.Message);
         }
         catch (Exception ex)
         {
             _logger.ToolError("process_write_input", ErrorCodes.IoFailed);
-            return Task.FromResult(CreateErrorResponse(
+            return CreateErrorResponse(
                 ErrorCodes.IoFailed,
-                $"Failed to write input: {ex.Message}"));
+                $"Failed to write input: {ex.Message}");
         }
     }
 

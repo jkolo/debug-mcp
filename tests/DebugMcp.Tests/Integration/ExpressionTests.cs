@@ -100,7 +100,7 @@ public class ExpressionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 14); // SayHello first statement
 
         await _targetProcess.SendCommandAsync("method");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - try to access an argument variable
         // Note: Exact variable name depends on MethodTarget implementation
@@ -136,7 +136,7 @@ public class ExpressionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32); // Instance method
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var result = await _processDebugger.EvaluateAsync("this");
@@ -165,7 +165,7 @@ public class ExpressionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - try to access a field through this
         // Note: Actual field name depends on NestedTarget implementation
@@ -192,7 +192,7 @@ public class ExpressionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - complex expression that requires full parser
         var result = await _processDebugger.EvaluateAsync("a + b * c");
@@ -219,7 +219,7 @@ public class ExpressionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var result = await _processDebugger.EvaluateAsync("nonExistentVariable");
@@ -245,7 +245,7 @@ public class ExpressionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32); // Deep nested
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - inspect at frame 1 (caller frame)
         var frame0Result = await _processDebugger.EvaluateAsync("this", frameIndex: 0);

@@ -101,7 +101,7 @@ public class StackInspectionTests : IAsyncLifetime
 
         // Trigger the nested call
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var (frames, totalFrames) = _processDebugger.GetStackFrames();
@@ -132,7 +132,7 @@ public class StackInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - get full stack to include runtime frames
         var (frames, _) = _processDebugger.GetStackFrames(maxFrames: 100);
@@ -161,7 +161,7 @@ public class StackInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act - get first 2 frames
         var (firstTwo, total1) = _processDebugger.GetStackFrames(startFrame: 0, maxFrames: 2);
@@ -196,7 +196,7 @@ public class StackInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 32);
 
         await _targetProcess.SendCommandAsync("nested");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var (frames, _) = _processDebugger.GetStackFrames();
@@ -228,7 +228,7 @@ public class StackInspectionTests : IAsyncLifetime
         await _breakpointManager.SetBreakpointAsync(sourceFile, 14); // SayHello first statement
 
         await _targetProcess.SendCommandAsync("method");
-        await _breakpointManager.WaitForBreakpointAsync(TimeSpan.FromSeconds(5));
+        await _processDebugger.WaitForPauseAsync(TimeSpan.FromSeconds(5));
 
         // Act
         var (frames, _) = _processDebugger.GetStackFrames();

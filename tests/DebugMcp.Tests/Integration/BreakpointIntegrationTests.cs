@@ -228,39 +228,4 @@ public class BreakpointIntegrationTests : IAsyncLifetime
         exceptionBp.Enabled.Should().BeTrue();
     }
 
-    /// <summary>
-    /// Verify WaitForBreakpointAsync times out when no breakpoint is hit.
-    /// </summary>
-    [Fact]
-    public async Task WaitForBreakpoint_WhenNoHit_ReturnsNullAfterTimeout()
-    {
-        // Act - wait with short timeout (no process attached, no hits will occur)
-        var hit = await _breakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromMilliseconds(100),
-            CancellationToken.None);
-
-        // Assert
-        hit.Should().BeNull("no breakpoint was hit");
-    }
-
-    /// <summary>
-    /// Verify WaitForBreakpointAsync can be cancelled.
-    /// </summary>
-    [Fact]
-    public async Task WaitForBreakpoint_WhenCancelled_ThrowsOperationCanceledException()
-    {
-        // Arrange
-        using var cts = new CancellationTokenSource();
-        var waitTask = _breakpointManager.WaitForBreakpointAsync(
-            TimeSpan.FromSeconds(30),
-            cts.Token);
-
-        // Act - cancel after short delay
-        await Task.Delay(50);
-        cts.Cancel();
-
-        // Assert
-        var act = async () => await waitTask;
-        await act.Should().ThrowAsync<OperationCanceledException>();
-    }
 }
