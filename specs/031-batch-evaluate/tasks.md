@@ -16,15 +16,15 @@
 
 **Purpose**: Create directory structure and model files needed by all stories.
 
-- [ ] T001 Create `DebugMcp/Models/Batch/` directory and stub files: `BatchCompletionReason.cs`, `ExperimentStatus.cs`, `ExperimentMode.cs`, `EvalMode.cs`
-- [ ] T002 [P] Create `DebugMcp/Models/Batch/ExperimentTrigger.cs` — abstract record with `SourceLocation(File, Line)` and `ExceptionType(TypeName)` subtypes (see data-model.md)
-- [ ] T003 [P] Create `DebugMcp/Models/Batch/Experiment.cs` — positional record: Trigger, Mode, Capture, Condition, MaxHits (default 1)
-- [ ] T004 [P] Create `DebugMcp/Models/Batch/ExperimentHit.cs` — positional record: Timestamp (DateTimeOffset), ThreadId, Location, Values, EvalErrors
-- [ ] T005 [P] Create `DebugMcp/Models/Batch/ExperimentResult.cs` — positional record: Index, Status, HitCount, Hits, ErrorMessage?
-- [ ] T006 [P] Create `DebugMcp/Models/Batch/BatchRequest.cs` — positional record: Experiments, TimeoutSeconds (30), EvalMode (Safe), MaxTotalHits (500)
-- [ ] T007 [P] Create `DebugMcp/Models/Batch/BatchResult.cs` — positional record: CompletionReason, TotalExperiments, TriggeredCount, NotTriggeredCount, ErrorCount, ExperimentResults
-- [ ] T008 Create `DebugMcp/Services/Batch/IBatchRunner.cs` — interface: `RunAsync(BatchRequest, CancellationToken): Task<BatchResult>`, `bool IsRunning`
-- [ ] T009 Create stub `DebugMcp/Services/Batch/BatchRunner.cs` implementing `IBatchRunner` — all methods throw `NotImplementedException`
+- [X] T001 Create `DebugMcp/Models/Batch/` directory and stub files: `BatchCompletionReason.cs`, `ExperimentStatus.cs`, `ExperimentMode.cs`, `EvalMode.cs`
+- [X] T002 [P] Create `DebugMcp/Models/Batch/ExperimentTrigger.cs` — abstract record with `SourceLocation(File, Line)` and `ExceptionType(TypeName)` subtypes (see data-model.md)
+- [X] T003 [P] Create `DebugMcp/Models/Batch/Experiment.cs` — positional record: Trigger, Mode, Capture, Condition, MaxHits (default 1)
+- [X] T004 [P] Create `DebugMcp/Models/Batch/ExperimentHit.cs` — positional record: Timestamp (DateTimeOffset), ThreadId, Location, Values, EvalErrors
+- [X] T005 [P] Create `DebugMcp/Models/Batch/ExperimentResult.cs` — positional record: Index, Status, HitCount, Hits, ErrorMessage?
+- [X] T006 [P] Create `DebugMcp/Models/Batch/BatchRequest.cs` — positional record: Experiments, TimeoutSeconds (30), EvalMode (Safe), MaxTotalHits (500)
+- [X] T007 [P] Create `DebugMcp/Models/Batch/BatchResult.cs` — positional record: CompletionReason, TotalExperiments, TriggeredCount, NotTriggeredCount, ErrorCount, ExperimentResults
+- [X] T008 Create `DebugMcp/Services/Batch/IBatchRunner.cs` — interface: `RunAsync(BatchRequest, CancellationToken): Task<BatchResult>`, `bool IsRunning`
+- [X] T009 Create stub `DebugMcp/Services/Batch/BatchRunner.cs` implementing `IBatchRunner` — all methods throw `NotImplementedException`
 
 ---
 
@@ -34,8 +34,8 @@
 
 **⚠️ CRITICAL**: Phase 3+ cannot begin until T010 and T011 are complete.
 
-- [ ] T010 Add `ResolvedBreakpointHitEventArgs` sealed class to `DebugMcp/Services/Breakpoints/BreakpointManager.cs`: fields `BreakpointId`, `ThreadId`, `Location`, `Timestamp`, `HitCount`, settable `ShouldContinue`
-- [ ] T011 Add `event EventHandler<ResolvedBreakpointHitEventArgs>? BreakpointResolved` to `BreakpointManager`; fire it from `OnDebuggerBreakpointHit` AFTER condition check and hit-count increment, passing `e.ShouldContinue` through: if event handler sets `ShouldContinue = true`, set `e.ShouldContinue = true`
+- [X] T010 Add `ResolvedBreakpointHitEventArgs` sealed class to `DebugMcp/Services/Breakpoints/BreakpointManager.cs`: fields `BreakpointId`, `ThreadId`, `Location`, `Timestamp`, `HitCount`, settable `ShouldContinue`
+- [X] T011 Add `event EventHandler<ResolvedBreakpointHitEventArgs>? BreakpointResolved` to `BreakpointManager`; fire it from `OnDebuggerBreakpointHit` AFTER condition check and hit-count increment, passing `e.ShouldContinue` through: if event handler sets `ShouldContinue = true`, set `e.ShouldContinue = true`
 
 **Checkpoint**: `dotnet build` passes; existing tests green.
 
@@ -49,21 +49,21 @@
 
 ### Tests for User Story 1 (TDD — write first, verify they FAIL)
 
-- [ ] T012 [P] [US1] Unit test — `BatchRunner` registers 3 experiments as breakpoints via `IBreakpointManager.SetBreakpointAsync`; dispatches single hit to correct experiment by breakpoint ID in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
-- [ ] T013 [P] [US1] Unit test — two experiments at same location share one physical breakpoint but each accumulate independent hits in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
-- [ ] T014 [P] [US1] Unit test — `BatchRunner` disables all pre-existing breakpoints on start and restores them on completion in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
-- [ ] T015 [P] [US1] Unit test — blocking experiment: `BreakpointResolved` event arg `ShouldContinue` is set to `true` after variable collection in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
+- [X] T012 [P] [US1] Unit test — `BatchRunner` registers 3 experiments as breakpoints via `IBreakpointManager.SetBreakpointAsync`; dispatches single hit to correct experiment by breakpoint ID in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
+- [X] T013 [P] [US1] Unit test — two experiments at same location share one physical breakpoint but each accumulate independent hits in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
+- [X] T014 [P] [US1] Unit test — `BatchRunner` disables all pre-existing breakpoints on start and restores them on completion in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
+- [X] T015 [P] [US1] Unit test — blocking experiment: `BreakpointResolved` event arg `ShouldContinue` is set to `true` after variable collection in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement `BatchRunner._bpToExperiments` dispatch table (`Dictionary<string, List<int>>`); implement `RunAsync` setup: validate request (1–20 experiments, no running batch), register experiments as breakpoints via `IBreakpointManager.SetBreakpointAsync`, populate dispatch table in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T017 [US1] Implement `BatchRunner.OnBreakpointResolved`: look up `_bpToExperiments` by breakpoint ID, for each matching experiment check per-experiment `MaxHits`, enqueue hit for background collection worker in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T018 [US1] Implement `BatchRunner` background `Channel<T>` collection worker: dequeue hit, call `IDebugSessionManager.GetVariables` with 100ms timeout per expression, append `ExperimentHit` to `ExperimentResult`, mark experiment as triggered in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T019 [US1] Implement pre-existing BP freeze: before starting, call `IBreakpointManager.GetBreakpointsAsync` + `GetExceptionBreakpointsAsync`, store `(id, originalEnabled)` pairs, call `SetBreakpointEnabledAsync(id, false)` for each enabled one; restore on batch end in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T020 [US1] Implement blocking-experiment auto-resume: in `OnBreakpointResolved`, for blocking-mode experiments set `e.ShouldContinue = true` after 100ms synchronous wait for variable collection in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T021 [US1] Implement batch cleanup: on completion remove all experiment-registered breakpoints via `RemoveBreakpointAsync`, restore pre-existing breakpoints, fire `TaskCompletionSource`; build and return `BatchResult` in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T022 [US1] Create `DebugMcp/Tools/BatchEvaluateTool.cs` — `[McpServerToolType]`, method `BatchEvaluateAsync`, parse JSON parameters into `BatchRequest`, call `IBatchRunner.RunAsync`, serialize `BatchResult` to JSON response; annotations: `ReadOnly=false, Destructive=false, Idempotent=false, OpenWorld=false`
-- [ ] T023 [US1] Register `IBatchRunner` / `BatchRunner` as singleton in `DebugMcp/Program.cs`; inject `BreakpointManager` (concrete) for event subscription, `IBreakpointManager` for operations, `IDebugSessionManager`, `ISafeExpressionAnalyzer?`
+- [X] T016 [US1] Implement `BatchRunner._bpToExperiments` dispatch table (`Dictionary<string, List<int>>`); implement `RunAsync` setup: validate request (1–20 experiments, no running batch), register experiments as breakpoints via `IBreakpointManager.SetBreakpointAsync`, populate dispatch table in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T017 [US1] Implement `BatchRunner.OnBreakpointResolved`: look up `_bpToExperiments` by breakpoint ID, for each matching experiment check per-experiment `MaxHits`, enqueue hit for background collection worker in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T018 [US1] Implement `BatchRunner` background `Channel<T>` collection worker: dequeue hit, call `IDebugSessionManager.GetVariables` with 100ms timeout per expression, append `ExperimentHit` to `ExperimentResult`, mark experiment as triggered in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T019 [US1] Implement pre-existing BP freeze: before starting, call `IBreakpointManager.GetBreakpointsAsync` + `GetExceptionBreakpointsAsync`, store `(id, originalEnabled)` pairs, call `SetBreakpointEnabledAsync(id, false)` for each enabled one; restore on batch end in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T020 [US1] Implement blocking-experiment auto-resume: in `OnBreakpointResolved`, for blocking-mode experiments set `e.ShouldContinue = true` after 100ms synchronous wait for variable collection in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T021 [US1] Implement batch cleanup: on completion remove all experiment-registered breakpoints via `RemoveBreakpointAsync`, restore pre-existing breakpoints, fire `TaskCompletionSource`; build and return `BatchResult` in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T022 [US1] Create `DebugMcp/Tools/BatchEvaluateTool.cs` — `[McpServerToolType]`, method `BatchEvaluateAsync`, parse JSON parameters into `BatchRequest`, call `IBatchRunner.RunAsync`, serialize `BatchResult` to JSON response; annotations: `ReadOnly=false, Destructive=false, Idempotent=false, OpenWorld=false`
+- [X] T023 [US1] Register `IBatchRunner` / `BatchRunner` as singleton in `DebugMcp/Program.cs`; inject `BreakpointManager` (concrete) for event subscription, `IBreakpointManager` for operations, `IDebugSessionManager`, `ISafeExpressionAnalyzer?`
 
 **Checkpoint**: `dotnet test --filter "FullyQualifiedName~BatchRunner"` green; manual Scenario 1 from quickstart.md passes.
 
@@ -77,15 +77,15 @@
 
 ### Tests for User Story 2 (TDD — write first, verify they FAIL)
 
-- [ ] T024 [P] [US2] Unit test — non-blocking experiments are registered via `IBreakpointManager.SetTracepointAsync` (not `SetBreakpointAsync`) in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
-- [ ] T025 [P] [US2] Unit test — non-blocking experiment hit does NOT set `e.ShouldContinue = true` (it was already false / tracepoint auto-continues) in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
-- [ ] T026 [P] [US2] Unit test — experiment with `max_hits: 3` collects exactly 3 hits then stops collecting further hits at that location in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
+- [X] T024 [P] [US2] Unit test — non-blocking experiments are registered via `IBreakpointManager.SetTracepointAsync` (not `SetBreakpointAsync`) in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
+- [X] T025 [P] [US2] Unit test — non-blocking experiment hit does NOT set `e.ShouldContinue = true` (it was already false / tracepoint auto-continues) in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
+- [X] T026 [P] [US2] Unit test — experiment with `max_hits: 3` collects exactly 3 hits then stops collecting further hits at that location in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerDispatchTests.cs`
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] In `BatchRunner.RunAsync` setup: register experiments with `Mode == NonBlocking` via `IBreakpointManager.SetTracepointAsync` instead of `SetBreakpointAsync` in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T028 [US2] In `BatchRunner.OnBreakpointResolved`: for non-blocking experiments, enqueue hit asynchronously (no synchronous wait, no `ShouldContinue` override); tracepoints already auto-continue via `BreakpointManager` in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T029 [US2] Enforce per-experiment `MaxHits`: when `ExperimentResult.HitCount >= Experiment.MaxHits`, skip further collection for that experiment; when all experiments have reached `MaxHits`, signal `AllTriggered` completion in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T027 [US2] In `BatchRunner.RunAsync` setup: register experiments with `Mode == NonBlocking` via `IBreakpointManager.SetTracepointAsync` instead of `SetBreakpointAsync` in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T028 [US2] In `BatchRunner.OnBreakpointResolved`: for non-blocking experiments, enqueue hit asynchronously (no synchronous wait, no `ShouldContinue` override); tracepoints already auto-continue via `BreakpointManager` in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T029 [US2] Enforce per-experiment `MaxHits`: when `ExperimentResult.HitCount >= Experiment.MaxHits`, skip further collection for that experiment; when all experiments have reached `MaxHits`, signal `AllTriggered` completion in `DebugMcp/Services/Batch/BatchRunner.cs`
 
 **Checkpoint**: `dotnet test --filter "FullyQualifiedName~BatchRunner"` still green; manual Scenario 2 passes.
 
@@ -99,15 +99,15 @@
 
 ### Tests for User Story 3 (TDD — write first, verify they FAIL)
 
-- [ ] T030 [P] [US3] Unit test — batch returns `BatchCompletionReason.Timeout` with partial results when timeout `CancellationToken` fires in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
-- [ ] T031 [P] [US3] Unit test — batch returns `BatchCompletionReason.ProcessExited` when `IProcessDebugger.StateChanged` fires `Disconnected` in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
-- [ ] T032 [P] [US3] Unit test — batch returns with collected data when external `CancellationToken` is cancelled in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
+- [X] T030 [P] [US3] Unit test — batch returns `BatchCompletionReason.Timeout` with partial results when timeout `CancellationToken` fires in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
+- [X] T031 [P] [US3] Unit test — batch returns `BatchCompletionReason.ProcessExited` when `IProcessDebugger.StateChanged` fires `Disconnected` in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
+- [X] T032 [P] [US3] Unit test — batch returns with collected data when external `CancellationToken` is cancelled in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] In `BatchRunner.RunAsync`: create `CancellationTokenSource` linked to `TimeSpan.FromSeconds(request.TimeoutSeconds)` and caller's token; store as `_batchCts` in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T034 [US3] In `BatchRunner` constructor: subscribe to `IProcessDebugger.StateChanged`; when `Disconnected`, cancel `_batchCts` and set `_completionReason = ProcessExited` in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T035 [US3] In `BatchRunner.RunAsync`: await `_completionTcs.Task` with linked token; on `OperationCanceledException` determine reason (Timeout if deadline exceeded, Cancelled if external) and finalize `BatchResult` with `ExperimentStatus.NotTriggered` for any untriggered experiments in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T033 [US3] In `BatchRunner.RunAsync`: create `CancellationTokenSource` linked to `TimeSpan.FromSeconds(request.TimeoutSeconds)` and caller's token; store as `_batchCts` in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T034 [US3] In `BatchRunner` constructor: subscribe to `IProcessDebugger.StateChanged`; when `Disconnected`, cancel `_batchCts` and set `_completionReason = ProcessExited` in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T035 [US3] In `BatchRunner.RunAsync`: await `_completionTcs.Task` with linked token; on `OperationCanceledException` determine reason (Timeout if deadline exceeded, Cancelled if external) and finalize `BatchResult` with `ExperimentStatus.NotTriggered` for any untriggered experiments in `DebugMcp/Services/Batch/BatchRunner.cs`
 
 **Checkpoint**: `dotnet test --filter "FullyQualifiedName~BatchRunner"` green; manual Scenario 3 passes.
 
@@ -117,12 +117,12 @@
 
 **Purpose**: Hit cap, eval_mode, contract test, observability, CLAUDE.md update.
 
-- [ ] T036 [P] Unit test — hit cap: when total hits across all experiments reaches `MaxTotalHits`, batch ends with `HitLimitReached` in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
-- [ ] T037 Implement `MaxTotalHits` soft cap in `BatchRunner` collection worker: `Interlocked.Increment` on total-hits counter; when `>= MaxTotalHits`, cancel `_batchCts` with `HitLimitReached` reason in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T038 [P] Implement `eval_mode` in `BatchRunner` collection worker: for each capture expression, if `EvalMode == Safe` call `ISafeExpressionAnalyzer.Analyze(expr)` first — if rejected, add to `EvalErrors` without calling `EvaluateAsync`; if `Full`, skip analyzer in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T039 [P] Contract test — add `batch_evaluate` entry to `tests/DebugMcp.Tests/Contract/ToolAnnotationTests.cs`: verify tool name, annotations (`ReadOnly=false, Destructive=false, Idempotent=false, OpenWorld=false`), and description mentions "batch"
-- [ ] T040 [P] Add structured logging to `BatchRunner`: batch start (experiment count, timeout, eval_mode), each experiment registration, each hit (experiment index, thread, hit count), batch end (reason, total hits, duration) in `DebugMcp/Services/Batch/BatchRunner.cs`
-- [ ] T041 Update `CLAUDE.md` "Active Technologies" and "Recent Changes" sections to reflect `031-batch-evaluate`: `BatchRunner`, `IBatchRunner`, `batch_evaluate` tool, `BreakpointResolved` event
+- [X] T036 [P] Unit test — hit cap: when total hits across all experiments reaches `MaxTotalHits`, batch ends with `HitLimitReached` in `tests/DebugMcp.Tests/Unit/Batch/BatchRunnerLifecycleTests.cs`
+- [X] T037 Implement `MaxTotalHits` soft cap in `BatchRunner` collection worker: `Interlocked.Increment` on total-hits counter; when `>= MaxTotalHits`, cancel `_batchCts` with `HitLimitReached` reason in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T038 [P] Implement `eval_mode` in `BatchRunner` collection worker: for each capture expression, if `EvalMode == Safe` call `ISafeExpressionAnalyzer.Analyze(expr)` first — if rejected, add to `EvalErrors` without calling `EvaluateAsync`; if `Full`, skip analyzer in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T039 [P] Contract test — add `batch_evaluate` entry to `tests/DebugMcp.Tests/Contract/ToolAnnotationTests.cs`: verify tool name, annotations (`ReadOnly=false, Destructive=false, Idempotent=false, OpenWorld=false`), and description mentions "batch"
+- [X] T040 [P] Add structured logging to `BatchRunner`: batch start (experiment count, timeout, eval_mode), each experiment registration, each hit (experiment index, thread, hit count), batch end (reason, total hits, duration) in `DebugMcp/Services/Batch/BatchRunner.cs`
+- [X] T041 Update `CLAUDE.md` "Active Technologies" and "Recent Changes" sections to reflect `031-batch-evaluate`: `BatchRunner`, `IBatchRunner`, `batch_evaluate` tool, `BreakpointResolved` event
 
 ---
 

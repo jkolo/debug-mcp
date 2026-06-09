@@ -155,6 +155,7 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - In-memory only; batch state lives in `BatchRunner` singleton for the duration of a run (031-batch-evaluate)
 
 ## Recent Changes
+- 031-batch-evaluate: Added `batch_evaluate` MCP tool, `IBatchRunner`/`BatchRunner` service, `IBreakpointEventSource` interface, `ResolvedBreakpointHitEventArgs` event args class; `BreakpointManager` now fires `BreakpointResolved` event after each hit; 36 tools total
 - 030-mcp-event-driven: Added 2 new MCP resources (`debugger://modules`, `debugger://snapshots`), `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input`
 - 029-safe-eval-mode: Added C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax`
 

@@ -9,7 +9,7 @@ namespace DebugMcp.Services.Breakpoints;
 /// <summary>
 /// Manages breakpoint lifecycle and operations using ICorDebug APIs.
 /// </summary>
-public sealed class BreakpointManager : IBreakpointManager
+public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSource
 {
     private readonly BreakpointRegistry _registry;
     private readonly IPdbSymbolReader _pdbReader;
@@ -24,6 +24,9 @@ public sealed class BreakpointManager : IBreakpointManager
     /// Event raised when a breakpoint's state changes (Pending→Bound or Bound→Pending).
     /// </summary>
     public event EventHandler<BreakpointStateChangedEventArgs>? BreakpointStateChanged;
+
+    /// <inheritdoc />
+    public event EventHandler<ResolvedBreakpointHitEventArgs>? BreakpointResolved;
 
     public BreakpointManager(
         BreakpointRegistry registry,
@@ -108,6 +111,26 @@ public sealed class BreakpointManager : IBreakpointManager
         {
             // Condition was false — signal that the callback should auto-continue
             e.ShouldContinue = true;
+        }
+
+        // Fire BreakpointResolved for batch dispatch (synchronous on ICorDebug callback thread).
+        // Handlers may set ShouldContinue = true to auto-resume blocking breakpoints (e.g., batch mode).
+        if (BreakpointResolved != null)
+        {
+            var resolvedArgs = new ResolvedBreakpointHitEventArgs
+            {
+                BreakpointId = hit.BreakpointId,
+                ThreadId = hit.ThreadId,
+                Location = hit.Location,
+                Timestamp = hit.Timestamp,
+                HitCount = hit.HitCount,
+                ShouldContinue = false,
+            };
+            BreakpointResolved.Invoke(this, resolvedArgs);
+            if (resolvedArgs.ShouldContinue)
+            {
+                e.ShouldContinue = true;
+            }
         }
     }
 
@@ -1108,6 +1131,34 @@ public sealed class BreakpointManager : IBreakpointManager
         public string? ErrorMessage { get; init; }
         public object? NativeBreakpoint { get; init; }
     }
+}
+
+/// <summary>
+/// Event args fired after a breakpoint hit is fully resolved (location, condition, hit count).
+/// Raised synchronously on the ICorDebug callback thread while the process is stopped.
+/// </summary>
+public sealed class ResolvedBreakpointHitEventArgs : EventArgs
+{
+    /// <summary>The breakpoint ID that was hit.</summary>
+    public required string BreakpointId { get; init; }
+
+    /// <summary>Thread that triggered the hit.</summary>
+    public required int ThreadId { get; init; }
+
+    /// <summary>Resolved source location of the hit.</summary>
+    public required BreakpointLocation Location { get; init; }
+
+    /// <summary>When the hit occurred.</summary>
+    public required DateTimeOffset Timestamp { get; init; }
+
+    /// <summary>Current hit count after this hit.</summary>
+    public required int HitCount { get; init; }
+
+    /// <summary>
+    /// Set to true by a handler (e.g., BatchRunner) to auto-resume the process after the event.
+    /// When true, overrides the normal pause behaviour for blocking breakpoints.
+    /// </summary>
+    public bool ShouldContinue { get; set; }
 }
 
 /// <summary>
