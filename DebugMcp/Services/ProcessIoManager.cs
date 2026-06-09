@@ -8,10 +8,18 @@ namespace DebugMcp.Services;
 /// Manages I/O redirection for debugged processes.
 /// Buffers stdout/stderr output and provides stdin access.
 /// </summary>
-public sealed class ProcessIoManager : IDisposable
+public sealed class ProcessIoManager : IOutputEventSource, IDisposable
 {
     private readonly ILogger<ProcessIoManager> _logger;
     private readonly Lock _lock = new();
+
+    private const int OutputEventMaxLength = 1024;
+
+    /// <summary>
+    /// Fired when process output is received.
+    /// Arguments: (content, streamName, truncated) where content is clipped at 1024 chars when truncated=true.
+    /// </summary>
+    public event Action<string, string, bool>? OutputReceived;
 
     private Process? _process;
     private StringBuilder _stdoutBuffer = new();
@@ -246,10 +254,15 @@ public sealed class ProcessIoManager : IDisposable
                     break;
                 }
 
+                var content = new string(charBuffer, 0, read);
                 lock (_lock)
                 {
-                    buffer.Append(charBuffer, 0, read);
+                    buffer.Append(content);
                 }
+
+                var truncated = content.Length > OutputEventMaxLength;
+                var eventContent = truncated ? content[..OutputEventMaxLength] : content;
+                OutputReceived?.Invoke(eventContent, streamName, truncated);
 
                 _logger.LogTrace("Read {Count} chars from {StreamName}", read, streamName);
             }

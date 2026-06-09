@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-debug-mcp is an MCP server that exposes .NET debugging as 40 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
+debug-mcp is an MCP server that exposes .NET debugging as 37 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
 
 ## Build & Test Commands
 
@@ -153,13 +153,17 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - In-memory (SnapshotStore — ConcurrentDictionary, existing) (030-mcp-event-driven)
 - C# 13 / .NET 10.0 + ClrDebug 0.3.4, ModelContextProtocol 1.3.0, System.Threading.Channels (already in use) (031-batch-evaluate)
 - In-memory only; batch state lives in `BatchRunner` singleton for the duration of a run (031-batch-evaluate)
+- C# 13 / .NET 10.0, `ConcurrentQueue<TimelineEvent>`, `IBreakpointEventSource`, `IOutputEventSource` (032-unified-debugging-timeline)
+- In-memory ring buffer (cap 10,000 events with oldest-eviction); `TimelineStore` singleton (032-unified-debugging-timeline)
 
 ## Recent Changes
+- 032-unified-debugging-timeline: Added `timeline_query` MCP tool, `debugger://timeline` MCP resource, `ITimelineStore`/`TimelineStore` service, `IOutputEventSource` interface; added `ThreadCreated`/`ThreadExited` events to `IProcessDebugger`/`ProcessDebugger`; `ProcessIoManager` now implements `IOutputEventSource` and fires `OutputReceived(content, stream, truncated)` event; 37 tools total
 - 031-batch-evaluate: Added `batch_evaluate` MCP tool, `IBatchRunner`/`BatchRunner` service, `IBreakpointEventSource` interface, `ResolvedBreakpointHitEventArgs` event args class; `BreakpointManager` now fires `BreakpointResolved` event after each hit; 36 tools total
 - 030-mcp-event-driven: Added 2 new MCP resources (`debugger://modules`, `debugger://snapshots`), `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input`
 - 029-safe-eval-mode: Added C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax`
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan at
+specs/032-unified-debugging-timeline/plan.md
 <!-- SPECKIT END -->

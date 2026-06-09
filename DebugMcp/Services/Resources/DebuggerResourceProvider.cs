@@ -8,6 +8,7 @@ using DebugMcp.Models.Modules;
 using DebugMcp.Models.Snapshots;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.Snapshots;
+using DebugMcp.Services.Timeline;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -34,6 +35,7 @@ public sealed class DebuggerResourceProvider
     private readonly ILogger<DebuggerResourceProvider> _logger;
     private readonly IProcessDebugger? _processDebugger;
     private readonly ISnapshotStore? _snapshotStore;
+    private readonly ITimelineStore? _timelineStore;
 
     public DebuggerResourceProvider(
         IDebugSessionManager sessionManager,
@@ -42,7 +44,8 @@ public sealed class DebuggerResourceProvider
         AllowedSourcePaths allowedSourcePaths,
         ILogger<DebuggerResourceProvider> logger,
         IProcessDebugger? processDebugger = null,
-        ISnapshotStore? snapshotStore = null)
+        ISnapshotStore? snapshotStore = null,
+        ITimelineStore? timelineStore = null)
     {
         _sessionManager = sessionManager;
         _breakpointRegistry = breakpointRegistry;
@@ -51,6 +54,7 @@ public sealed class DebuggerResourceProvider
         _logger = logger;
         _processDebugger = processDebugger;
         _snapshotStore = snapshotStore;
+        _timelineStore = timelineStore;
     }
 
     /// <summary>
@@ -366,4 +370,17 @@ public sealed class DebuggerResourceProvider
     }
 
     #endregion
+
+    /// <summary>
+    /// Unified debugging timeline — all debug events in chronological order.
+    /// </summary>
+    [McpServerResource(UriTemplate = "debugger://timeline", Name = "Debugging Timeline", MimeType = "application/json")]
+    public string GetTimelineJson()
+    {
+        if (_timelineStore == null)
+            return """{"events":[],"totalEvents":0,"eventsDropped":0,"sessionId":null}""";
+
+        var response = _timelineStore.GetAll();
+        return JsonSerializer.Serialize(response, JsonOptions);
+    }
 }
