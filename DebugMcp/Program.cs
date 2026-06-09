@@ -128,6 +128,17 @@ rootCommand.SetAction(async parseResult =>
         sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DebugMcp.Services.Batch.BatchRunner>>(),
         sp.GetService<IProcessDebugger>()));
 
+    // Register timeline store (032-unified-debugging-timeline)
+    builder.Services.AddSingleton<DebugMcp.Services.Timeline.ITimelineStore>(sp =>
+        new DebugMcp.Services.Timeline.TimelineStore(
+            sp.GetService<DebugMcp.Services.Breakpoints.IBreakpointEventSource>(),
+            sp.GetService<IProcessDebugger>(),
+            sp.GetService<DebugMcp.Services.IOutputEventSource>(),
+            sp.GetRequiredService<ILogger<DebugMcp.Services.Timeline.TimelineStore>>(),
+            sp.GetService<IDebugSessionManager>()));
+    builder.Services.AddSingleton<DebugMcp.Services.IOutputEventSource>(sp =>
+        (DebugMcp.Services.IOutputEventSource)sp.GetRequiredService<ProcessIoManager>());
+
     // Register exception autopsy service (022-exception-autopsy)
     builder.Services.AddSingleton<IExceptionAutopsyService, ExceptionAutopsyService>();
 
@@ -240,6 +251,9 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();
 
     var host = builder.Build();
+
+    // Force eager instantiation so TimelineStore subscribes to events before any debug session starts
+    host.Services.GetRequiredService<DebugMcp.Services.Timeline.ITimelineStore>();
 
     var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DebugMcp");
     if (disableRoslyn)

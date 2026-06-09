@@ -109,6 +109,12 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
     public event EventHandler<ExceptionHitEventArgs>? ExceptionHit;
 
     /// <inheritdoc />
+    public event EventHandler<ThreadCreatedEventArgs>? ThreadCreated;
+
+    /// <inheritdoc />
+    public event EventHandler<ThreadExitedEventArgs>? ThreadExited;
+
+    /// <inheritdoc />
     public bool IsAttached => _process != null;
 
     /// <inheritdoc />
@@ -3087,6 +3093,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             if (ShouldAutoContinue())
                 e.Controller.Continue(false);
+            ThreadCreated?.Invoke(this, new ThreadCreatedEventArgs { ThreadId = (int)e.Thread.Id });
         };
 
         // Handle thread exit
@@ -3094,6 +3101,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         {
             if (ShouldAutoContinue())
                 e.Controller.Continue(false);
+            ThreadExited?.Invoke(this, new ThreadExitedEventArgs { ThreadId = (int)e.Thread.Id });
         };
 
         // Handle step complete

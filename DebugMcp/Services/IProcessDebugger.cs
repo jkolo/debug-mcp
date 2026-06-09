@@ -41,6 +41,16 @@ public interface IProcessDebugger
     event EventHandler<ExceptionHitEventArgs>? ExceptionHit;
 
     /// <summary>
+    /// Event raised when a new managed thread is created.
+    /// </summary>
+    event EventHandler<ThreadCreatedEventArgs>? ThreadCreated;
+
+    /// <summary>
+    /// Event raised when a managed thread exits.
+    /// </summary>
+    event EventHandler<ThreadExitedEventArgs>? ThreadExited;
+
+    /// <summary>
     /// Gets whether a debug session is active.
     /// </summary>
     bool IsAttached { get; }
@@ -547,4 +557,22 @@ public sealed class ExceptionHitEventArgs : EventArgs
     /// Used when an exception breakpoint matches a first-chance exception.
     /// </summary>
     public bool ShouldContinue { get; set; } = true;
+}
+
+/// <summary>
+/// Event args for thread created events.
+/// </summary>
+public sealed class ThreadCreatedEventArgs : EventArgs
+{
+    /// <summary>The ID of the newly created thread.</summary>
+    public required int ThreadId { get; init; }
+}
+
+/// <summary>
+/// Event args for thread exited events.
+/// </summary>
+public sealed class ThreadExitedEventArgs : EventArgs
+{
+    /// <summary>The ID of the exited thread.</summary>
+    public required int ThreadId { get; init; }
 }

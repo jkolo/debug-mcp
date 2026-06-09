@@ -61,6 +61,9 @@ public class ToolAnnotationTests
 
         // Batch Tools (1)
         ["batch_evaluate"] = new("Batch Evaluate", ReadOnly: false, Destructive: false, Idempotent: false, OpenWorld: false),
+
+        // Timeline Tools (1) — 032-unified-debugging-timeline
+        ["timeline_query"] = new("Query Timeline", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
     };
 
     /// <summary>
@@ -70,7 +73,7 @@ public class ToolAnnotationTests
     [
         "debug_launch", "breakpoint_set", "debug_continue", "debug_step",
         "variables_get", "evaluate", "stacktrace_get", "exception_get_context", "debug_disconnect",
-        "batch_evaluate",
+        "batch_evaluate", "timeline_query",
     ];
 
     /// <summary>
@@ -183,10 +186,10 @@ public class ToolAnnotationTests
     }
 
     [Fact]
-    public void ExpectedAnnotations_Covers36Tools()
+    public void ExpectedAnnotations_Covers37Tools()
     {
-        ExpectedAnnotations.Should().HaveCount(36,
-            "The spec defines 36 tools (35 from feature 030 + 1 batch_evaluate from 031)");
+        ExpectedAnnotations.Should().HaveCount(37,
+            "The spec defines 37 tools (36 from feature 031 + 1 timeline_query from 032)");
     }
 
     // ── Description content tests for 10 enhanced tools (FR-008, FR-009) ──
