@@ -7,6 +7,9 @@ namespace DebugMcp.Services.Snapshots;
 /// </summary>
 public interface ISnapshotStore
 {
+    /// <summary>Fires when the store is mutated (Add, Remove, Clear).</summary>
+    event EventHandler<SnapshotChangedEventArgs>? Changed;
+
     /// <summary>
     /// Adds a snapshot to the store.
     /// </summary>

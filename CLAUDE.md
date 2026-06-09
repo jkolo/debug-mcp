@@ -149,6 +149,9 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 ## Active Technologies
 - C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax` (029-safe-eval-mode)
 - N/A — stateless per-call analysis; `SafeEvalAllowlist` singleton constructed once at startup (029-safe-eval-mode)
+- C# 13 / .NET 10.0 + ModelContextProtocol 1.3.0, ClrDebug 0.3.4, System.Threading.Channels, xUnit + FluentAssertions + Moq (030-mcp-event-driven)
+- In-memory (SnapshotStore — ConcurrentDictionary, existing) (030-mcp-event-driven)
 
 ## Recent Changes
+- 030-mcp-event-driven: Added 2 new MCP resources (`debugger://modules`, `debugger://snapshots`), `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input`
 - 029-safe-eval-mode: Added C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax`

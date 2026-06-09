@@ -1,6 +1,7 @@
 using ClrDebug;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
+using DebugMcp.Models.Inspection;
 using Microsoft.Extensions.Logging;
 
 namespace DebugMcp.Services.Breakpoints;
@@ -17,6 +18,7 @@ public sealed class BreakpointManager : IBreakpointManager
     private readonly IBreakpointNotifier _notifier;
     private readonly LogMessageEvaluator? _logMessageEvaluator;
     private readonly ILogger<BreakpointManager> _logger;
+    private readonly IDebugSessionManager? _sessionManager;
 
     /// <summary>
     /// Event raised when a breakpoint's state changes (Pending→Bound or Bound→Pending).
@@ -30,7 +32,8 @@ public sealed class BreakpointManager : IBreakpointManager
         IConditionEvaluator conditionEvaluator,
         IBreakpointNotifier notifier,
         ILogger<BreakpointManager> logger,
-        LogMessageEvaluator? logMessageEvaluator = null)
+        LogMessageEvaluator? logMessageEvaluator = null,
+        IDebugSessionManager? sessionManager = null)
     {
         _registry = registry;
         _pdbReader = pdbReader;
@@ -39,6 +42,7 @@ public sealed class BreakpointManager : IBreakpointManager
         _notifier = notifier;
         _logMessageEvaluator = logMessageEvaluator;
         _logger = logger;
+        _sessionManager = sessionManager;
 
         // Subscribe to debugger events
         _processDebugger.BreakpointHit += OnDebuggerBreakpointHit;
@@ -712,6 +716,7 @@ public sealed class BreakpointManager : IBreakpointManager
 
     /// <summary>
     /// Creates a BreakpointNotification from hit information.
+    /// For blocking breakpoints, attempts to fetch locals from the top frame within 100ms.
     /// </summary>
     private BreakpointNotification CreateNotification(
         Breakpoint breakpoint,
@@ -719,6 +724,33 @@ public sealed class BreakpointManager : IBreakpointManager
         int hitCount,
         string? logMessage)
     {
+        IReadOnlyList<VariableSummary>? locals = null;
+        string? localsError = null;
+
+        if (_sessionManager != null && breakpoint.Type != BreakpointType.Tracepoint)
+        {
+            try
+            {
+                var localsTask = Task.Run(
+                    () => _sessionManager.GetVariables(hit.ThreadId, 0, "locals", null));
+                var completed = localsTask.Wait(100);
+                if (!completed)
+                {
+                    localsError = "timeout";
+                }
+                else
+                {
+                    locals = localsTask.Result
+                        .Select(v => new VariableSummary(v.Name, v.Type, v.Value, v.HasChildren))
+                        .ToList();
+                }
+            }
+            catch (Exception)
+            {
+                localsError = "unavailable";
+            }
+        }
+
         return new BreakpointNotification(
             BreakpointId: breakpoint.Id,
             Type: breakpoint.Type,
@@ -726,13 +758,15 @@ public sealed class BreakpointManager : IBreakpointManager
                 File: hit.Location.File,
                 Line: hit.Location.Line,
                 Column: hit.Location.Column,
-                FunctionName: null, // TODO: Could be enhanced with stack info
+                FunctionName: null,
                 ModuleName: null),
             ThreadId: hit.ThreadId,
             Timestamp: hit.Timestamp,
             HitCount: hitCount,
             LogMessage: logMessage,
-            ExceptionInfo: hit.ExceptionInfo);
+            ExceptionInfo: hit.ExceptionInfo,
+            Locals: locals,
+            LocalsError: localsError);
     }
 
     /// <summary>

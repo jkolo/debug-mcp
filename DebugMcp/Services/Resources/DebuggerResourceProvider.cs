@@ -4,7 +4,10 @@ using System.Text.Json.Serialization;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Models.Inspection;
+using DebugMcp.Models.Modules;
+using DebugMcp.Models.Snapshots;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Services.Snapshots;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -29,19 +32,25 @@ public sealed class DebuggerResourceProvider
     private readonly ThreadSnapshotCache _threadSnapshotCache;
     private readonly AllowedSourcePaths _allowedSourcePaths;
     private readonly ILogger<DebuggerResourceProvider> _logger;
+    private readonly IProcessDebugger? _processDebugger;
+    private readonly ISnapshotStore? _snapshotStore;
 
     public DebuggerResourceProvider(
         IDebugSessionManager sessionManager,
         BreakpointRegistry breakpointRegistry,
         ThreadSnapshotCache threadSnapshotCache,
         AllowedSourcePaths allowedSourcePaths,
-        ILogger<DebuggerResourceProvider> logger)
+        ILogger<DebuggerResourceProvider> logger,
+        IProcessDebugger? processDebugger = null,
+        ISnapshotStore? snapshotStore = null)
     {
         _sessionManager = sessionManager;
         _breakpointRegistry = breakpointRegistry;
         _threadSnapshotCache = threadSnapshotCache;
         _allowedSourcePaths = allowedSourcePaths;
         _logger = logger;
+        _processDebugger = processDebugger;
+        _snapshotStore = snapshotStore;
     }
 
     /// <summary>
@@ -178,6 +187,66 @@ public sealed class DebuggerResourceProvider
     }
 
     /// <summary>
+    /// Loaded modules/assemblies in the debuggee process.
+    /// </summary>
+    [McpServerResource(UriTemplate = "debugger://modules", Name = "Loaded Modules", MimeType = "application/json")]
+    public string GetModulesJson()
+    {
+        if (_sessionManager.CurrentSession == null || _processDebugger == null)
+            return """{"modules":[],"count":0}""";
+
+        try
+        {
+            var modules = _processDebugger.GetModulesAsync().GetAwaiter().GetResult();
+            var dtos = modules.Select(m => new ModuleDto
+            {
+                Name = m.Name,
+                FullName = m.FullName,
+                Path = m.Path,
+                Version = m.Version,
+                IsManaged = m.IsManaged,
+                IsDynamic = m.IsDynamic,
+                HasSymbols = m.HasSymbols,
+                ModuleId = m.ModuleId,
+                BaseAddress = m.BaseAddress,
+                Size = m.Size,
+                SymbolStatus = m.SymbolStatus
+            }).ToList();
+
+            return JsonSerializer.Serialize(new { modules = dtos, count = dtos.Count }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch modules for resource");
+            return """{"modules":[],"count":0}""";
+        }
+    }
+
+    /// <summary>
+    /// In-memory debug state snapshots.
+    /// </summary>
+    [McpServerResource(UriTemplate = "debugger://snapshots", Name = "Snapshots", MimeType = "application/json")]
+    public string GetSnapshotsJson()
+    {
+        if (_snapshotStore == null)
+            return """{"snapshots":[],"count":0}""";
+
+        var snapshots = _snapshotStore.GetAll();
+        var dtos = snapshots.Select(s => new SnapshotDto
+        {
+            Id = s.Id,
+            Label = s.Label,
+            CreatedAt = s.CreatedAt,
+            ThreadId = s.ThreadId,
+            FrameIndex = s.FrameIndex,
+            FunctionName = s.FunctionName,
+            VariableCount = s.Variables.Count
+        }).ToList();
+
+        return JsonSerializer.Serialize(new { snapshots = dtos, count = dtos.Count }, JsonOptions);
+    }
+
+    /// <summary>
     /// Gets the list of available resources (only when session is active).
     /// </summary>
     public bool HasActiveSession => _sessionManager.CurrentSession != null;
@@ -268,6 +337,32 @@ public sealed class DebuggerResourceProvider
         public required string State { get; set; }
         public bool IsCurrent { get; set; }
         public SourceLocationDto? Location { get; set; }
+    }
+
+    internal sealed class ModuleDto
+    {
+        public required string Name { get; set; }
+        public required string FullName { get; set; }
+        public string? Path { get; set; }
+        public required string Version { get; set; }
+        public bool IsManaged { get; set; }
+        public bool IsDynamic { get; set; }
+        public bool HasSymbols { get; set; }
+        public required string ModuleId { get; set; }
+        public string? BaseAddress { get; set; }
+        public int Size { get; set; }
+        public required string SymbolStatus { get; set; }
+    }
+
+    internal sealed class SnapshotDto
+    {
+        public required string Id { get; set; }
+        public required string Label { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public int ThreadId { get; set; }
+        public int FrameIndex { get; set; }
+        public required string FunctionName { get; set; }
+        public int VariableCount { get; set; }
     }
 
     #endregion

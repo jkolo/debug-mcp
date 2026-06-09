@@ -133,7 +133,15 @@ public sealed class BreakpointNotifier : IBreakpointNotifier, IDisposable
                     message = notification.ExceptionInfo.Message,
                     isFirstChance = notification.ExceptionInfo.IsFirstChance,
                     stackTrace = notification.ExceptionInfo.StackTrace
-                } : null
+                } : null,
+                locals = notification.Locals?.Select(v => new
+                {
+                    name = v.Name,
+                    type = v.Type,
+                    value = v.Value,
+                    hasChildren = v.HasChildren
+                }),
+                localsError = notification.LocalsError
             };
 
             // Fire and forget - don't await the notification send

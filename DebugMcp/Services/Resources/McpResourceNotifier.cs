@@ -1,4 +1,5 @@
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Services.Snapshots;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -9,7 +10,7 @@ namespace DebugMcp.Services.Resources;
 /// via IMcpServer. Subscribes to IProcessDebugger and BreakpointRegistry events
 /// to trigger resource update notifications.
 /// </summary>
-public sealed class McpResourceNotifier : ResourceNotifier
+public class McpResourceNotifier : ResourceNotifier
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IProcessDebugger _processDebugger;
@@ -32,6 +33,7 @@ public sealed class McpResourceNotifier : ResourceNotifier
         ThreadSnapshotCache threadSnapshotCache,
         AllowedSourcePaths allowedSourcePaths,
         PdbSymbolCache pdbSymbolCache,
+        ISnapshotStore snapshotStore,
         ILogger<McpResourceNotifier> logger,
         int debounceMs = 300) : base(debounceMs)
     {
@@ -50,6 +52,7 @@ public sealed class McpResourceNotifier : ResourceNotifier
         _processDebugger.ModuleLoaded += OnModuleLoaded;
         _processDebugger.ModuleUnloaded += OnModuleUnloaded;
         _breakpointRegistry.Changed += OnBreakpointRegistryChanged;
+        snapshotStore.Changed += (_, _) => NotifyResourceUpdated("debugger://snapshots");
     }
 
     private void OnStateChanged(object? sender, SessionStateChangedEventArgs e)
@@ -85,6 +88,8 @@ public sealed class McpResourceNotifier : ResourceNotifier
         {
             NotifyListChanged();
         }
+
+        _ = SendSessionStateNotificationAsync(e);
     }
 
     private void OnStepCompleted(object? sender, StepCompleteEventArgs e)
@@ -120,11 +125,14 @@ public sealed class McpResourceNotifier : ResourceNotifier
         {
             _logger.LogWarning(ex, "Failed to extract source paths from PDB for {Module}", e.ModulePath);
         }
+
+        NotifyResourceUpdated("debugger://modules");
     }
 
     private void OnModuleUnloaded(object? sender, ModuleUnloadedEventArgs e)
     {
         _allowedSourcePaths.RemoveModule(e.ModulePath);
+        NotifyResourceUpdated("debugger://modules");
     }
 
     private void OnBreakpointRegistryChanged(object? sender, EventArgs e)
@@ -136,6 +144,41 @@ public sealed class McpResourceNotifier : ResourceNotifier
     {
         _logger.LogDebug("Sending resource updated notification: {Uri}", uri);
         _ = SendResourceUpdatedAsync(uri);
+    }
+
+    internal const string SessionStateChangedMethod = "debugger/sessionStateChanged";
+
+    internal static SessionStateChangedPayload BuildSessionStatePayload(SessionStateChangedEventArgs e) =>
+        new()
+        {
+            OldState = e.OldState.ToString(),
+            NewState = e.NewState.ToString(),
+            PauseReason = e.PauseReason?.ToString(),
+            Location = e.Location != null
+                ? new SessionStateLocationPayload
+                {
+                    File = e.Location.File,
+                    Line = e.Location.Line,
+                    Column = e.Location.Column
+                }
+                : null,
+            ActiveThreadId = e.ThreadId,
+            Timestamp = DateTimeOffset.UtcNow
+        };
+
+    protected virtual async Task SendSessionStateNotificationAsync(SessionStateChangedEventArgs e)
+    {
+        var server = GetServer();
+        if (server == null) return;
+
+        try
+        {
+            await server.SendNotificationAsync(SessionStateChangedMethod, BuildSessionStatePayload(e));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send session state changed notification");
+        }
     }
 
     protected override void OnListChanged()
@@ -201,4 +244,21 @@ public sealed class McpResourceNotifier : ResourceNotifier
 
         return _server;
     }
+}
+
+internal sealed class SessionStateChangedPayload
+{
+    public required string OldState { get; init; }
+    public required string NewState { get; init; }
+    public string? PauseReason { get; init; }
+    public SessionStateLocationPayload? Location { get; init; }
+    public int? ActiveThreadId { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+
+internal sealed class SessionStateLocationPayload
+{
+    public required string File { get; init; }
+    public int Line { get; init; }
+    public int? Column { get; init; }
 }
