@@ -151,7 +151,14 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - N/A — stateless per-call analysis; `SafeEvalAllowlist` singleton constructed once at startup (029-safe-eval-mode)
 - C# 13 / .NET 10.0 + ModelContextProtocol 1.3.0, ClrDebug 0.3.4, System.Threading.Channels, xUnit + FluentAssertions + Moq (030-mcp-event-driven)
 - In-memory (SnapshotStore — ConcurrentDictionary, existing) (030-mcp-event-driven)
+- C# 13 / .NET 10.0 + ClrDebug 0.3.4, ModelContextProtocol 1.3.0, System.Threading.Channels (already in use) (031-batch-evaluate)
+- In-memory only; batch state lives in `BatchRunner` singleton for the duration of a run (031-batch-evaluate)
 
 ## Recent Changes
 - 030-mcp-event-driven: Added 2 new MCP resources (`debugger://modules`, `debugger://snapshots`), `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input`
 - 029-safe-eval-mode: Added C# 13 / .NET 10.0 + `Microsoft.CodeAnalysis.CSharp.Workspaces` (already referenced) — `CSharpSyntaxTree`, `CSharpSyntaxWalker`, `InvocationExpressionSyntax`
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
