@@ -58,6 +58,9 @@ public class ToolAnnotationTests
         ["snapshot_create"] = new("Create State Snapshot", ReadOnly: false, Destructive: false, Idempotent: false, OpenWorld: false),
         ["snapshot_diff"] = new("Compare Two Snapshots", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
         ["snapshot_delete"] = new("Delete Snapshot(s)", ReadOnly: false, Destructive: true, Idempotent: false, OpenWorld: false),
+
+        // Batch Tools (1)
+        ["batch_evaluate"] = new("Batch Evaluate", ReadOnly: false, Destructive: false, Idempotent: false, OpenWorld: false),
     };
 
     /// <summary>
@@ -66,7 +69,8 @@ public class ToolAnnotationTests
     private static readonly HashSet<string> EnhancedDescriptionTools =
     [
         "debug_launch", "breakpoint_set", "debug_continue", "debug_step",
-        "variables_get", "evaluate", "stacktrace_get", "exception_get_context", "debug_disconnect"
+        "variables_get", "evaluate", "stacktrace_get", "exception_get_context", "debug_disconnect",
+        "batch_evaluate",
     ];
 
     /// <summary>
@@ -152,6 +156,17 @@ public class ToolAnnotationTests
             $"Tool '{toolName}': expected OpenWorld={expected.OpenWorld}, got OpenWorld={attr.OpenWorld}");
     }
 
+    // ── batch_evaluate specific tests (T039) ────────────────────────────────
+
+    [Fact]
+    public void BatchEvaluate_Description_MentionsBatch()
+    {
+        var tool = DiscoverAllTools().FirstOrDefault(t => t.Name == "batch_evaluate");
+        tool.Should().NotBeNull("batch_evaluate tool must be registered");
+        tool!.Description?.Description.Should().Contain("batch",
+            "batch_evaluate description must mention 'batch'");
+    }
+
     // ── Coverage check (FR-011) ─────────────────────────────────────────────
 
     [Fact]
@@ -168,10 +183,10 @@ public class ToolAnnotationTests
     }
 
     [Fact]
-    public void ExpectedAnnotations_Covers35Tools()
+    public void ExpectedAnnotations_Covers36Tools()
     {
-        ExpectedAnnotations.Should().HaveCount(35,
-            "The spec defines 35 tools (41 original - 6 removed in feature 030)");
+        ExpectedAnnotations.Should().HaveCount(36,
+            "The spec defines 36 tools (35 from feature 030 + 1 batch_evaluate from 031)");
     }
 
     // ── Description content tests for 10 enhanced tools (FR-008, FR-009) ──

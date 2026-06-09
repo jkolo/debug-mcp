@@ -32,6 +32,7 @@
 | 027 | State Snapshot & Diff | v0.11.0 | Capture debug state snapshots and diff two snapshots to track state evolution |
 | 028 | Collection & Object Summarizer | v0.12.0 | `collection_analyze` and `object_summarize` tools — single-call collection/object inspection with stats, anomaly detection |
 | 029 | Safe Evaluation Mode | TBD | `evaluate_safe` tool with Roslyn AST safety gate — blocks method calls, object construction, assignments before execution; configurable allowlist of known-pure methods; essential guardrail for autonomous agents |
+| 030 | MCP Event-Driven Debugger Interface | TBD | Event-driven model replacing polling: `debugger://modules` and `debugger://snapshots` resources, `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input` |
 
 ## Proposed Features
 
@@ -39,120 +40,120 @@
 
 Features that fundamentally change how AI agents interact with the debugger — reducing round-trips, token usage, and enabling autonomous debugging loops.
 
-#### 030 - Batch Evaluate & Hypothesis Runner
+#### 031 - Batch Evaluate & Hypothesis Runner
 Run N micro-experiments in one call: set breakpoints/tracepoints, run to events, collect variables/stack/memory snapshots, output structured summary. Agents can request 5-20 experiments instead of slow sequential single-stepping. Enables parallel hypothesis testing.
 
 ### Tier 2 — Enhanced Debugging Capabilities
 
 Features that significantly expand what agents can diagnose and how efficiently.
 
-#### 031 - Unified Debugging Timeline
+#### 032 - Unified Debugging Timeline
 `debugger://timeline` resource merging breakpoint hits, exceptions (first-chance/user-unhandled), module loads, thread starts/exits, stdout/stderr events. Each event includes stable IDs and references to thread, frame, module, source location. Enables cross-modality reasoning ("right after stdout line X, exception Y happened").
 
-#### 032 - Correlation IDs
+#### 033 - Correlation IDs
 Every tool invocation accepts optional `correlation_id`, echoed in timeline/notifications. Agents can associate outcomes with actions — critical for multi-step plans and parallel agent workflows.
 
-#### 033 - Edit and Continue (Hot Patching)
+#### 034 - Edit and Continue (Hot Patching)
 Modify code while paused and resume with changes applied via `code_apply_patch(file, content)`. Leverages Roslyn EnC capabilities. Closes the autonomous loop: reproduce bug → inspect → write fix → apply → verify — without restarting the process. The "holy grail" of AI-assisted debugging.
 
-#### 034 - Symbol Health Diagnostics
+#### 035 - Symbol Health Diagnostics
 `symbols_status` tool: per-module PDB loaded? Source server available? Portable PDB? Checksum match? Where loaded from (cache, NuGet, Microsoft, local)? Actionable remediation hints. Prevents agents from wasting time when symbols are missing.
 
-#### 035 - Bulk APIs & Pagination
+#### 036 - Bulk APIs & Pagination
 Add `next_cursor` + `total_estimate` to `variables_get`, `members_get`, `references_get`, `types_get`, `modules_list/search`. Prevents token blowup on large result sets and improves latency for "scan then zoom" patterns.
 
-#### 036 - Enriched Debug State
+#### 037 - Enriched Debug State
 Enrich `debug_state` with: `stop_reason` (breakpoint/exception/step/completed/pause), exception details when relevant, "safe-to-evaluate" hints. Consistent across notifications. Gives agents clear state machine transitions.
 
-#### 037 - Thread Focus Mode
+#### 038 - Thread Focus Mode
 `debug_focus_thread(thread_id)` — all subsequent stepping/inspection commands implicitly target this thread. Reduces parameter passing and agent errors from hallucinating wrong thread IDs.
 
 ### Tier 3 — Advanced Analysis
 
 Deep analysis features for complex debugging scenarios.
 
-#### 038 - Heap Snapshot & Diff
+#### 039 - Heap Snapshot & Diff
 Capture heap object snapshots and compare two snapshots to find leaked or growing objects. Enables autonomous memory leak diagnosis: set breakpoint → snapshot → continue → snapshot → diff.
 
-#### 039 - GC Root Retention Paths
+#### 040 - GC Root Retention Paths
 `memory_find_retention_paths(object_address)` — answer "why is this object alive?" by returning the chain of GC roots holding it. Agents follow paths better than graph visualizations.
 
-#### 040 - Heap Query Objects
+#### 041 - Heap Query Objects
 `heap_query_objects(type_name, filter_expression)` — LINQ-style queries over the managed heap. Example: find all `User` objects where `IsActive && LastLogin < threshold`. Find needles in haystacks without iterating memory.
 
-#### 041 - Watch Queries (Temporal Predicates)
+#### 042 - Watch Queries (Temporal Predicates)
 Declarative, event-driven conditions: "Notify when `Order.Total` becomes negative", "Break when `cacheHits` stops increasing for 5 seconds", "Alert on first `NullReferenceException` on thread X in module Y". Beyond static watchpoints — temporal and filtered.
 
-#### 042 - Causality Capture
+#### 043 - Causality Capture
 "Why did this value change?" — show last N writes to a field/property with stack traces, threads, and timestamps. Approximate via targeted conditional tracepoints on setters/usages, agent-guided narrowing.
 
-#### 043 - Code Decompilation
+#### 044 - Code Decompilation
 `code_decompile(type_or_method)` via ICSharpCode.Decompiler — generate C# source from IL. Enables debugging third-party DLLs without source code. Fills the gap when symbol servers don't provide source.
 
-#### 044 - Anomaly Detection
+#### 045 - Anomaly Detection
 `anomaly_detect` — heuristic scan of runtime state (threads, stacks, variables) for common patterns: null reference candidates, potential deadlocks, memory pressure, thread pool starvation. Returns structured hypotheses with confidence scores. Configurable thresholds to manage false positives.
 
-#### 045 - Thread Management
+#### 046 - Thread Management
 Freeze/thaw individual threads and set the active thread for inspection. Enables race condition debugging by isolating thread execution.
 
-#### 046 - GC & Runtime Events
+#### 047 - GC & Runtime Events
 Subscribe to runtime events: GC collections, JIT compilations, exceptions thrown, thread pool events. Observe runtime behavior without breakpoints. Useful for performance diagnostics and understanding application health.
 
-#### 047 - Dump File Analysis
+#### 048 - Dump File Analysis
 Load and analyze `.dmp` crash dump files offline. Post-mortem debugging of production crashes without a live process. Link to common crash pipelines (dotnet-dump, Windows Error Reporting, container core dumps).
 
 ### Tier 4 — Integrations & Ecosystem
 
 Expanding reach beyond local debugging.
 
-#### 048 - OpenTelemetry Integration
+#### 049 - OpenTelemetry Integration
 `telemetry_get_current_activity()` — read current TraceId/SpanId/tags from `System.Diagnostics.Activity`. Correlate debugger state with distributed traces. Enables pivot from "span error in Jaeger" → "attach & break at the code".
 
-#### 049 - CI Debug Mode
+#### 050 - CI Debug Mode
 Attach to `dotnet test` process on test failure in CI. Auto-capture timeline, snapshots, symbol status. Emit debug artifact bundle as GitHub Actions artifact. Annotate PRs with failure summaries.
 
-#### 050 - Debug Artifact Export
+#### 051 - Debug Artifact Export
 Export shareable bundle: tool calls made, breakpoints/tracepoints, evaluation expressions, captured timeline events, variable snapshots, symbol resolution. Reproducible debugging sessions for team collaboration and agent replay.
 
-#### 051 - VS Code Extension
+#### 052 - VS Code Extension
 Extension that manages MCP server connection, provides "Send to agent" workflow, and surfaces debug timeline/resources in the editor. Low-friction adoption path for VS Code users.
 
-#### 052 - Remote Debugging
+#### 053 - Remote Debugging
 TCP/network transport for debugging processes on remote machines or containers. Extends the architecture beyond local stdio.
 
-#### 053 - DAP Compatibility Layer
+#### 054 - DAP Compatibility Layer
 Debug Adapter Protocol adapter exposing debug-mcp capabilities through the standard DAP interface. Enables IDE integration (VS Code, JetBrains) for human+AI hybrid workflows.
 
-#### 054 - Cloud Debugging Integration
+#### 055 - Cloud Debugging Integration
 Integrate with Azure App Insights / AWS X-Ray for hybrid local/remote sessions. Pull production telemetry into MCP resources for context-aware debugging.
 
 ### Tier 5 — Developer Experience & Quality
 
 Improvements to the project itself for maintainability and contributor productivity.
 
-#### 055 - Guardrails Policy
+#### 056 - Guardrails Policy
 Configurable safety limits: max evaluation time, max object expansion depth, max memory read size, max tool calls per minute, denylist/allowlist for `evaluate` expressions. Prevents agents from "foot-gunning" production-like processes.
 
-#### 056 - Caching Layer
+#### 057 - Caching Layer
 LRU cache for Roslyn compilations per session + file hash. Cross-session TTL cache for symbol server results. `cache_clear` / `cache_stats` tools for troubleshooting.
 
-#### 057 - Internal Metrics
+#### 058 - Internal Metrics
 `debugger://metrics` resource exposing tool latency histograms, cache hit ratios, symbol download timings. Optional Prometheus endpoint for operational monitoring.
 
-#### 058 - Mockable Test Harness
+#### 059 - Mockable Test Harness
 Fake ICorDebug runtime layer or recorded session playback for unit tests. Dramatically improves contributor velocity and reduces flaky E2E test dependency.
 
-#### 059 - Debug Scenario Scripts
+#### 060 - Debug Scenario Scripts
 YAML/JSON scripting format for reproducible debugging scenarios: launch/attach parameters, breakpoints/tracepoints, expected events, assertions. Useful for regression tests and sharing repro steps.
 
-#### 060 - Schema-First Tool Definitions
+#### 061 - Schema-First Tool Definitions
 Define tools in a schema, generate C# models, JSON schema, and TypeScript client types. Stable, typed contracts for agent framework integration.
 
-#### 061 - Standardized Response Schema
+#### 062 - Standardized Response Schema
 All tool responses include consistent metadata: timestamps, staleness flags (`is_stale`), partial result annotations, error context. Schema versioning via MCP for backwards compatibility.
 
-#### 062 - Code Coverage
+#### 063 - Code Coverage
 Track which lines/branches execute during a debug session. Useful for understanding test coverage or identifying dead code paths during debugging.
 
-#### 063 - Auto-Generate E2E Specs
+#### 064 - Auto-Generate E2E Specs
 Generate Reqnroll specifications from MCP tool definitions. Reduce test coverage gaps and keep E2E tests in sync with tool API surface.

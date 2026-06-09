@@ -1,0 +1,145 @@
+{
+  "tool": "batch_evaluate",
+  "title": "Batch Evaluate & Hypothesis Runner",
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+  },
+  "description": "Run up to 20 micro-experiments in one call. For each experiment, specify a trigger (source location or exception type), optional variables to capture, an optional condition, and whether to pause execution (blocking) or continue (non-blocking). Returns a structured summary of all results when all experiments trigger, the timeout expires, or the process exits. Pre-existing breakpoints are frozen for the duration of the batch and restored on completion.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["experiments"],
+    "properties": {
+      "experiments": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 20,
+        "description": "List of experiments to run. Each experiment defines what to observe and how.",
+        "items": {
+          "type": "object",
+          "required": ["trigger"],
+          "properties": {
+            "trigger": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["file", "line"],
+                  "properties": {
+                    "file": { "type": "string", "description": "Absolute path to source file." },
+                    "line": { "type": "integer", "minimum": 1, "description": "1-based line number." }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["exception_type"],
+                  "properties": {
+                    "exception_type": { "type": "string", "description": "Fully qualified exception type name." }
+                  }
+                }
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["blocking", "non_blocking"],
+              "default": "non_blocking",
+              "description": "blocking: pause momentarily to collect variables, then auto-resume. non_blocking: collect and continue immediately."
+            },
+            "capture": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Variable names or C# expressions to evaluate at the trigger."
+            },
+            "condition": {
+              "type": "string",
+              "description": "Optional C# expression; experiment only fires when this evaluates to true."
+            },
+            "max_hits": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Stop collecting after this many hits for this experiment."
+            }
+          }
+        }
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 30,
+        "description": "Batch ends and returns partial results after this many seconds."
+      },
+      "eval_mode": {
+        "type": "string",
+        "enum": ["safe", "full"],
+        "default": "safe",
+        "description": "safe: Roslyn AST safety gate validates capture expressions before evaluation (blocks method calls, new, assignments). full: arbitrary expressions permitted."
+      },
+      "max_total_hits": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 500,
+        "description": "Soft cap on combined hit count across all experiments. Batch ends with reason hit_limit_reached when exceeded."
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "success": { "type": "boolean" },
+      "completion_reason": {
+        "type": "string",
+        "enum": ["all_triggered", "timeout", "process_exited", "cancelled", "hit_limit_reached"]
+      },
+      "total_experiments": { "type": "integer" },
+      "triggered": { "type": "integer" },
+      "not_triggered": { "type": "integer" },
+      "errors": { "type": "integer" },
+      "experiments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "index": { "type": "integer" },
+            "status": { "type": "string", "enum": ["triggered", "not_triggered", "error"] },
+            "hit_count": { "type": "integer" },
+            "error_message": { "type": "string" },
+            "hits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "timestamp": { "type": "string", "format": "date-time" },
+                  "thread_id": { "type": "integer" },
+                  "location": {
+                    "type": "object",
+                    "properties": {
+                      "file": { "type": "string" },
+                      "line": { "type": "integer" }
+                    }
+                  },
+                  "values": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" },
+                    "description": "Captured variable name → string value."
+                  },
+                  "eval_errors": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" },
+                    "description": "Variable name → error message for failed evaluations."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "errorResponses": {
+    "no_active_session": { "code": "no_active_session", "message": "No active debug session." },
+    "batch_already_running": { "code": "batch_already_running", "message": "A batch is already running. Cancel it or wait for completion." },
+    "validation_error": { "code": "validation_error", "message": "Invalid batch parameters (e.g., > 20 experiments, invalid trigger location)." }
+  }
+}

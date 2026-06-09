@@ -116,6 +116,17 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<IBreakpointNotifier, BreakpointNotifier>();
     builder.Services.AddSingleton<LogMessageEvaluator>();
     builder.Services.AddSingleton<IBreakpointManager, BreakpointManager>();
+    builder.Services.AddSingleton<DebugMcp.Services.Breakpoints.IBreakpointEventSource>(sp =>
+        (DebugMcp.Services.Breakpoints.IBreakpointEventSource)sp.GetRequiredService<IBreakpointManager>());
+
+    // Register batch evaluate service (031-batch-evaluate)
+    builder.Services.AddSingleton<DebugMcp.Services.Batch.IBatchRunner>(sp => new DebugMcp.Services.Batch.BatchRunner(
+        sp.GetRequiredService<DebugMcp.Services.Breakpoints.IBreakpointEventSource>(),
+        sp.GetRequiredService<IBreakpointManager>(),
+        sp.GetRequiredService<IDebugSessionManager>(),
+        sp.GetService<DebugMcp.Services.SafeEval.ISafeExpressionAnalyzer>(),
+        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DebugMcp.Services.Batch.BatchRunner>>(),
+        sp.GetService<IProcessDebugger>()));
 
     // Register exception autopsy service (022-exception-autopsy)
     builder.Services.AddSingleton<IExceptionAutopsyService, ExceptionAutopsyService>();
