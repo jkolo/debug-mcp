@@ -772,8 +772,13 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
         {
             try
             {
-                var localsTask = Task.Run(
-                    () => _sessionManager.GetVariables(hit.ThreadId, 0, "locals", null));
+                // LongRunning = dedicated thread; prevents Task.Wait() from inlining the
+                // work on the caller thread (which would ignore the timeout).
+                var localsTask = Task.Factory.StartNew(
+                    () => _sessionManager.GetVariables(hit.ThreadId, 0, "locals", null),
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
                 var completed = localsTask.Wait(_localsTimeoutMs);
                 if (!completed)
                 {
