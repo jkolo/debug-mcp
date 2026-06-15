@@ -19,7 +19,7 @@ public sealed record InspectionFinding
 
     /// <summary>Native ReSharper severity (verbatim, lower-cased in JSON).</summary>
     [JsonPropertyName("severity")]
-    [JsonConverter(typeof(JsonStringEnumConverter<ReSharperSeverity>))]
+    [JsonConverter(typeof(ReSharperSeverityJsonConverter))]
     public required ReSharperSeverity Severity { get; init; }
 
     /// <summary>Inspection category/group, if provided by the engine.</summary>
