@@ -189,6 +189,7 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
         BreakpointLocation? resolvedLocation = location;
         string? boundModulePath = null;
         object? nativeBreakpoint = null;
+        var fileFoundInModule = false;
 
         if (_processDebugger.IsAttached)
         {
@@ -214,6 +215,7 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
                         if (!containsFile)
                             continue;
 
+                        fileFoundInModule = true;
                         _logger.LogDebug("Found source file {File} in module {Module}",
                             file, moduleInfo.ModulePath);
 
@@ -252,7 +254,20 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
 
                 if (state == BreakpointState.Pending)
                 {
-                    message = message ?? "Module not loaded; breakpoint will bind when module loads";
+                    if (fileFoundInModule)
+                    {
+                        // The source file IS in a loaded module but the line didn't bind — the
+                        // line is invalid (no executable code). Surface it as an error with a
+                        // nearest-valid-line hint instead of a silent pending breakpoint (BUG-005).
+                        // The "not found" wording routes the tool to its INVALID_LINE handler;
+                        // the finally block resumes the process.
+                        throw new InvalidOperationException(
+                            $"Line {line} not found in '{file}': the file is loaded but has no executable code at that line");
+                    }
+
+                    // File is not part of any currently-loaded module — keep it pending, but say so
+                    // accurately rather than the misleading "Module not loaded" (BUG-006).
+                    message ??= "Source file is not part of any currently-loaded module; breakpoint will bind if a matching module loads";
                     _logger.LogDebug("Breakpoint {Id} pending: {Message}", id, message);
                 }
             }

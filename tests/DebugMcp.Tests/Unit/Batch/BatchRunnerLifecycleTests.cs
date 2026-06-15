@@ -96,10 +96,10 @@ public class BatchRunnerLifecycleTests
             Times.Once);
     }
 
-    // ─── T015: blocking experiment sets ShouldContinue ───
+    // ─── T015: blocking experiment defers capture out of the callback ───
 
     [Fact]
-    public async Task RunAsync_BlockingExperiment_SetsEventArgsShouldContinueTrueAfterCapture()
+    public async Task RunAsync_BlockingExperiment_DefersCaptureAndLeavesProcessPausedInCallback()
     {
         // Arrange
         _bpManagerMock
@@ -117,7 +117,7 @@ public class BatchRunnerLifecycleTests
         var runTask = _sut.RunAsync(request, CancellationToken.None);
         await Task.Yield();
 
-        // Act — raise the event and inspect ShouldContinue after handler runs
+        // Act — raise the event and inspect ShouldContinue after the handler runs
         var hitArgs = new ResolvedBreakpointHitEventArgs
         {
             BreakpointId = "bp-001",
@@ -128,11 +128,14 @@ public class BatchRunnerLifecycleTests
             ShouldContinue = false,
         };
         _eventSource.RaiseBreakpointResolved(hitArgs);
-        await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-        // Assert — blocking experiment overrides ShouldContinue so process auto-resumes
-        hitArgs.ShouldContinue.Should().BeTrue(
-            "blocking batch experiments must auto-resume the process after variable capture");
+        // Assert — capture is deferred: the callback must NOT resume the process (it stays paused
+        // so the deferred task can func-eval); the hit is still recorded for the experiment.
+        hitArgs.ShouldContinue.Should().BeFalse(
+            "blocking batch experiments defer their capture and leave the process paused in the callback");
+        result.ExperimentResults[0].Status.Should().Be(ExperimentStatus.Triggered);
+        result.ExperimentResults[0].HitCount.Should().Be(1);
     }
 
     // ─── T030: timeout returns partial results ───

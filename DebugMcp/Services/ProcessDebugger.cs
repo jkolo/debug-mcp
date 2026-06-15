@@ -1266,7 +1266,10 @@ public sealed partial class ProcessDebugger : IProcessDebugger, IDisposable
 
                 if (_activeThreadId == null)
                 {
-                    throw new InvalidOperationException("Cannot step: no active thread");
+                    // Typically the entry-point pause (stopAtEntry) before any managed thread is
+                    // running. Stepping needs a thread + managed frame (BUG-002).
+                    throw new InvalidOperationException(
+                        "Cannot step: no active managed thread yet (e.g. at the entry point before user code runs). Set a breakpoint in your code and debug_continue to it first, then step.");
                 }
 
                 _logger.LogDebug("Stepping {Mode}...", mode);
