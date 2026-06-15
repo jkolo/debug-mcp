@@ -151,8 +151,8 @@ public class SnapshotsResourceTests
             SnapshotId = "snap-new"
         });
 
-        // Wait for debounce (1ms) to fire
-        await Task.Delay(100);
+        // Wait for notification (deterministic — no blind Task.Delay)
+        await spy.NextNotificationAsync.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Assert
         spy.NotifiedUris.Should().Contain("debugger://snapshots",
@@ -174,7 +174,10 @@ public class SnapshotsResourceTests
 file sealed class SpyNotifierForSnapshots : McpResourceNotifier
 {
     private readonly List<string> _notifiedUris = [];
+    private readonly TaskCompletionSource<string> _nextNotification = new();
+
     public IReadOnlyList<string> NotifiedUris => _notifiedUris;
+    public Task<string> NextNotificationAsync => _nextNotification.Task;
 
     public SpyNotifierForSnapshots(
         IServiceProvider serviceProvider,
@@ -195,6 +198,7 @@ file sealed class SpyNotifierForSnapshots : McpResourceNotifier
     protected override void OnResourceUpdated(string uri)
     {
         _notifiedUris.Add(uri);
+        _nextNotification.TrySetResult(uri);
     }
 
     protected override void OnListChanged() { }
