@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
         'tools/memory',
         'tools/modules',
         'tools/code-analysis',
+        'tools/resharper',
         'tools/process-io',
       ],
     },

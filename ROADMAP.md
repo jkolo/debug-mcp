@@ -33,6 +33,9 @@
 | 028 | Collection & Object Summarizer | v0.12.0 | `collection_analyze` and `object_summarize` tools — single-call collection/object inspection with stats, anomaly detection |
 | 029 | Safe Evaluation Mode | TBD | `evaluate_safe` tool with Roslyn AST safety gate — blocks method calls, object construction, assignments before execution; configurable allowlist of known-pure methods; essential guardrail for autonomous agents |
 | 030 | MCP Event-Driven Debugger Interface | TBD | Event-driven model replacing polling: `debugger://modules` and `debugger://snapshots` resources, `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input` |
+| 031 | Batch Evaluate | TBD | `batch_evaluate` tool — set transient breakpoints, run, and collect expression values across hits in a single call (36 tools total) |
+| 032 | Unified Debugging Timeline | TBD | `timeline_query` tool + `debugger://timeline` resource — chronological view of breakpoint hits, exceptions, module/thread events, and stdout/stderr (37 tools total) |
+| 034 | ReSharper Inspections | TBD | `resharper_inspect_solution` + `resharper_inspect_project` tools — runs JetBrains ReSharper's inspections (hundreds beyond Roslyn) via the auto-installed `jb inspectcode` engine; opt-out via `--no-resharper`, native severities, lazy self-installing version-pinned engine cache (39 tools total) |
 
 ## Proposed Features
 
