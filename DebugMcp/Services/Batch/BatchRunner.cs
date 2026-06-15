@@ -79,10 +79,12 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
         var totalHits = 0;
         var allTriggeredCount = 0; // how many experiments have reached MaxHits
 
-        // Blocking experiments defer their capture out of the ICorDebug callback: a property
-        // getter / method call needs a func-eval, which can only run while the process is in a
-        // stable pause (not mid-callback). The callback enqueues the hit and leaves the process
-        // paused; the processing task below captures the values and then resumes (BUG-016).
+        // Blocking experiments defer their capture out of the ICorDebug callback. Property
+        // getters / method calls run a func-eval that can be slow on first use; doing that
+        // inline would block the ICorDebug callback thread on a short timeout (the original
+        // cause of BUG-016's "timeout" capture failures). Instead the callback enqueues the hit
+        // and leaves the process paused, and the processing task below captures the values with
+        // a longer timeout off the callback thread, then resumes.
         var blockingChannel = Channel.CreateUnbounded<(List<int> Indices, int ThreadId, BreakpointLocation Location, DateTimeOffset Timestamp)>();
 
         // Step 1: freeze pre-existing breakpoints
@@ -232,9 +234,10 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
                     continue;
                 }
 
-                // Non-blocking (tracepoint): the process does not pause, so we must capture
-                // synchronously here. Func-eval (property getters) can't run mid-callback and will
-                // surface as a per-expression error — that is an inherent tracepoint limitation.
+                // Non-blocking (tracepoint): the process does not pause, so capture synchronously
+                // here on the callback thread with a short timeout. Func-eval (property getters)
+                // generally works, but a slow first eval can exceed the timeout and surface as a
+                // per-expression "timeout" error.
                 if (!string.IsNullOrWhiteSpace(exp.Condition))
                 {
                     try
@@ -266,7 +269,7 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
                         {
                             var evalTask = Task.Run(() =>
                                 _sessionManager.EvaluateAsync(expr, e.ThreadId, 0, timeoutMs: 500));
-                            if (!evalTask.Wait(600)) evalErrors[expr] = "capture_requires_pause";
+                            if (!evalTask.Wait(600)) evalErrors[expr] = "timeout";
                             else if (evalTask.Result.Success) values[expr] = evalTask.Result.Value ?? "null";
                             else evalErrors[expr] = evalTask.Result.Error?.Code ?? "error";
                         }
