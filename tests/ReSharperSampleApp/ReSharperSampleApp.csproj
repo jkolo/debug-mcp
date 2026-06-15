@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- This project intentionally contains a ReSharper-only inspection issue
+         (a redundant cast) that the C# compiler does NOT flag. It is the fixture
+         target for feature 034 (ReSharper Inspections). Keep it compiler-clean. -->
+  </PropertyGroup>
+
+</Project>

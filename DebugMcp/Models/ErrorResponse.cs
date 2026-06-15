@@ -180,4 +180,18 @@ public static class ErrorCodes
 
     /// <summary>Snapshot ID does not exist.</summary>
     public const string SnapshotNotFound = "SNAPSHOT_NOT_FOUND";
+
+    // ReSharper inspection error codes (034-resharper-inspect)
+
+    /// <summary>The .NET SDK (dotnet CLI) is unavailable to acquire/run the ReSharper engine.</summary>
+    public const string PrerequisiteMissing = "PREREQUISITE_MISSING";
+
+    /// <summary>Downloading/installing the ReSharper engine failed (offline, install error, unwritable cache).</summary>
+    public const string EngineAcquisitionFailed = "ENGINE_ACQUISITION_FAILED";
+
+    /// <summary>The ReSharper engine ran but failed, crashed, or produced unparseable output.</summary>
+    public const string InspectionFailed = "INSPECTION_FAILED";
+
+    /// <summary>The engine's pre-analysis build of the target failed.</summary>
+    public const string BuildFailed = "BUILD_FAILED";
 }
