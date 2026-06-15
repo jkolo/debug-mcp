@@ -6,6 +6,7 @@ using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
 using DebugMcp.Services.Completions;
 using DebugMcp.Services.Inspection;
+using DebugMcp.Services.ReSharper;
 using DebugMcp.Services.Resources;
 using DebugMcp.Prompts;
 using DebugMcp.Services.Snapshots;
@@ -29,6 +30,24 @@ var noRoslynOption = new Option<bool>("--no-roslyn", "-r")
     Description = "Disable Roslyn code analysis tools (use when JetBrains MCP provides equivalent functionality)"
 };
 rootCommand.Options.Add(noRoslynOption);
+
+var noResharperOption = new Option<bool>("--no-resharper", "-R")
+{
+    Description = "Disable ReSharper inspection tools (skips the lazy engine download)"
+};
+rootCommand.Options.Add(noResharperOption);
+
+var resharperCacheOption = new Option<string?>("--resharper-cache")
+{
+    Description = "Directory for the cached ReSharper engine (default: ~/.debug-mcp/resharper)"
+};
+rootCommand.Options.Add(resharperCacheOption);
+
+var resharperVersionOption = new Option<string?>("--resharper-version")
+{
+    Description = "Pinned ReSharper command-line engine version to acquire"
+};
+rootCommand.Options.Add(resharperVersionOption);
 
 var noSymbolsOption = new Option<bool>("--no-symbols")
 {
@@ -70,6 +89,9 @@ rootCommand.SetAction(async parseResult =>
 {
     var enableStderr = parseResult.GetValue(stderrOption);
     var disableRoslyn = parseResult.GetValue(noRoslynOption);
+    var disableResharper = parseResult.GetValue(noResharperOption);
+    var resharperCache = parseResult.GetValue(resharperCacheOption);
+    var resharperVersion = parseResult.GetValue(resharperVersionOption);
     var noSymbols = parseResult.GetValue(noSymbolsOption);
     var symbolServers = parseResult.GetValue(symbolServersOption);
     var symbolCache = parseResult.GetValue(symbolCacheOption);
@@ -188,10 +210,22 @@ rootCommand.SetAction(async parseResult =>
         builder.Services.AddSingleton<ICodeAnalysisService, CodeAnalysisService>();
     }
 
+    // Register ReSharper inspection services (034-resharper-inspect)
+    var resharperOptions = ReSharperOptions.Create(disableResharper, resharperCache, resharperVersion);
+    builder.Services.AddSingleton(resharperOptions);
+    if (resharperOptions.Enabled)
+    {
+        builder.Services.AddSingleton<IInspectionReportParser, InspectionReportParser>();
+        builder.Services.AddSingleton<IReSharperRunner, ReSharperCliRunner>();
+        builder.Services.AddSingleton<IReSharperEngineProvider, ReSharperEngineProvider>();
+        builder.Services.AddSingleton<IReSharperInspectionService, ReSharperInspectionService>();
+    }
+
     // Configure MCP server with stdio transport, logging, and resources capabilities
     var toolTypes = typeof(Program).Assembly.GetTypes()
         .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() != null)
-        .Where(t => !disableRoslyn || !t.Name.StartsWith("Code", StringComparison.Ordinal));
+        .Where(t => !disableRoslyn || !t.Name.StartsWith("Code", StringComparison.Ordinal))
+        .Where(t => resharperOptions.Enabled || !t.Name.StartsWith("ReSharper", StringComparison.Ordinal));
 
     builder.Services
         .AddMcpServer(options =>
@@ -263,6 +297,16 @@ rootCommand.SetAction(async parseResult =>
     else
     {
         logger.LogInformation("Roslyn code analysis tools enabled");
+    }
+
+    if (!resharperOptions.Enabled)
+    {
+        logger.LogInformation("ReSharper inspection tools disabled (--no-resharper)");
+    }
+    else
+    {
+        logger.LogInformation("ReSharper inspection tools enabled (engine version {Version}, cache {Cache})",
+            resharperOptions.Version, resharperOptions.CacheDirectory);
     }
 
     if (!symbolOptions.Enabled)
