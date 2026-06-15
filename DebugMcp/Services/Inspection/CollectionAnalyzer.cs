@@ -106,6 +106,20 @@ public sealed class CollectionAnalyzer : ICollectionAnalyzer
             await EnumerateElementsAsync(expression, kind.Value, count, enumLimit, maxPreviewItems,
                 elementType, threadId, frameIndex, timeoutMs, cancellationToken);
 
+        // When the declared collection type doesn't carry a usable generic argument the static
+        // ExtractElementType falls back to System.Object; infer the real element type from the
+        // observed elements instead (BUG-012).
+        if (elementType is "System.Object" or "unknown" or "")
+        {
+            var observed = firstElements.Concat(lastElements)
+                .Select(e => e.Type)
+                .Where(t => !string.IsNullOrEmpty(t) && t != "null")
+                .Distinct()
+                .ToList();
+            if (observed.Count == 1)
+                elementType = observed[0];
+        }
+
         return new CollectionSummary(
             Count: count,
             ElementType: elementType,
@@ -184,12 +198,21 @@ public sealed class CollectionAnalyzer : ICollectionAnalyzer
         var closeBracket = collectionType.LastIndexOf(']');
         if (openBracket >= 0 && closeBracket > openBracket)
         {
-            var inner = collectionType[(openBracket + 1)..closeBracket];
+            // Strip the outer brackets and any inner [[...]] assembly-qualification wrappers.
+            var inner = collectionType[(openBracket + 1)..closeBracket].Trim().Trim('[', ']').Trim();
+
             // For Dictionary<K,V>, return the full KeyValuePair type
             if (kind == CollectionKind.Dictionary && inner.Contains(','))
             {
                 return $"System.Collections.Generic.KeyValuePair`2[{inner}]";
             }
+
+            // For single-arg generics the inner may be assembly-qualified
+            // ("System.String, System.Private.CoreLib, ...") — keep just the type name.
+            var commaIdx = inner.IndexOf(',');
+            if (commaIdx > 0)
+                inner = inner[..commaIdx].Trim();
+
             return inner;
         }
 

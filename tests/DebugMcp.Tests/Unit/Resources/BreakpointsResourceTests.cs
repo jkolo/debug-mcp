@@ -66,12 +66,12 @@ public class BreakpointsResourceTests
         root.GetProperty("breakpoints").GetArrayLength().Should().Be(1);
         var bp = root.GetProperty("breakpoints")[0];
         bp.GetProperty("id").GetString().Should().Be("bp-abc123");
-        bp.GetProperty("type").GetString().Should().Be("Breakpoint");
-        bp.GetProperty("file").GetString().Should().Be("/src/Program.cs");
-        bp.GetProperty("line").GetInt32().Should().Be(42);
+        bp.GetProperty("type").GetString().Should().Be("breakpoint");
+        bp.GetProperty("location").GetProperty("file").GetString().Should().Be("/src/Program.cs");
+        bp.GetProperty("location").GetProperty("line").GetInt32().Should().Be(42);
         bp.GetProperty("enabled").GetBoolean().Should().BeTrue();
         bp.GetProperty("verified").GetBoolean().Should().BeTrue();
-        bp.GetProperty("state").GetString().Should().Be("Bound");
+        bp.GetProperty("state").GetString().Should().Be("bound");
         bp.GetProperty("hitCount").GetInt32().Should().Be(3);
         bp.GetProperty("condition").GetString().Should().Be("x > 5");
     }
@@ -93,7 +93,7 @@ public class BreakpointsResourceTests
         var doc = JsonDocument.Parse(json);
         var bp = doc.RootElement.GetProperty("breakpoints")[0];
 
-        bp.GetProperty("type").GetString().Should().Be("Tracepoint");
+        bp.GetProperty("type").GetString().Should().Be("tracepoint");
         bp.GetProperty("logMessage").GetString().Should().Be("Counter is {i}");
     }
 

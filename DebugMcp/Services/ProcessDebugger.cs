@@ -1866,7 +1866,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                             location = new SourceLocation(
                                 File: sourceLocationResult.FilePath,
                                 Line: sourceLocationResult.Line,
-                                FunctionName: sourceLocationResult.FunctionName,
+                                // Mirror the already-resolved, type-qualified frame method name
+                                // instead of the PDB's bare/raw value, which degrades to a metadata
+                                // token (e.g. "0x0600001D") when the metadata lookup fails (BUG-003).
+                                FunctionName: methodName,
                                 ModuleName: modulePath
                             );
                             isExternal = false;
@@ -3284,7 +3287,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         return callback;
     }
 
-    private static SourceLocation? GetCurrentLocation(CorDebugThread thread)
+    private SourceLocation? GetCurrentLocation(CorDebugThread thread)
     {
         var info = GetCurrentLocationInfo(thread);
         return info?.Location;
@@ -3292,8 +3295,12 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
     /// <summary>
     /// Gets detailed location information including IL offset for PDB mapping.
+    /// The returned <see cref="LocationInfo.Location"/> is fully resolved against the PDB
+    /// (file/line) and metadata (type-qualified method name) so callbacks that store the
+    /// session location (step/continue/pause/exception) no longer surface an unresolved
+    /// "Unknown"/line 0/raw-token placeholder (BUG-001).
     /// </summary>
-    private static LocationInfo? GetCurrentLocationInfo(CorDebugThread thread)
+    private LocationInfo? GetCurrentLocationInfo(CorDebugThread thread)
     {
         try
         {
@@ -3303,6 +3310,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var function = frame.Function;
             var module = function.Module;
             var methodToken = (int)function.Token;
+            var modulePath = module.Name;
+            var methodName = GetMethodName(function);
 
             // Try to get IL offset from the frame
             int? ilOffset = null;
@@ -3321,19 +3330,41 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 // IL offset not available
             }
 
-            // Create basic location - PDB reading will enhance this later
+            // Resolve file/line from the PDB using the same path as GetStackFrames so the
+            // step-complete/pause location matches what stacktrace_get reports.
+            string file = "Unknown";
+            int line = 0;
+            if (ilOffset.HasValue && !string.IsNullOrEmpty(modulePath))
+            {
+                try
+                {
+                    var sourceLocationResult = _pdbSymbolReader
+                        .FindSourceLocationAsync(modulePath, methodToken, ilOffset.Value)
+                        .ConfigureAwait(false).GetAwaiter().GetResult();
+                    if (sourceLocationResult != null)
+                    {
+                        file = sourceLocationResult.FilePath;
+                        line = sourceLocationResult.Line;
+                    }
+                }
+                catch
+                {
+                    // PDB resolution unavailable — fall back to Unknown/0
+                }
+            }
+
             var location = new SourceLocation(
-                File: "Unknown",
-                Line: 0,
-                FunctionName: $"0x{methodToken:X8}",
-                ModuleName: module.Name
+                File: file,
+                Line: line,
+                FunctionName: methodName,
+                ModuleName: modulePath
             );
 
             return new LocationInfo(
                 Location: location,
                 MethodToken: methodToken,
                 ILOffset: ilOffset,
-                ModulePath: module.Name
+                ModulePath: modulePath
             );
         }
         catch
@@ -4098,12 +4129,16 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 }
             }
 
-            // Check locals - use index-based matching since we don't have local names
+            // Check locals — match by PDB name first (e.g. "result"), falling back to the
+            // synthetic "local_N" slot pattern when symbols are unavailable (BUG-011). The
+            // PDB names are the same ones surfaced by variables_get, so an expression root
+            // that variables_get lists is now resolvable here too.
             var localValues = ilFrame.EnumerateLocalVariables().ToList();
+            var localNames = ResolveLocalVariableNames(ilFrame);
             for (int i = 0; i < localValues.Count; i++)
             {
-                // Match local_N pattern
-                if (name == $"local_{i}")
+                var pdbName = localNames.TryGetValue(i, out var resolved) ? resolved : null;
+                if (name == pdbName || name == $"local_{i}")
                 {
                     try
                     {
@@ -4525,8 +4560,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 };
             }
 
-            // Check for circular references
-            var address = refValue.Value;
+            // Check for circular references.
+            // refValue.Value is a CORDB_ADDRESS struct whose ToString() already emits a
+            // "0x"-prefixed hex string; forcing ulong here makes the ":X16" format apply
+            // correctly (otherwise we'd get a double "0x0x..." prefix — BUG-013).
+            ulong address = refValue.Value;
             if (!visitedAddresses.Add(address))
             {
                 var circularType = GetTypeName(value);
@@ -4962,7 +5000,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     });
                 }
 
-                targetAddress = $"0x{refValue.Value:X16}";
+                targetAddress = $"0x{(ulong)refValue.Value:X16}";
                 var derefValue = refValue.Dereference();
                 if (derefValue != null)
                 {
@@ -5016,7 +5054,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         {
                             SourceAddress = sourceAddress,
                             SourceType = sourceType,
-                            TargetAddress = $"0x{elemRef.Value:X16}",
+                            TargetAddress = $"0x{(ulong)elemRef.Value:X16}",
                             TargetType = elemType,
                             Path = $"[{i}]",
                             ReferenceType = Models.Memory.ReferenceType.ArrayElement
@@ -5065,7 +5103,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                                 {
                                     SourceAddress = sourceAddress,
                                     SourceType = sourceType,
-                                    TargetAddress = $"0x{fieldRef.Value:X16}",
+                                    TargetAddress = $"0x{(ulong)fieldRef.Value:X16}",
                                     TargetType = fieldType,
                                     Path = fieldProps.szField ?? $"field_{fieldToken}",
                                     ReferenceType = Models.Memory.ReferenceType.Field
@@ -5250,7 +5288,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         if ((fieldAttrs & CorFieldAttr.fdStatic) != 0) continue;
 
                         // Get field type info
-                        var fieldTypeName = GetFieldTypeName(metaImport, fieldProps.ppvSigBlob);
+                        var fieldTypeName = GetFieldTypeName(metaImport, fieldProps.ppvSigBlob, fieldProps.pcbSigBlob);
                         var fieldSize = GetFieldSize(fieldTypeName);
                         var alignment = GetFieldAlignment(fieldTypeName);
                         bool isReference = IsReferenceType(fieldTypeName);
@@ -5312,10 +5350,174 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         };
     }
 
-    private string GetFieldTypeName(ClrDebug.MetaDataImport metaImport, IntPtr sigBlob)
+    private string GetFieldTypeName(ClrDebug.MetaDataImport metaImport, IntPtr sigBlob, int sigLength)
     {
-        // Simplified field type name extraction
-        // In a full implementation, you'd parse the signature blob
+        // Parse the field signature blob (ECMA-335 II.23.2.4) to recover the CLR type name
+        // instead of the old "Unknown" placeholder (BUG-015).
+        try
+        {
+            if (sigBlob == IntPtr.Zero || sigLength <= 0)
+                return "Unknown";
+
+            var sig = new byte[sigLength];
+            System.Runtime.InteropServices.Marshal.Copy(sigBlob, sig, 0, sigLength);
+
+            int pos = 0;
+            // FIELD signature starts with the calling convention byte 0x06 (IMAGE_CEE_CS_CALLCONV_FIELD).
+            if (pos < sig.Length && sig[pos] == 0x06)
+                pos++;
+
+            return ParseTypeSignature(metaImport, sig, ref pos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error parsing field signature blob");
+            return "Unknown";
+        }
+    }
+
+    /// <summary>
+    /// Parses a single type from a metadata signature blob, resolving TypeDef/TypeRef tokens
+    /// to their CLR names. Covers the element types that appear in ordinary field signatures.
+    /// </summary>
+    private string ParseTypeSignature(ClrDebug.MetaDataImport metaImport, byte[] sig, ref int pos)
+    {
+        if (pos >= sig.Length)
+            return "Unknown";
+
+        // Skip custom modifiers / pinned markers that may precede the type.
+        while (pos < sig.Length)
+        {
+            var mod = (ClrDebug.CorElementType)sig[pos];
+            if (mod == ClrDebug.CorElementType.CModReqd || mod == ClrDebug.CorElementType.CModOpt)
+            {
+                pos++;
+                DecompressUnsigned(sig, ref pos); // consume the modifier's coded token
+            }
+            else if (mod == ClrDebug.CorElementType.Pinned || mod == ClrDebug.CorElementType.Sentinel)
+            {
+                pos++;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (pos >= sig.Length)
+            return "Unknown";
+
+        var et = (ClrDebug.CorElementType)sig[pos++];
+        switch (et)
+        {
+            case ClrDebug.CorElementType.Void: return "System.Void";
+            case ClrDebug.CorElementType.Boolean: return "System.Boolean";
+            case ClrDebug.CorElementType.Char: return "System.Char";
+            case ClrDebug.CorElementType.I1: return "System.SByte";
+            case ClrDebug.CorElementType.U1: return "System.Byte";
+            case ClrDebug.CorElementType.I2: return "System.Int16";
+            case ClrDebug.CorElementType.U2: return "System.UInt16";
+            case ClrDebug.CorElementType.I4: return "System.Int32";
+            case ClrDebug.CorElementType.U4: return "System.UInt32";
+            case ClrDebug.CorElementType.I8: return "System.Int64";
+            case ClrDebug.CorElementType.U8: return "System.UInt64";
+            case ClrDebug.CorElementType.R4: return "System.Single";
+            case ClrDebug.CorElementType.R8: return "System.Double";
+            case ClrDebug.CorElementType.String: return "System.String";
+            case ClrDebug.CorElementType.I: return "System.IntPtr";
+            case ClrDebug.CorElementType.U: return "System.UIntPtr";
+            case ClrDebug.CorElementType.Object: return "System.Object";
+            case ClrDebug.CorElementType.TypedByRef: return "System.TypedReference";
+            case ClrDebug.CorElementType.Ptr:
+                return ParseTypeSignature(metaImport, sig, ref pos) + "*";
+            case ClrDebug.CorElementType.ByRef:
+                return "ref " + ParseTypeSignature(metaImport, sig, ref pos);
+            case ClrDebug.CorElementType.SZArray:
+                return ParseTypeSignature(metaImport, sig, ref pos) + "[]";
+            case ClrDebug.CorElementType.Var:
+                return "T" + DecompressUnsigned(sig, ref pos);
+            case ClrDebug.CorElementType.MVar:
+                return "M" + DecompressUnsigned(sig, ref pos);
+            case ClrDebug.CorElementType.ValueType:
+            case ClrDebug.CorElementType.Class:
+            {
+                var token = DecodeTypeDefOrRefToken(sig, ref pos);
+                return ResolveTypeTokenName(metaImport, token);
+            }
+            case ClrDebug.CorElementType.GenericInst:
+            {
+                var genericType = ParseTypeSignature(metaImport, sig, ref pos); // ValueType|Class + token
+                var argCount = DecompressUnsigned(sig, ref pos);
+                var args = new List<string>();
+                for (int a = 0; a < argCount && pos < sig.Length; a++)
+                    args.Add(ParseTypeSignature(metaImport, sig, ref pos));
+                return $"{genericType}<{string.Join(", ", args)}>";
+            }
+            case ClrDebug.CorElementType.Array:
+            {
+                var elementType = ParseTypeSignature(metaImport, sig, ref pos);
+                var rank = (int)DecompressUnsigned(sig, ref pos);
+                // Consume sizes and lower bounds so callers stay aligned (values unused here).
+                var numSizes = (int)DecompressUnsigned(sig, ref pos);
+                for (int s = 0; s < numSizes; s++) DecompressUnsigned(sig, ref pos);
+                var numLoBounds = (int)DecompressUnsigned(sig, ref pos);
+                for (int l = 0; l < numLoBounds; l++) DecompressUnsigned(sig, ref pos);
+                return elementType + "[" + new string(',', Math.Max(0, rank - 1)) + "]";
+            }
+            default:
+                return "Unknown";
+        }
+    }
+
+    /// <summary>Decompresses an unsigned integer per ECMA-335 II.23.2.</summary>
+    private static uint DecompressUnsigned(byte[] sig, ref int pos)
+    {
+        if (pos >= sig.Length) return 0;
+        byte b = sig[pos++];
+        if ((b & 0x80) == 0)
+            return b;
+        if ((b & 0xC0) == 0x80)
+        {
+            if (pos >= sig.Length) return 0;
+            return (uint)(((b & 0x3F) << 8) | sig[pos++]);
+        }
+        uint value = (uint)((b & 0x1F) << 24);
+        if (pos < sig.Length) value |= (uint)(sig[pos++] << 16);
+        if (pos < sig.Length) value |= (uint)(sig[pos++] << 8);
+        if (pos < sig.Length) value |= sig[pos++];
+        return value;
+    }
+
+    /// <summary>Decodes a compressed TypeDefOrRef coded index into a full metadata token.</summary>
+    private static int DecodeTypeDefOrRefToken(byte[] sig, ref int pos)
+    {
+        var coded = DecompressUnsigned(sig, ref pos);
+        var tag = coded & 0x3;
+        var rid = coded >> 2;
+        return tag switch
+        {
+            0 => (int)(0x02000000 | rid), // TypeDef
+            1 => (int)(0x01000000 | rid), // TypeRef
+            2 => (int)(0x1B000000 | rid), // TypeSpec
+            _ => 0
+        };
+    }
+
+    /// <summary>Resolves a TypeDef/TypeRef token to its (namespace-qualified) type name.</summary>
+    private string ResolveTypeTokenName(ClrDebug.MetaDataImport metaImport, int token)
+    {
+        try
+        {
+            var table = (token & 0xFF000000);
+            if (table == 0x02000000)
+                return metaImport.GetTypeDefProps(token).szTypeDef ?? "Unknown";
+            if (table == 0x01000000)
+                return metaImport.GetTypeRefProps(token).szName ?? "Unknown";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error resolving type token 0x{Token:X8}", token);
+        }
         return "Unknown";
     }
 

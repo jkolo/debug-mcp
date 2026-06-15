@@ -94,6 +94,16 @@ public sealed class MemoryReadTool
             // Read memory
             var memory = await _sessionManager.ReadMemoryAsync(address, size);
 
+            // A read that returned zero bytes is a failure, not a success — surface it as an
+            // error envelope instead of success:true with an embedded error string (BUG-014).
+            if (memory.ActualSize == 0)
+            {
+                _logger.ToolError("memory_read", ErrorCodes.MemoryReadFailed);
+                return CreateErrorResponse(ErrorCodes.MemoryReadFailed,
+                    memory.Error ?? $"Failed to read memory at address {address}",
+                    new { address = memory.Address, requestedSize = memory.RequestedSize, actualSize = 0 });
+            }
+
             stopwatch.Stop();
             _logger.ToolCompleted("memory_read", stopwatch.ElapsedMilliseconds);
             _logger.LogInformation("Read {ActualSize}/{RequestedSize} bytes from address {Address}",

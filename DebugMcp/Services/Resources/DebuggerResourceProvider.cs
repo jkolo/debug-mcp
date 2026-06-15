@@ -105,13 +105,22 @@ public sealed class DebuggerResourceProvider
             Breakpoints = breakpoints.Select(bp => new BreakpointDto
             {
                 Id = bp.Id,
-                Type = bp.Type == BreakpointType.Tracepoint ? "Tracepoint" : "Breakpoint",
-                File = bp.Location.File,
-                Line = bp.Location.Line,
-                Column = bp.Location.Column,
+                // Lower-case type/state and a nested location, matching breakpoint_set's
+                // response shape so consumers don't have to special-case the resource (BUG-009).
+                Type = bp.Type == BreakpointType.Tracepoint ? "tracepoint" : "breakpoint",
+                Location = new BreakpointLocationDto
+                {
+                    File = bp.Location.File,
+                    Line = bp.Location.Line,
+                    Column = bp.Location.Column,
+                    EndLine = bp.Location.EndLine,
+                    EndColumn = bp.Location.EndColumn,
+                    FunctionName = bp.Location.FunctionName,
+                    ModuleName = bp.Location.ModuleName
+                },
                 Enabled = bp.Enabled,
                 Verified = bp.Verified,
-                State = bp.State.ToString(),
+                State = bp.State.ToString().ToLowerInvariant(),
                 HitCount = bp.HitCount,
                 Condition = bp.Condition,
                 LogMessage = bp.LogMessage,
@@ -301,9 +310,7 @@ public sealed class DebuggerResourceProvider
     {
         public required string Id { get; set; }
         public required string Type { get; set; }
-        public required string File { get; set; }
-        public int Line { get; set; }
-        public int? Column { get; set; }
+        public required BreakpointLocationDto Location { get; set; }
         public bool Enabled { get; set; }
         public bool Verified { get; set; }
         public required string State { get; set; }
@@ -313,6 +320,17 @@ public sealed class DebuggerResourceProvider
         public int HitCountMultiple { get; set; }
         public int MaxNotifications { get; set; }
         public int NotificationsSent { get; set; }
+    }
+
+    internal sealed class BreakpointLocationDto
+    {
+        public required string File { get; set; }
+        public int Line { get; set; }
+        public int? Column { get; set; }
+        public int? EndLine { get; set; }
+        public int? EndColumn { get; set; }
+        public string? FunctionName { get; set; }
+        public string? ModuleName { get; set; }
     }
 
     internal sealed class ExceptionBreakpointDto
