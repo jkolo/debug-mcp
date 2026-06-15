@@ -29,7 +29,7 @@ internal sealed record EvalResult(
 /// <summary>
 /// Low-level process debugging operations using ICorDebug via ClrDebug.
 /// </summary>
-public sealed class ProcessDebugger : IProcessDebugger, IDisposable
+public sealed partial class ProcessDebugger : IProcessDebugger, IDisposable
 {
     private readonly ILogger<ProcessDebugger> _logger;
     private readonly IPdbSymbolReader _pdbSymbolReader;
@@ -3567,7 +3567,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         CorDebugValue[]? args,
         CorDebugType[]? typeArgs = null,
         int timeoutMs = 5000,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<object?>? hostArgs = null)
     {
         CorDebugEval? eval = null;
         TaskCompletionSource<EvalResult> completionSource;
@@ -3604,6 +3605,23 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             if (args != null)
             {
                 allArgs.AddRange(args);
+            }
+
+            // Materialize host-side primitive arguments (e.g. an indexer's int index) into
+            // debuggee value-type CorDebugValues using the active eval. Reference-typed args
+            // (strings/objects) can't be created synchronously and are rejected here.
+            if (hostArgs != null)
+            {
+                foreach (var ha in hostArgs)
+                {
+                    var argVal = ha as CorDebugValue ?? CreatePrimitiveEvalValue(eval, ha);
+                    if (argVal == null)
+                    {
+                        return new EvalResult(false, null,
+                            new NotSupportedException("Cannot marshal an argument of this type into the debuggee (only numeric/bool/char value-type arguments are supported)"));
+                    }
+                    allArgs.Add(argVal);
+                }
             }
 
             _logger.LogDebug("Calling function with {ArgCount} arguments (including this)", allArgs.Count);
@@ -3895,14 +3913,23 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         Message: "Could not access stack frame for evaluation"));
             }
 
-            // Try to resolve the expression as a variable reference first
+            // Fast path: resolve a bare identifier (local/argument/this) without parsing.
             var result = TryResolveAsVariable(expression, ilFrame);
             if (result != null)
             {
                 return result;
             }
 
-            // Try to resolve as property path using ICorDebugEval for property getters (T062, T063)
+            // Full expression evaluation: parse with Roslyn and walk the tree against the
+            // debuggee (arithmetic, member access, indexers, method calls, casts, interpolation).
+            var treeResult = await TryEvaluateExpressionTreeAsync(
+                expression, threadId, frameIndex, thread, timeoutMs, cancellationToken);
+            if (treeResult != null)
+            {
+                return treeResult;
+            }
+
+            // Fallback for text Roslyn can't parse: legacy dotted property-path resolver.
             result = await TryResolvePropertyPathAsync(
                 expression,
                 ilFrame,
