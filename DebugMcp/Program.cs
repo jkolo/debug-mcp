@@ -289,6 +289,12 @@ rootCommand.SetAction(async parseResult =>
     // Force eager instantiation so TimelineStore subscribes to events before any debug session starts
     host.Services.GetRequiredService<DebugMcp.Services.Timeline.ITimelineStore>();
 
+    // Force eager instantiation so the resource notifier subscribes to debugger events
+    // (state changes, module loads, breakpoint changes) up front. Otherwise it is only
+    // created on the first resources/subscribe request, leaving event-driven resource caches
+    // (e.g. the debugger://threads snapshot) unpopulated for clients that only read resources.
+    host.Services.GetRequiredService<ResourceNotifier>();
+
     var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DebugMcp");
     if (disableRoslyn)
     {
