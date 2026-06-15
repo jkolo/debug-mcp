@@ -29,7 +29,7 @@ internal sealed record EvalResult(
 /// <summary>
 /// Low-level process debugging operations using ICorDebug via ClrDebug.
 /// </summary>
-public sealed class ProcessDebugger : IProcessDebugger, IDisposable
+public sealed partial class ProcessDebugger : IProcessDebugger, IDisposable
 {
     private readonly ILogger<ProcessDebugger> _logger;
     private readonly IPdbSymbolReader _pdbSymbolReader;
@@ -1266,7 +1266,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
                 if (_activeThreadId == null)
                 {
-                    throw new InvalidOperationException("Cannot step: no active thread");
+                    // Typically the entry-point pause (stopAtEntry) before any managed thread is
+                    // running. Stepping needs a thread + managed frame (BUG-002).
+                    throw new InvalidOperationException(
+                        "Cannot step: no active managed thread yet (e.g. at the entry point before user code runs). Set a breakpoint in your code and debug_continue to it first, then step.");
                 }
 
                 _logger.LogDebug("Stepping {Mode}...", mode);
@@ -1866,7 +1869,10 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                             location = new SourceLocation(
                                 File: sourceLocationResult.FilePath,
                                 Line: sourceLocationResult.Line,
-                                FunctionName: sourceLocationResult.FunctionName,
+                                // Mirror the already-resolved, type-qualified frame method name
+                                // instead of the PDB's bare/raw value, which degrades to a metadata
+                                // token (e.g. "0x0600001D") when the metadata lookup fails (BUG-003).
+                                FunctionName: methodName,
                                 ModuleName: modulePath
                             );
                             isExternal = false;
@@ -3284,7 +3290,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         return callback;
     }
 
-    private static SourceLocation? GetCurrentLocation(CorDebugThread thread)
+    private SourceLocation? GetCurrentLocation(CorDebugThread thread)
     {
         var info = GetCurrentLocationInfo(thread);
         return info?.Location;
@@ -3292,8 +3298,12 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
 
     /// <summary>
     /// Gets detailed location information including IL offset for PDB mapping.
+    /// The returned <see cref="LocationInfo.Location"/> is fully resolved against the PDB
+    /// (file/line) and metadata (type-qualified method name) so callbacks that store the
+    /// session location (step/continue/pause/exception) no longer surface an unresolved
+    /// "Unknown"/line 0/raw-token placeholder (BUG-001).
     /// </summary>
-    private static LocationInfo? GetCurrentLocationInfo(CorDebugThread thread)
+    private LocationInfo? GetCurrentLocationInfo(CorDebugThread thread)
     {
         try
         {
@@ -3303,6 +3313,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             var function = frame.Function;
             var module = function.Module;
             var methodToken = (int)function.Token;
+            var modulePath = module.Name;
+            var methodName = GetMethodName(function);
 
             // Try to get IL offset from the frame
             int? ilOffset = null;
@@ -3321,19 +3333,41 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 // IL offset not available
             }
 
-            // Create basic location - PDB reading will enhance this later
+            // Resolve file/line from the PDB using the same path as GetStackFrames so the
+            // step-complete/pause location matches what stacktrace_get reports.
+            string file = "Unknown";
+            int line = 0;
+            if (ilOffset.HasValue && !string.IsNullOrEmpty(modulePath))
+            {
+                try
+                {
+                    var sourceLocationResult = _pdbSymbolReader
+                        .FindSourceLocationAsync(modulePath, methodToken, ilOffset.Value)
+                        .ConfigureAwait(false).GetAwaiter().GetResult();
+                    if (sourceLocationResult != null)
+                    {
+                        file = sourceLocationResult.FilePath;
+                        line = sourceLocationResult.Line;
+                    }
+                }
+                catch
+                {
+                    // PDB resolution unavailable — fall back to Unknown/0
+                }
+            }
+
             var location = new SourceLocation(
-                File: "Unknown",
-                Line: 0,
-                FunctionName: $"0x{methodToken:X8}",
-                ModuleName: module.Name
+                File: file,
+                Line: line,
+                FunctionName: methodName,
+                ModuleName: modulePath
             );
 
             return new LocationInfo(
                 Location: location,
                 MethodToken: methodToken,
                 ILOffset: ilOffset,
-                ModulePath: module.Name
+                ModulePath: modulePath
             );
         }
         catch
@@ -3536,7 +3570,8 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         CorDebugValue[]? args,
         CorDebugType[]? typeArgs = null,
         int timeoutMs = 5000,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<object?>? hostArgs = null)
     {
         CorDebugEval? eval = null;
         TaskCompletionSource<EvalResult> completionSource;
@@ -3573,6 +3608,23 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
             if (args != null)
             {
                 allArgs.AddRange(args);
+            }
+
+            // Materialize host-side primitive arguments (e.g. an indexer's int index) into
+            // debuggee value-type CorDebugValues using the active eval. Reference-typed args
+            // (strings/objects) can't be created synchronously and are rejected here.
+            if (hostArgs != null)
+            {
+                foreach (var ha in hostArgs)
+                {
+                    var argVal = ha as CorDebugValue ?? CreatePrimitiveEvalValue(eval, ha);
+                    if (argVal == null)
+                    {
+                        return new EvalResult(false, null,
+                            new NotSupportedException("Cannot marshal an argument of this type into the debuggee (only numeric/bool/char value-type arguments are supported)"));
+                    }
+                    allArgs.Add(argVal);
+                }
             }
 
             _logger.LogDebug("Calling function with {ArgCount} arguments (including this)", allArgs.Count);
@@ -3864,14 +3916,23 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         Message: "Could not access stack frame for evaluation"));
             }
 
-            // Try to resolve the expression as a variable reference first
+            // Fast path: resolve a bare identifier (local/argument/this) without parsing.
             var result = TryResolveAsVariable(expression, ilFrame);
             if (result != null)
             {
                 return result;
             }
 
-            // Try to resolve as property path using ICorDebugEval for property getters (T062, T063)
+            // Full expression evaluation: parse with Roslyn and walk the tree against the
+            // debuggee (arithmetic, member access, indexers, method calls, casts, interpolation).
+            var treeResult = await TryEvaluateExpressionTreeAsync(
+                expression, threadId, frameIndex, thread, timeoutMs, cancellationToken);
+            if (treeResult != null)
+            {
+                return treeResult;
+            }
+
+            // Fallback for text Roslyn can't parse: legacy dotted property-path resolver.
             result = await TryResolvePropertyPathAsync(
                 expression,
                 ilFrame,
@@ -4098,12 +4159,16 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 }
             }
 
-            // Check locals - use index-based matching since we don't have local names
+            // Check locals — match by PDB name first (e.g. "result"), falling back to the
+            // synthetic "local_N" slot pattern when symbols are unavailable (BUG-011). The
+            // PDB names are the same ones surfaced by variables_get, so an expression root
+            // that variables_get lists is now resolvable here too.
             var localValues = ilFrame.EnumerateLocalVariables().ToList();
+            var localNames = ResolveLocalVariableNames(ilFrame);
             for (int i = 0; i < localValues.Count; i++)
             {
-                // Match local_N pattern
-                if (name == $"local_{i}")
+                var pdbName = localNames.TryGetValue(i, out var resolved) ? resolved : null;
+                if (name == pdbName || name == $"local_{i}")
                 {
                     try
                     {
@@ -4525,8 +4590,11 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                 };
             }
 
-            // Check for circular references
-            var address = refValue.Value;
+            // Check for circular references.
+            // refValue.Value is a CORDB_ADDRESS struct whose ToString() already emits a
+            // "0x"-prefixed hex string; forcing ulong here makes the ":X16" format apply
+            // correctly (otherwise we'd get a double "0x0x..." prefix — BUG-013).
+            ulong address = refValue.Value;
             if (!visitedAddresses.Add(address))
             {
                 var circularType = GetTypeName(value);
@@ -4962,7 +5030,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                     });
                 }
 
-                targetAddress = $"0x{refValue.Value:X16}";
+                targetAddress = $"0x{(ulong)refValue.Value:X16}";
                 var derefValue = refValue.Dereference();
                 if (derefValue != null)
                 {
@@ -5016,7 +5084,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         {
                             SourceAddress = sourceAddress,
                             SourceType = sourceType,
-                            TargetAddress = $"0x{elemRef.Value:X16}",
+                            TargetAddress = $"0x{(ulong)elemRef.Value:X16}",
                             TargetType = elemType,
                             Path = $"[{i}]",
                             ReferenceType = Models.Memory.ReferenceType.ArrayElement
@@ -5065,7 +5133,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                                 {
                                     SourceAddress = sourceAddress,
                                     SourceType = sourceType,
-                                    TargetAddress = $"0x{fieldRef.Value:X16}",
+                                    TargetAddress = $"0x{(ulong)fieldRef.Value:X16}",
                                     TargetType = fieldType,
                                     Path = fieldProps.szField ?? $"field_{fieldToken}",
                                     ReferenceType = Models.Memory.ReferenceType.Field
@@ -5250,7 +5318,7 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
                         if ((fieldAttrs & CorFieldAttr.fdStatic) != 0) continue;
 
                         // Get field type info
-                        var fieldTypeName = GetFieldTypeName(metaImport, fieldProps.ppvSigBlob);
+                        var fieldTypeName = GetFieldTypeName(metaImport, fieldProps.ppvSigBlob, fieldProps.pcbSigBlob);
                         var fieldSize = GetFieldSize(fieldTypeName);
                         var alignment = GetFieldAlignment(fieldTypeName);
                         bool isReference = IsReferenceType(fieldTypeName);
@@ -5312,10 +5380,42 @@ public sealed class ProcessDebugger : IProcessDebugger, IDisposable
         };
     }
 
-    private string GetFieldTypeName(ClrDebug.MetaDataImport metaImport, IntPtr sigBlob)
+    private string GetFieldTypeName(ClrDebug.MetaDataImport metaImport, IntPtr sigBlob, int sigLength)
     {
-        // Simplified field type name extraction
-        // In a full implementation, you'd parse the signature blob
+        // Parse the field signature blob (ECMA-335 II.23.2.4) to recover the CLR type name
+        // instead of the old "Unknown" placeholder (BUG-015).
+        try
+        {
+            if (sigBlob == IntPtr.Zero || sigLength <= 0)
+                return "Unknown";
+
+            var sig = new byte[sigLength];
+            System.Runtime.InteropServices.Marshal.Copy(sigBlob, sig, 0, sigLength);
+
+            return MetadataSignatureParser.ParseFieldSignature(sig, token => ResolveTypeTokenName(metaImport, token));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error parsing field signature blob");
+            return "Unknown";
+        }
+    }
+
+    /// <summary>Resolves a TypeDef/TypeRef token to its (namespace-qualified) type name.</summary>
+    private string ResolveTypeTokenName(ClrDebug.MetaDataImport metaImport, int token)
+    {
+        try
+        {
+            var table = (token & 0xFF000000);
+            if (table == 0x02000000)
+                return metaImport.GetTypeDefProps(token).szTypeDef ?? "Unknown";
+            if (table == 0x01000000)
+                return metaImport.GetTypeRefProps(token).szName ?? "Unknown";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error resolving type token 0x{Token:X8}", token);
+        }
         return "Unknown";
     }
 

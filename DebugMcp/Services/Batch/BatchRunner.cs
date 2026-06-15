@@ -79,6 +79,14 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
         var totalHits = 0;
         var allTriggeredCount = 0; // how many experiments have reached MaxHits
 
+        // Blocking experiments defer their capture out of the ICorDebug callback. Property
+        // getters / method calls run a func-eval that can be slow on first use; doing that
+        // inline would block the ICorDebug callback thread on a short timeout (the original
+        // cause of BUG-016's "timeout" capture failures). Instead the callback enqueues the hit
+        // and leaves the process paused, and the processing task below captures the values with
+        // a longer timeout off the callback thread, then resumes.
+        var blockingChannel = Channel.CreateUnbounded<(List<int> Indices, int ThreadId, BreakpointLocation Location, DateTimeOffset Timestamp)>();
+
         // Step 1: freeze pre-existing breakpoints
         var existing = await _breakpointManager.GetBreakpointsAsync(cancellationToken);
         var existingEx = await _breakpointManager.GetExceptionBreakpointsAsync(cancellationToken);
@@ -128,48 +136,126 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
             }
         }
 
+        // Records a hit against an experiment and updates completion bookkeeping. Returns false
+        // once the batch has completed (so callers can stop continuing the process).
+        bool CommitHit(int idx, ExperimentHit hit)
+        {
+            var exp = request.Experiments[idx];
+            var hits = experimentHits[idx];
+            lock (hits)
+            {
+                if (hits.Count >= exp.MaxHits)
+                    return !completionTcs.Task.IsCompleted;
+                hits.Add(hit);
+                if (hits.Count == 1)
+                    experimentStatus[idx] = ExperimentStatus.Triggered;
+                _logger.LogDebug("Experiment[{Index}] hit #{HitNum} on thread {Thread}", idx, hits.Count, hit.ThreadId);
+
+                if (hits.Count >= exp.MaxHits)
+                {
+                    allTriggeredCount++;
+                    if (allTriggeredCount >= request.Experiments.Count)
+                    {
+                        completionReason = BatchCompletionReason.AllTriggered;
+                        completionTcs.TrySetResult();
+                        return false;
+                    }
+                }
+            }
+
+            var total = Interlocked.Increment(ref totalHits);
+            if (total >= request.MaxTotalHits)
+            {
+                completionReason = BatchCompletionReason.HitLimitReached;
+                completionTcs.TrySetResult();
+                return false;
+            }
+            return true;
+        }
+
+        // Captures an experiment's expressions while the process is in a stable pause (async,
+        // so property getters / method calls can func-eval correctly).
+        async Task<(Dictionary<string, string> Values, Dictionary<string, string> Errors)> CaptureAsync(
+            Experiment exp, int threadId, CancellationToken captureCt)
+        {
+            var values = new Dictionary<string, string>();
+            var evalErrors = new Dictionary<string, string>();
+            if (exp.Capture is { Count: > 0 })
+            {
+                foreach (var expr in exp.Capture)
+                {
+                    if (request.EvalMode == EvalMode.Safe && _safeAnalyzer != null)
+                    {
+                        var analysis = _safeAnalyzer.Analyze(expr);
+                        if (!analysis.IsAllowed)
+                        {
+                            evalErrors[expr] = $"blocked by safe eval: {analysis.Rejection?.Message ?? "unsafe expression"}";
+                            continue;
+                        }
+                    }
+
+                    try
+                    {
+                        var r = await _sessionManager.EvaluateAsync(expr, threadId, 0, timeoutMs: 2000, captureCt);
+                        if (r.Success) values[expr] = r.Value ?? "null";
+                        else evalErrors[expr] = r.Error?.Code ?? "error";
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        evalErrors[expr] = "timeout";
+                    }
+                    catch (Exception ex)
+                    {
+                        evalErrors[expr] = ex.GetType().Name;
+                    }
+                }
+            }
+            return (values, evalErrors);
+        }
+
         // Subscribe to BreakpointResolved AFTER setup (synchronous from here — before any await)
         void OnBreakpointResolved(object? sender, ResolvedBreakpointHitEventArgs e)
         {
             if (!bpToExperiments.TryGetValue(e.BreakpointId, out var indices))
                 return;
 
-            var isAnyBlocking = false;
+            var blockingIndices = new List<int>();
 
             foreach (var idx in indices)
             {
                 var exp = request.Experiments[idx];
-                var hits = experimentHits[idx];
+                if (experimentHits[idx].Count >= exp.MaxHits)
+                    continue; // already saturated
 
-                if (hits.Count >= exp.MaxHits)
-                    continue; // this experiment already saturated
+                // Blocking experiments are captured by the deferred processing task while paused.
+                if (exp.Mode == ExperimentMode.Blocking)
+                {
+                    blockingIndices.Add(idx);
+                    continue;
+                }
 
-                // Per-experiment condition check (synchronous, process is stopped)
+                // Non-blocking (tracepoint): the process does not pause, so capture synchronously
+                // here on the callback thread with a short timeout. Func-eval (property getters)
+                // generally works, but a slow first eval can exceed the timeout and surface as a
+                // per-expression "timeout" error.
                 if (!string.IsNullOrWhiteSpace(exp.Condition))
                 {
                     try
                     {
                         var condTask = Task.Run(() =>
                             _sessionManager.EvaluateAsync(exp.Condition, e.ThreadId, 0, timeoutMs: 500));
-                        var completed = condTask.Wait(600);
-                        if (completed && condTask.Result.Success && condTask.Result.Value == "False")
-                            continue; // condition false
+                        if (condTask.Wait(600) && condTask.Result.Success && condTask.Result.Value == "False")
+                            continue;
                     }
-                    catch
-                    {
-                        // If condition evaluation fails, treat as true (don't skip)
-                    }
+                    catch { /* treat condition errors as true */ }
                 }
 
-                // Capture variables synchronously (same pattern as BreakpointManager.CreateNotification)
                 var values = new Dictionary<string, string>();
                 var evalErrors = new Dictionary<string, string>();
-
                 if (exp.Capture is { Count: > 0 })
                 {
                     foreach (var expr in exp.Capture)
                     {
-                        // eval_mode safety gate
                         if (request.EvalMode == EvalMode.Safe && _safeAnalyzer != null)
                         {
                             var analysis = _safeAnalyzer.Analyze(expr);
@@ -179,24 +265,13 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
                                 continue;
                             }
                         }
-
                         try
                         {
                             var evalTask = Task.Run(() =>
                                 _sessionManager.EvaluateAsync(expr, e.ThreadId, 0, timeoutMs: 500));
-                            var completed = evalTask.Wait(600);
-                            if (!completed)
-                            {
-                                evalErrors[expr] = "timeout";
-                            }
-                            else if (evalTask.Result.Success)
-                            {
-                                values[expr] = evalTask.Result.Value ?? "null";
-                            }
-                            else
-                            {
-                                evalErrors[expr] = evalTask.Result.Error?.Code ?? "error";
-                            }
+                            if (!evalTask.Wait(600)) evalErrors[expr] = "timeout";
+                            else if (evalTask.Result.Success) values[expr] = evalTask.Result.Value ?? "null";
+                            else evalErrors[expr] = evalTask.Result.Error?.Code ?? "error";
                         }
                         catch (Exception ex)
                         {
@@ -205,61 +280,55 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
                     }
                 }
 
-                var hit = new ExperimentHit(
-                    e.Timestamp,
-                    e.ThreadId,
-                    e.Location,
-                    values,
-                    evalErrors);
-
-                // Track blocking BEFORE any completion-triggered early return
-                if (exp.Mode == ExperimentMode.Blocking)
-                    isAnyBlocking = true;
-
-                lock (hits)
-                {
-                    if (hits.Count >= exp.MaxHits)
-                        return; // double-check under lock
-                    hits.Add(hit);
-                    if (hits.Count == 1)
-                    {
-                        experimentStatus[idx] = ExperimentStatus.Triggered;
-                    }
-                    _logger.LogDebug("Experiment[{Index}] hit #{HitNum} on thread {Thread}",
-                        idx, hits.Count, e.ThreadId);
-
-                    if (hits.Count >= exp.MaxHits)
-                    {
-                        allTriggeredCount++;
-                        if (allTriggeredCount >= request.Experiments.Count)
-                        {
-                            completionReason = BatchCompletionReason.AllTriggered;
-                            if (isAnyBlocking)
-                                e.ShouldContinue = true;
-                            completionTcs.TrySetResult();
-                            return;
-                        }
-                    }
-                }
-
-                // Total hit cap
-                var total = Interlocked.Increment(ref totalHits);
-                if (total >= request.MaxTotalHits)
-                {
-                    completionReason = BatchCompletionReason.HitLimitReached;
-                    if (isAnyBlocking)
-                        e.ShouldContinue = true;
-                    completionTcs.TrySetResult();
-                    return;
-                }
+                CommitHit(idx, new ExperimentHit(e.Timestamp, e.ThreadId, e.Location, values, evalErrors));
             }
 
-            // If any experiment for this hit is blocking, set ShouldContinue
-            if (isAnyBlocking)
-                e.ShouldContinue = true;
+            // Hand blocking hits to the processing task and leave the process paused (do not set
+            // ShouldContinue) so the deferred capture can func-eval, then resume.
+            if (blockingIndices.Count > 0)
+                blockingChannel.Writer.TryWrite((blockingIndices, e.ThreadId, e.Location, e.Timestamp));
+        }
+
+        // Deferred capture loop for blocking experiments. Runs off the ICorDebug callback thread;
+        // each iteration sees the process in a stable pause.
+        async Task ProcessBlockingHitsAsync(CancellationToken loopCt)
+        {
+            await foreach (var (indices, threadId, location, timestamp) in blockingChannel.Reader.ReadAllAsync(loopCt))
+            {
+                foreach (var idx in indices)
+                {
+                    var exp = request.Experiments[idx];
+                    if (experimentHits[idx].Count >= exp.MaxHits)
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(exp.Condition))
+                    {
+                        try
+                        {
+                            var cr = await _sessionManager.EvaluateAsync(exp.Condition, threadId, 0, timeoutMs: 2000, loopCt);
+                            if (cr.Success && cr.Value == "False")
+                                continue;
+                        }
+                        catch { /* treat condition errors as true */ }
+                    }
+
+                    var (values, evalErrors) = await CaptureAsync(exp, threadId, loopCt);
+                    CommitHit(idx, new ExperimentHit(timestamp, threadId, location, values, evalErrors));
+                }
+
+                // Resume for the next hit unless the batch just finished.
+                if (!completionTcs.Task.IsCompleted)
+                {
+                    try { await _sessionManager.ContinueAsync(loopCt); }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Batch resume after deferred capture failed"); }
+                }
+            }
         }
 
         _eventSource.BreakpointResolved += OnBreakpointResolved;
+
+        using var processingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var processingTask = ProcessBlockingHitsAsync(processingCts.Token);
 
         // Subscribe to process exit
         void OnStateChanged(object? sender, SessionStateChangedEventArgs e)
@@ -299,6 +368,16 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
             if (_processDebugger != null)
                 _processDebugger.StateChanged -= OnStateChanged;
 
+            // Drain the deferred-capture task: complete the channel so its loop ends, then await
+            // it (bounded) so any in-flight capture finishes before results are built.
+            blockingChannel.Writer.TryComplete();
+            try { await processingTask.WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Deferred capture task did not drain cleanly");
+                processingCts.Cancel();
+            }
+
             // Remove batch breakpoints
             foreach (var bpId in batchBpIds)
             {
@@ -311,6 +390,15 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
             {
                 try { await _breakpointManager.SetBreakpointEnabledAsync(id, wasEnabled); }
                 catch (Exception ex) { _logger.LogWarning(ex, "Failed to restore bp {Id}", id); }
+            }
+
+            // Deferred blocking capture leaves the process paused at the final hit; resume it so
+            // the post-batch state matches the original (running) semantics.
+            if (completionReason != BatchCompletionReason.ProcessExited &&
+                _sessionManager.CurrentSession?.State == SessionState.Paused)
+            {
+                try { await _sessionManager.ContinueAsync(); }
+                catch (Exception ex) { _logger.LogDebug(ex, "Failed to resume process after batch"); }
             }
 
             _isRunning = false;

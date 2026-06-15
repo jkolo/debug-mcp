@@ -57,7 +57,7 @@ public sealed class DebugPauseTool
                 return JsonSerializer.Serialize(new
                 {
                     success = true,
-                    state = "already_paused",
+                    session = BuildSessionResponse(session),
                     threads = currentThreads.Select(t => BuildThreadResponse(t))
                 }, new JsonSerializerOptions { WriteIndented = true });
             }
@@ -69,10 +69,13 @@ public sealed class DebugPauseTool
             _logger.ToolCompleted("debug_pause", stopwatch.ElapsedMilliseconds);
             _logger.LogInformation("Paused process with {ThreadCount} threads", threads.Count);
 
+            // Re-read the session so the response carries the same `session` envelope as
+            // debug_continue / debug_step (BUG-004); `threads` stays as supplementary detail.
+            var pausedSession = _sessionManager.CurrentSession ?? session;
             return JsonSerializer.Serialize(new
             {
                 success = true,
-                state = "paused",
+                session = BuildSessionResponse(pausedSession),
                 threads = threads.Select(t => BuildThreadResponse(t))
             }, new JsonSerializerOptions { WriteIndented = true });
         }
@@ -101,6 +104,43 @@ public sealed class DebugPauseTool
                 details
             }
         }, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private static object BuildSessionResponse(DebugSession session)
+    {
+        var response = new Dictionary<string, object?>
+        {
+            ["processId"] = session.ProcessId,
+            ["processName"] = session.ProcessName,
+            ["state"] = session.State.ToString().ToLowerInvariant(),
+            ["launchMode"] = session.LaunchMode.ToString().ToLowerInvariant()
+        };
+
+        if (session.State == SessionState.Paused)
+        {
+            if (session.PauseReason.HasValue)
+            {
+                response["pauseReason"] = session.PauseReason.Value.ToString().ToLowerInvariant();
+            }
+
+            if (session.CurrentLocation != null)
+            {
+                response["location"] = new
+                {
+                    file = session.CurrentLocation.File,
+                    line = session.CurrentLocation.Line,
+                    column = session.CurrentLocation.Column,
+                    functionName = session.CurrentLocation.FunctionName
+                };
+            }
+
+            if (session.ActiveThreadId.HasValue)
+            {
+                response["activeThreadId"] = session.ActiveThreadId.Value;
+            }
+        }
+
+        return response;
     }
 
     private static object BuildThreadResponse(ThreadInfo thread)

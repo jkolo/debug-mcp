@@ -95,11 +95,14 @@ public sealed class BreakpointSetExceptionTool
             _logger.LogInformation("Set exception breakpoint {Id} for {Type} (first: {First}, second: {Second}, subtypes: {Subtypes})",
                 exceptionBreakpoint.Id, exception_type, break_on_first_chance, break_on_second_chance, include_subtypes);
 
-            // Return success response
+            // Return success response. The type name is accepted without resolving it against
+            // loaded modules (exception types frequently live in assemblies that load later); make
+            // that explicit so a typo'd type isn't mistaken for an armed, matchable breakpoint (BUG-008).
             return JsonSerializer.Serialize(new
             {
                 success = true,
-                breakpoint = SerializeExceptionBreakpoint(exceptionBreakpoint)
+                breakpoint = SerializeExceptionBreakpoint(exceptionBreakpoint),
+                note = $"Exception type '{exception_type}' was not verified to exist; this breakpoint only fires if/when an exception of this type (by name) is thrown."
             }, new JsonSerializerOptions { WriteIndented = true });
         }
         catch (OperationCanceledException)
