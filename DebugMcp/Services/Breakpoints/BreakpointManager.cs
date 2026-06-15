@@ -19,6 +19,7 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
     private readonly LogMessageEvaluator? _logMessageEvaluator;
     private readonly ILogger<BreakpointManager> _logger;
     private readonly IDebugSessionManager? _sessionManager;
+    private readonly int _localsTimeoutMs;
 
     /// <summary>
     /// Event raised when a breakpoint's state changes (Pending→Bound or Bound→Pending).
@@ -36,7 +37,8 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
         IBreakpointNotifier notifier,
         ILogger<BreakpointManager> logger,
         LogMessageEvaluator? logMessageEvaluator = null,
-        IDebugSessionManager? sessionManager = null)
+        IDebugSessionManager? sessionManager = null,
+        int localsTimeoutMs = 100)
     {
         _registry = registry;
         _pdbReader = pdbReader;
@@ -46,6 +48,7 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
         _logMessageEvaluator = logMessageEvaluator;
         _logger = logger;
         _sessionManager = sessionManager;
+        _localsTimeoutMs = localsTimeoutMs;
 
         // Subscribe to debugger events
         _processDebugger.BreakpointHit += OnDebuggerBreakpointHit;
@@ -771,7 +774,7 @@ public sealed class BreakpointManager : IBreakpointManager, IBreakpointEventSour
             {
                 var localsTask = Task.Run(
                     () => _sessionManager.GetVariables(hit.ThreadId, 0, "locals", null));
-                var completed = localsTask.Wait(100);
+                var completed = localsTask.Wait(_localsTimeoutMs);
                 if (!completed)
                 {
                     localsError = "timeout";

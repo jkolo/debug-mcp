@@ -46,7 +46,7 @@ public class BreakpointNotificationLocalsTests
             .Returns(Task.CompletedTask);
     }
 
-    private BreakpointManager CreateManager()
+    private BreakpointManager CreateManager(int localsTimeoutMs = 5000)
     {
         var logger = new Mock<ILogger<BreakpointManager>>();
         return new BreakpointManager(
@@ -56,7 +56,8 @@ public class BreakpointNotificationLocalsTests
             _conditionEvaluatorMock.Object,
             _notifierMock.Object,
             logger.Object,
-            sessionManager: _sessionManagerMock.Object);
+            sessionManager: _sessionManagerMock.Object,
+            localsTimeoutMs: localsTimeoutMs);
     }
 
     [Fact]
@@ -104,7 +105,7 @@ public class BreakpointNotificationLocalsTests
             });
 
         _processDebuggerMock.Setup(x => x.IsAttached).Returns(false);
-        var manager = CreateManager();
+        var manager = CreateManager(localsTimeoutMs: 100);
         var bp = await manager.SetBreakpointAsync("/src/Program.cs", 10);
 
         var hit = new BreakpointHit(bp.Id, ThreadId: 1, DateTimeOffset.UtcNow, bp.Location, HitCount: 1);
