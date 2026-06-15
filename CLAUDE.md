@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-debug-mcp is an MCP server that exposes .NET debugging as 37 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
+debug-mcp is an MCP server that exposes .NET debugging as 39 structured tools. It interfaces directly with the .NET runtime via ICorDebug APIs (through the ClrDebug NuGet wrapper) — the same approach JetBrains Rider uses. AI agents connect via Model Context Protocol to launch processes, set breakpoints, step through code, inspect variables, and analyze exceptions.
 
 ## Build & Test Commands
 
@@ -155,8 +155,11 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - In-memory only; batch state lives in `BatchRunner` singleton for the duration of a run (031-batch-evaluate)
 - C# 13 / .NET 10.0, `ConcurrentQueue<TimelineEvent>`, `IBreakpointEventSource`, `IOutputEventSource` (032-unified-debugging-timeline)
 - In-memory ring buffer (cap 10,000 events with oldest-eviction); `TimelineStore` singleton (032-unified-debugging-timeline)
+- C# 13 / .NET 10.0 + JetBrains.ReSharper.GlobalTools (runtime-acquired dotnet tool `jb inspectcode`), `System.Xml.Linq` SARIF/XML parsing, `System.Diagnostics.Process` (034-resharper-inspect)
+- On-disk engine cache at `~/.debug-mcp/resharper/<version>/` (version-pinned, lazy-installed via `dotnet tool install --tool-path`); stateless per-call inspection (034-resharper-inspect)
 
 ## Recent Changes
+- 034-resharper-inspect: Added `resharper_inspect_solution` + `resharper_inspect_project` MCP tools (39 tools total), `IReSharperInspectionService`/`IReSharperEngineProvider`/`IReSharperRunner`/`IInspectionReportParser` services in `Services/ReSharper/`, `ReSharperOptions` (opt-out via `--no-resharper`, mirrors `--no-roslyn`), `InspectionFinding`/`InspectionResult`/`ReSharperSeverity` models. Engine self-installs lazily on first use. Parser uses ReSharper **XML** output (SARIF collapses suggestion/hint → note; native severity preserved via `<IssueType Severity=…>`). New error codes: PREREQUISITE_MISSING/ENGINE_ACQUISITION_FAILED/INSPECTION_FAILED/BUILD_FAILED.
 - 032-unified-debugging-timeline: Added `timeline_query` MCP tool, `debugger://timeline` MCP resource, `ITimelineStore`/`TimelineStore` service, `IOutputEventSource` interface; added `ThreadCreated`/`ThreadExited` events to `IProcessDebugger`/`ProcessDebugger`; `ProcessIoManager` now implements `IOutputEventSource` and fires `OutputReceived(content, stream, truncated)` event; 37 tools total
 - 031-batch-evaluate: Added `batch_evaluate` MCP tool, `IBatchRunner`/`BatchRunner` service, `IBreakpointEventSource` interface, `ResolvedBreakpointHitEventArgs` event args class; `BreakpointManager` now fires `BreakpointResolved` event after each hit; 36 tools total
 - 030-mcp-event-driven: Added 2 new MCP resources (`debugger://modules`, `debugger://snapshots`), `debugger/sessionStateChanged` notification, enriched `breakpointHit` payload with locals; removed 6 polling tools (35 tools total); fixed fake-async in `process_read_output`/`process_write_input`
@@ -165,5 +168,5 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-specs/032-unified-debugging-timeline/plan.md
+specs/034-resharper-inspect/plan.md
 <!-- SPECKIT END -->

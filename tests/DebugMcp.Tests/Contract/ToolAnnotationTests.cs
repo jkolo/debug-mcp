@@ -64,6 +64,11 @@ public class ToolAnnotationTests
 
         // Timeline Tools (1) — 032-unified-debugging-timeline
         ["timeline_query"] = new("Query Timeline", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false),
+
+        // ReSharper Inspection Tools (2) — 034-resharper-inspect.
+        // OpenWorld=true because the first call may reach the network to acquire the engine.
+        ["resharper_inspect_solution"] = new("Inspect Solution (ReSharper)", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: true),
+        ["resharper_inspect_project"] = new("Inspect Project (ReSharper)", ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: true),
     };
 
     /// <summary>
@@ -186,10 +191,10 @@ public class ToolAnnotationTests
     }
 
     [Fact]
-    public void ExpectedAnnotations_Covers37Tools()
+    public void ExpectedAnnotations_Covers39Tools()
     {
-        ExpectedAnnotations.Should().HaveCount(37,
-            "The spec defines 37 tools (36 from feature 031 + 1 timeline_query from 032)");
+        ExpectedAnnotations.Should().HaveCount(39,
+            "The spec defines 39 tools (37 through feature 032 + 2 ReSharper tools from 034)");
     }
 
     // ── Description content tests for 10 enhanced tools (FR-008, FR-009) ──

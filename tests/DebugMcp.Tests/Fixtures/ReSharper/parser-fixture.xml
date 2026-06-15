@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic fixture mirroring the EXACT schema emitted by jb inspectcode XML output
+     (see sample-inspection.xml for a real recording). Curated to exercise the parser across
+     all four native severities (ERROR/WARNING/SUGGESTION/HINT), a finding without a File
+     (solution-level), and multiple projects, plus deterministic ordering. -->
+<Report ToolsVersion="261.0.20260519.64707">
+  <Information>
+    <Solution>tests\ReSharperSampleApp\ReSharperSampleApp.sln</Solution>
+    <InspectionScope>
+      <Element>Solution</Element>
+    </InspectionScope>
+  </Information>
+  <IssueTypes>
+    <IssueType Id="RedundantCast" Category="Redundancies in Code" CategoryId="CodeRedundancy" Description="Redundant cast" Severity="WARNING" WikiUrl="https://www.jetbrains.com/help/resharper/RedundantCast.html" />
+    <IssueType Id="UnusedMember.Global" Category="Redundancies in Symbol Declarations" CategoryId="DeclarationRedundancy" Description="Type member is never used" Severity="SUGGESTION" Global="True" WikiUrl="https://www.jetbrains.com/help/resharper/UnusedMember.Global.html" />
+    <IssueType Id="UseStringInterpolation" Category="Language Usage Opportunities" CategoryId="LanguageUsage" Description="Use string interpolation expression" Severity="SUGGESTION" WikiUrl="https://www.jetbrains.com/help/resharper/UseStringInterpolation.html" />
+    <IssueType Id="ArrangeThisQualifier" Category="Code Style" CategoryId="CodeStyle" Description="Redundant 'this.' qualifier" Severity="HINT" WikiUrl="https://www.jetbrains.com/help/resharper/ArrangeThisQualifier.html" />
+    <IssueType Id="CSharpErrors" Category="Potential Code Quality Issues" CategoryId="CodeSmell" Description="Compiler-like error surfaced by ReSharper" Severity="ERROR" />
+    <IssueType Id="SolutionWideAnalysisDisabled" Category="Solution" CategoryId="Solution" Description="Solution-wide analysis is off" Severity="WARNING" />
+  </IssueTypes>
+  <Issues>
+    <Project Name="ReSharperSampleApp">
+      <Issue TypeId="RedundantCast" File="Calculator.cs" Offset="431-436" Line="12" Message="Type cast is redundant" />
+      <Issue TypeId="UnusedMember.Global" File="Calculator.cs" Offset="707-715" Line="20" Message="Method 'Describe' is never used" />
+      <Issue TypeId="UseStringInterpolation" File="Calculator.cs" Offset="950-963" Line="24" Message="Use string interpolation expression" />
+      <Issue TypeId="ArrangeThisQualifier" File="Calculator.cs" Offset="120-130" Line="6" Message="Qualifier 'this.' is redundant" />
+      <Issue TypeId="CSharpErrors" File="Program.cs" Offset="10-20" Line="3" Message="Cannot resolve symbol 'Foo'" />
+    </Project>
+    <Project Name="OtherProject">
+      <Issue TypeId="RedundantCast" File="Helper.cs" Offset="50-55" Line="8" Message="Type cast is redundant" />
+      <!-- Solution-level finding: no File/Line attributes -->
+      <Issue TypeId="SolutionWideAnalysisDisabled" Message="Solution-wide analysis is disabled" />
+    </Project>
+  </Issues>
+</Report>
