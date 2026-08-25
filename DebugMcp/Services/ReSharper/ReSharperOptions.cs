@@ -7,7 +7,7 @@ namespace DebugMcp.Services.ReSharper;
 public sealed record ReSharperOptions
 {
     /// <summary>Pinned engine version acquired on first use.</summary>
-    public const string DefaultVersion = "2026.1.2";
+    public const string DefaultVersion = "2026.2.1";
 
     /// <summary>NuGet package id of the ReSharper command-line engine (dotnet tool).</summary>
     public const string PackageId = "JetBrains.ReSharper.GlobalTools";
