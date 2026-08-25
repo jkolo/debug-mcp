@@ -160,3 +160,19 @@ Track which lines/branches execute during a debug session. Useful for understand
 
 #### 064 - Auto-Generate E2E Specs
 Generate Reqnroll specifications from MCP tool definitions. Reduce test coverage gaps and keep E2E tests in sync with tool API surface.
+
+### Tier 4 — MCP Protocol Evolution (unlocked by MCP SDK v2)
+
+Capabilities that became available after the MCP SDK 1.3.0 → 2.2.0 upgrade (spec `2026-07-28`). Not implemented yet — proposals only.
+
+#### 065 - Migrate Logging off deprecated MCP Logging capability
+MCP Logging (`notifications/message`, `McpServer.LoggingLevel`) is deprecated as of spec `2026-07-28` ([SEP-2577](https://modelcontextprotocol.io/seps/2577-deprecate-roots-sampling-and-logging)) — still functional for ≥12 months, currently tracked as suppressed `MCP9005` in `DebugMcp/DebugMcp.csproj`. `McpLogger` (`DebugMcp/Infrastructure/McpLogger.cs`) already supports a stderr sink via `LoggingOptions.EnableStderr`; this feature is the decision + implementation to make stderr (or an OpenTelemetry exporter) the primary delivery path and drop the protocol notification once the deprecation window closes. See `docs/dependencies.md` for the current state.
+
+#### 066 - Long operations on MCP Tasks
+`ModelContextProtocol.Extensions.Tasks` (SEP-2663) gives long-running tool calls a way to report progress and let the client poll/cancel instead of blocking on a single request. Direct fit for the worst UX spots in the current tool surface: `resharper_inspect_solution` (first-use engine acquisition is a ~180–650 MB download plus a full solution build, today a single opaque blocking call), `batch_evaluate` (N sequential experiments with no interim feedback), and `debug_launch` when it triggers symbol-server downloads. Would need a new package reference and a design pass on which tools opt in.
+
+#### 067 - Caching hints on immutable results
+SEP-2549 caching hints let a tool response tell the client a result is safe to reuse without a new round-trip. Natural candidates: `modules_list`, `types_get`, `members_get`, `layout_get` — all describe a loaded module's static shape, which doesn't change while that module stays loaded. Directly serves the existing Tier 1 goal of reducing agent round-trips and token usage.
+
+#### 068 - Batch breakpoint-state notifications with DeferChangedEvents
+The SDK's `DeferChangedEvents()` batches multiple primitive-change notifications (e.g. resource list changes) into one push instead of one per change. Relevant to `debugger://breakpoints`: `batch_evaluate` can set and clear many transient breakpoints in one call today, each mutation firing its own notification — deferring would collapse that into a single update per batch run.

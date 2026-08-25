@@ -33,10 +33,10 @@ dotnet run --project DebugMcp
 ## Tech Stack
 
 - **Runtime**: .NET 10.0 (pinned in `global.json`), C#, cross-platform (Windows/macOS/Linux, x64/arm64)
-- **Debugging**: ClrDebug 0.3.4 (ICorDebug wrappers), DbgShim 9.0
-- **MCP SDK**: ModelContextProtocol 1.2.0
-- **Code Analysis**: Roslyn (Microsoft.CodeAnalysis 5.3.0)
-- **Tests**: xUnit + FluentAssertions + Moq
+- **Debugging**: ClrDebug 0.4.2 (ICorDebug wrappers), DbgShim 9.0
+- **MCP SDK**: ModelContextProtocol 2.2.0
+- **Code Analysis**: Roslyn (Microsoft.CodeAnalysis 5.9.0)
+- **Tests**: xUnit + AwesomeAssertions + Moq
 - **E2E**: Reqnroll (Gherkin BDD) in `tests/DebugMcp.E2E/`
 - **Docs site**: Docusaurus 3.9.2 in `website/`
 
