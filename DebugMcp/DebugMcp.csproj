@@ -8,6 +8,12 @@
         <RootNamespace>DebugMcp</RootNamespace>
         <AssemblyName>DebugMcp</AssemblyName>
 
+        <!-- MCP9005: MCP Logging (notifications/message, McpServer.LoggingLevel) deprecated as of
+             spec 2026-07-28 (SEP-2577); still functional for >=12 months per SDK versioning policy.
+             McpLogger already supports stderr as an alternative sink. Migration tracked as
+             ROADMAP #065. -->
+        <NoWarn>$(NoWarn);MCP9005</NoWarn>
+
         <!-- .NET Tool Packaging -->
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>debug-mcp</ToolCommandName>
