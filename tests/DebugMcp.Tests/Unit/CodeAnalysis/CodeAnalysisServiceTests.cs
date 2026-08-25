@@ -1,6 +1,6 @@
 using DebugMcp.Models.CodeAnalysis;
 using DebugMcp.Services.CodeAnalysis;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 
 namespace DebugMcp.Tests.Unit.CodeAnalysis;
@@ -400,7 +400,7 @@ public class CodeAnalysisServiceTests : IDisposable
         var diagnostics = await _service.GetDiagnosticsAsync(maxResults: 5);
 
         // Assert
-        diagnostics.Count.Should().BeLessOrEqualTo(5);
+        diagnostics.Count.Should().BeLessThanOrEqualTo(5);
     }
 
     #endregion

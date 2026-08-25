@@ -1,6 +1,6 @@
 using DebugMcp.Models.Inspection;
 using DebugMcp.Services;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DebugMcp.Tests.Unit;
@@ -118,7 +118,7 @@ public class AsyncStackTraceServiceTests
 
         // Should be capped at the depth limit (original + max 50 continuations)
         var continuationFrames = result.Where(f => f.FrameKind == "async_continuation").ToList();
-        continuationFrames.Should().HaveCountLessOrEqualTo(50);
+        continuationFrames.Should().HaveCountLessThanOrEqualTo(50);
     }
 
     /// <summary>

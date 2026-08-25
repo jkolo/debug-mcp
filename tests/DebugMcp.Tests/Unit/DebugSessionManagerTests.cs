@@ -1,6 +1,6 @@
 using DebugMcp.Models;
 using DebugMcp.Services;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

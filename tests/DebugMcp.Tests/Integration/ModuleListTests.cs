@@ -3,7 +3,7 @@ using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Tests.Helpers;
 using DebugMcp.Tests.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

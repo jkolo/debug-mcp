@@ -1,5 +1,5 @@
 using DebugMcp.Models.Breakpoints;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Unit;
 

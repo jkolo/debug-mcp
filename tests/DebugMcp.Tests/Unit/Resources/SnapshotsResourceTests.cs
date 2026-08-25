@@ -4,7 +4,7 @@ using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.Resources;
 using DebugMcp.Services.Snapshots;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

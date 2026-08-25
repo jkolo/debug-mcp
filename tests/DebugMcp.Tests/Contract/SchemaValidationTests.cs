@@ -2,7 +2,7 @@ using System.Text.Json;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Models.Inspection;
-using FluentAssertions;
+using AwesomeAssertions;
 using ThreadState = DebugMcp.Models.Inspection.ThreadState;
 
 namespace DebugMcp.Tests.Contract;

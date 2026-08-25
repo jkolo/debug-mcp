@@ -1,5 +1,5 @@
 using DebugMcp.Models.Modules;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Contract;
 

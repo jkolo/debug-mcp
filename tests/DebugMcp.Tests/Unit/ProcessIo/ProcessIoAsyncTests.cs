@@ -1,6 +1,6 @@
 using System.Reflection;
 using DebugMcp.Tools;
-using FluentAssertions;
+using AwesomeAssertions;
 using ModelContextProtocol.Server;
 
 namespace DebugMcp.Tests.Unit.ProcessIo;

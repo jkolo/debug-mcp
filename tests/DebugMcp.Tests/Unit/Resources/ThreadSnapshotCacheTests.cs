@@ -1,7 +1,7 @@
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Services.Resources;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Unit.Resources;
 

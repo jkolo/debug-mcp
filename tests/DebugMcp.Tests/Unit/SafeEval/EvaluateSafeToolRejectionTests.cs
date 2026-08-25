@@ -4,7 +4,7 @@ using DebugMcp.Services.SafeEval;
 using DebugMcp.Tools;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Unit.SafeEval;
 

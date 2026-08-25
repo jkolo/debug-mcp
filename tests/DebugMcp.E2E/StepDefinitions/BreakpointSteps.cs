@@ -2,7 +2,7 @@ using DebugMcp.E2E.Support;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Tests.Helpers;
 using DebugMcp.Tests.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.E2E.StepDefinitions;
 

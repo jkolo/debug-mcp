@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DebugMcp.Models;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Contract;
 

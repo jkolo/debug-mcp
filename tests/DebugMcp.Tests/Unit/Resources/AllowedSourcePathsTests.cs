@@ -1,5 +1,5 @@
 using DebugMcp.Services.Resources;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Unit.Resources;
 

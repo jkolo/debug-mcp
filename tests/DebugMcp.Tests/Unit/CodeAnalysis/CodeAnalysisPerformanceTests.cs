@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using DebugMcp.Models.CodeAnalysis;
 using DebugMcp.Services.CodeAnalysis;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -9,7 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="AwesomeAssertions" />
         <PackageReference Include="Moq" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="Reqnroll.xUnit" />
@@ -25,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="FluentAssertions" />
+        <Using Include="AwesomeAssertions" />
         <Using Include="Reqnroll" />
     </ItemGroup>
 

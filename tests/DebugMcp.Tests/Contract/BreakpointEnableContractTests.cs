@@ -1,6 +1,6 @@
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace DebugMcp.Tests.Contract;
 

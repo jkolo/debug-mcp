@@ -2,7 +2,7 @@ using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

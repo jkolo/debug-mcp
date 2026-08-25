@@ -4,7 +4,7 @@ using DebugMcp.Models.Inspection;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Tests.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using StackFrame = DebugMcp.Models.Inspection.StackFrame;

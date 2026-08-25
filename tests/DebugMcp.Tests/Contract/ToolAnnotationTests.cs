@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
-using FluentAssertions;
+using AwesomeAssertions;
 using ModelContextProtocol.Server;
 
 namespace DebugMcp.Tests.Contract;

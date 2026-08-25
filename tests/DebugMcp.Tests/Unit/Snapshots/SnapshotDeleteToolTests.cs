@@ -1,7 +1,7 @@
 using System.Text.Json;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Tools;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

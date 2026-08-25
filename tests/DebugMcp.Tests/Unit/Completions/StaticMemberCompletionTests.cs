@@ -2,7 +2,7 @@ using DebugMcp.Models;
 using DebugMcp.Models.Modules;
 using DebugMcp.Services;
 using DebugMcp.Services.Completions;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Protocol;
 using Moq;

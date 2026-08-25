@@ -1,5 +1,5 @@
 using DebugMcp.Services.Completions;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 
 namespace DebugMcp.Tests.Unit.Completions;

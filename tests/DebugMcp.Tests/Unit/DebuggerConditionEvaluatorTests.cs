@@ -1,5 +1,5 @@
 using DebugMcp.Services.Breakpoints;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

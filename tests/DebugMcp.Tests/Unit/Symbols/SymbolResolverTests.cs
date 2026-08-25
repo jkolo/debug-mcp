@@ -244,7 +244,7 @@ public class SymbolResolverTests : IDisposable
 
         await Task.WhenAll(tasks);
 
-        maxConcurrent.Should().BeLessOrEqualTo(2, "concurrency should be limited to MaxConcurrentDownloads");
+        maxConcurrent.Should().BeLessThanOrEqualTo(2, "concurrency should be limited to MaxConcurrentDownloads");
     }
 
     [Fact]
