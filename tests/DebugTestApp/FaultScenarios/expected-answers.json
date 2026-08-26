@@ -1,0 +1,61 @@
+{
+  "$schema": "Human-identified fault frame per fixture (FR-030). 'function' matches AutopsyFrame.Function exactly. 'frameIndex' is the index within the hand-built frame list each Unit test constructs for this fixture — see tests/DebugMcp.Tests/Unit/Enrichment/FaultCorpusFixtures.cs.",
+  "scenarios": [
+    {
+      "name": "NullDereference",
+      "mandatoryCategory": "null dereference",
+      "function": "DebugTestApp.FaultScenarios.NullDereference.Run",
+      "frameIndex": 0
+    },
+    {
+      "name": "NestedCallChain",
+      "mandatoryCategory": "fault in a nested call chain",
+      "function": "DebugTestApp.FaultScenarios.NestedCallChain.Deepest",
+      "frameIndex": 0
+    },
+    {
+      "name": "AsyncBoundary",
+      "mandatoryCategory": "fault crossing an async boundary",
+      "function": "DebugTestApp.FaultScenarios.AsyncBoundary.LoadOrderAsync",
+      "frameIndex": 0
+    },
+    {
+      "name": "AggregateInnerException",
+      "mandatoryCategory": "aggregate/inner exception",
+      "function": "DebugTestApp.FaultScenarios.AggregateInnerException.ProcessItem",
+      "frameIndex": 0
+    },
+    {
+      "name": "NoSymbolsAvailable",
+      "mandatoryCategory": "symbols deliberately unavailable",
+      "function": null,
+      "frameIndex": null,
+      "expectedOutcome": "RankingUnavailable"
+    },
+    {
+      "name": "ExternalFrameDemotion",
+      "function": "DebugTestApp.FaultScenarios.ExternalFrameDemotion.ParseConfig",
+      "frameIndex": 0
+    },
+    {
+      "name": "ExceptionMessageReference",
+      "function": "DebugTestApp.FaultScenarios.ExceptionMessageReference.Validate",
+      "frameIndex": 0
+    },
+    {
+      "name": "EmptyCollectionFault",
+      "function": "DebugTestApp.FaultScenarios.EmptyCollectionFault.PickFirst",
+      "frameIndex": 0
+    },
+    {
+      "name": "MultipleNullCandidates",
+      "function": "DebugTestApp.FaultScenarios.MultipleNullCandidates.Innermost",
+      "frameIndex": 0
+    },
+    {
+      "name": "DeepChainManyExternalFrames",
+      "function": "DebugTestApp.FaultScenarios.DeepChainManyExternalFrames.Step3",
+      "frameIndex": 0
+    }
+  ]
+}

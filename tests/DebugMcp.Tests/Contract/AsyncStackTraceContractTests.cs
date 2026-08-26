@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Services;
+using DebugMcp.Services.Inspection;
 using DebugMcp.Tools;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -32,7 +33,7 @@ public class AsyncStackTraceContractTests
         };
 
         var sessionManager = CreateMockSessionManager(frames);
-        var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
+        var tool = new StacktraceGetTool(sessionManager, new SuspicionRanker(), NullLogger<StacktraceGetTool>.Instance);
 
         // Act
         var result = await tool.GetStackTraceAsync();
@@ -59,7 +60,7 @@ public class AsyncStackTraceContractTests
         };
 
         var sessionManager = CreateMockSessionManager(frames);
-        var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
+        var tool = new StacktraceGetTool(sessionManager, new SuspicionRanker(), NullLogger<StacktraceGetTool>.Instance);
 
         // Act
         var result = await tool.GetStackTraceAsync(include_raw: true);
@@ -102,7 +103,7 @@ public class AsyncStackTraceContractTests
         };
 
         var sessionManager = CreateMockSessionManager(frames);
-        var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
+        var tool = new StacktraceGetTool(sessionManager, new SuspicionRanker(), NullLogger<StacktraceGetTool>.Instance);
 
         // Act
         var result = await tool.GetStackTraceAsync();
@@ -136,7 +137,7 @@ public class AsyncStackTraceContractTests
         };
 
         var sessionManager = CreateMockSessionManager(frames);
-        var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
+        var tool = new StacktraceGetTool(sessionManager, new SuspicionRanker(), NullLogger<StacktraceGetTool>.Instance);
 
         // Act
         var result = await tool.GetStackTraceAsync();
@@ -180,7 +181,7 @@ public class AsyncStackTraceContractTests
         };
 
         var sessionManager = CreateMockSessionManager(frames);
-        var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
+        var tool = new StacktraceGetTool(sessionManager, new SuspicionRanker(), NullLogger<StacktraceGetTool>.Instance);
 
         // Act
         var result = await tool.GetStackTraceAsync();

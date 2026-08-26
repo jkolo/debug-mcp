@@ -530,6 +530,13 @@ public class LegacyTextContractTests
         parsed.GetProperty("exception").GetProperty("isFirstChance").GetBoolean().Should().BeTrue();
         parsed.GetProperty("frames")[0].GetProperty("function").GetString().Should().Be("MyApp.Service.Process()");
         parsed.GetProperty("totalFrames").GetInt32().Should().Be(1);
+
+        // T070/FR-025: ranking is additive — every field above is still present and unchanged.
+        // The service (not this mock) computes ranking; this mock returns Enrichment: null
+        // (default), so both new fields are simply absent here — covered directly by
+        // ExceptionAutopsyServiceTests instead, which exercises the real SuspicionRanker.
+        parsed.TryGetProperty("ranking", out _).Should().BeFalse();
+        parsed.TryGetProperty("ranking_unavailable", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -1046,7 +1053,7 @@ public class LegacyTextContractTests
         };
         sessionManager.Setup(m => m.GetStackFrames(It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>()))
             .Returns((frames, frames.Count));
-        var tool = new StacktraceGetTool(sessionManager.Object, Mock.Of<ILogger<StacktraceGetTool>>());
+        var tool = new StacktraceGetTool(sessionManager.Object, new SuspicionRanker(), Mock.Of<ILogger<StacktraceGetTool>>());
 
         var result = await tool.GetStackTraceAsync();
         var parsed = JsonSerializer.SerializeToElement(result, WireOptions);
@@ -1068,6 +1075,13 @@ public class LegacyTextContractTests
         argument.GetProperty("name").GetString().Should().Be("arg1");
         argument.GetProperty("has_children").GetBoolean().Should().BeFalse();
         parsed.TryGetProperty("raw_frames", out _).Should().BeFalse("raw_frames omitted unless include_raw is set");
+
+        // T070/FR-025: ranking is additive — every field above is still present and unchanged,
+        // and the single non-external frame gets the InnermostUserFrame heuristic.
+        var ranking = parsed.GetProperty("ranking");
+        ranking[0].GetProperty("frameIndex").GetInt32().Should().Be(0);
+        ranking[0].GetProperty("reasons")[0].GetProperty("heuristic").GetString().Should().Be(SuspicionHeuristics.InnermostUserFrame);
+        parsed.TryGetProperty("ranking_unavailable", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -1075,7 +1089,7 @@ public class LegacyTextContractTests
     {
         var sessionManager = new Mock<IDebugSessionManager>();
         sessionManager.Setup(m => m.CurrentSession).Returns((DebugSession?)null);
-        var tool = new StacktraceGetTool(sessionManager.Object, Mock.Of<ILogger<StacktraceGetTool>>());
+        var tool = new StacktraceGetTool(sessionManager.Object, new SuspicionRanker(), Mock.Of<ILogger<StacktraceGetTool>>());
 
         var result = await tool.GetStackTraceAsync();
         var parsed = JsonSerializer.SerializeToElement(result, WireOptions);

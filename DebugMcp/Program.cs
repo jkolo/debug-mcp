@@ -164,6 +164,9 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<DebugMcp.Services.IOutputEventSource>(sp =>
         (DebugMcp.Services.IOutputEventSource)sp.GetRequiredService<ProcessIoManager>());
 
+    // Register deterministic suspicion ranking (069-mcp-surface-modernization, US4)
+    builder.Services.AddSingleton<DebugMcp.Services.Inspection.ISuspicionRanker, DebugMcp.Services.Inspection.SuspicionRanker>();
+
     // Register exception autopsy service (022-exception-autopsy)
     builder.Services.AddSingleton<IExceptionAutopsyService, ExceptionAutopsyService>();
 

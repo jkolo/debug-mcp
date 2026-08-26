@@ -17,7 +17,9 @@ public sealed record ExceptionGetContextResult(
     IReadOnlyList<ExceptionFrameInfo>? Frames = null,
     int? TotalFrames = null,
     int? ThrowingFrameIndex = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    IReadOnlyList<RankedSuspect>? Ranking = null,
+    RankingUnavailable? RankingUnavailable = null);
 
 /// <summary>A single stack frame within <c>exception_get_context</c>'s <c>frames</c> array.</summary>
 public sealed record ExceptionFrameInfo(

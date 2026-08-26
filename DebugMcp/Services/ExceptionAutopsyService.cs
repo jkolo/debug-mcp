@@ -1,5 +1,6 @@
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
+using DebugMcp.Services.Inspection;
 using Microsoft.Extensions.Logging;
 
 namespace DebugMcp.Services;
@@ -11,15 +12,18 @@ public sealed class ExceptionAutopsyService : IExceptionAutopsyService
 {
     private readonly IDebugSessionManager _sessionManager;
     private readonly IProcessDebugger _processDebugger;
+    private readonly ISuspicionRanker _ranker;
     private readonly ILogger<ExceptionAutopsyService> _logger;
 
     public ExceptionAutopsyService(
         IDebugSessionManager sessionManager,
         IProcessDebugger processDebugger,
+        ISuspicionRanker ranker,
         ILogger<ExceptionAutopsyService> logger)
     {
         _sessionManager = sessionManager;
         _processDebugger = processDebugger;
+        _ranker = ranker;
         _logger = logger;
     }
 
@@ -75,6 +79,9 @@ public sealed class ExceptionAutopsyService : IExceptionAutopsyService
         var (innerExceptions, truncated) = await WalkInnerExceptionsAsync(
             threadId, maxInnerExceptions, cancellationToken);
 
+        // 5. Deterministic suspicion ranking over the captured frames (FR-022-FR-026)
+        var enrichment = _ranker.Rank(autopsyFrames, exceptionDetail);
+
         _logger.LogDebug(
             "Autopsy complete: {FrameCount} frames, {InnerCount} inner exceptions",
             autopsyFrames.Count, innerExceptions.Count);
@@ -85,7 +92,8 @@ public sealed class ExceptionAutopsyService : IExceptionAutopsyService
             InnerExceptions: innerExceptions,
             InnerExceptionsTruncated: truncated,
             Frames: autopsyFrames,
-            TotalFrames: totalFrames);
+            TotalFrames: totalFrames,
+            Enrichment: enrichment);
     }
 
     private async Task<ExceptionDetail> GetExceptionDetailAsync(

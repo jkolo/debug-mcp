@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using DebugMcp.Models.Inspection;
 
 namespace DebugMcp.Models.Results;
 
@@ -10,7 +11,9 @@ public sealed record StacktraceGetResult(
     IReadOnlyList<StackFrameResult>? Frames = null,
     [property: JsonPropertyName("raw_frames")] IReadOnlyList<RawStackFrameResult>? RawFrames = null,
     ToolError? Error = null,
-    TruncationInfo? Truncation = null);
+    TruncationInfo? Truncation = null,
+    IReadOnlyList<RankedSuspect>? Ranking = null,
+    [property: JsonPropertyName("ranking_unavailable")] RankingUnavailable? RankingUnavailable = null);
 
 /// <summary>A single logical stack frame (async-reconstructed), as emitted in <c>frames</c>.</summary>
 public sealed record StackFrameResult(

@@ -1,6 +1,7 @@
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Services;
+using DebugMcp.Services.Inspection;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -22,6 +23,7 @@ public class ExceptionAutopsyServiceTests
         _sut = new ExceptionAutopsyService(
             _sessionManagerMock.Object,
             _processDebuggerMock.Object,
+            new SuspicionRanker(),
             _loggerMock.Object);
     }
 
@@ -90,6 +92,13 @@ public class ExceptionAutopsyServiceTests
         result.TotalFrames.Should().Be(3);
         result.InnerExceptions.Should().BeEmpty();
         result.InnerExceptionsTruncated.Should().BeFalse();
+
+        // T067/FR-022-FR-026: the real SuspicionRanker is wired in — frame 0 is the innermost
+        // non-external frame, frame 2 has no symbols.
+        result.Enrichment.Should().NotBeNull();
+        result.Enrichment!.Ranking.Should().NotBeNull();
+        result.Enrichment.Ranking!.Should().Contain(r => r.FrameIndex == 0 && r.Reasons.Any(reason => reason.Heuristic == SuspicionHeuristics.InnermostUserFrame));
+        result.Enrichment.Ranking!.Should().Contain(r => r.FrameIndex == 2 && r.Reasons.Any(reason => reason.Heuristic == SuspicionHeuristics.ExternalFrameNoSymbols));
     }
 
     [Fact]

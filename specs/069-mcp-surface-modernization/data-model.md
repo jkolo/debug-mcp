@@ -248,7 +248,11 @@ instance is constructed, not inside `LoadAsync`. There is no per-call phase to r
 ## 5. Ranked suspect
 
 Output of deterministic enrichment. **Strictly additive** — every field present before this
-feature remains (FR-025).
+feature remains (FR-025). Enrichment applies to **frame-bearing** results only —
+`RankedSuspect.FrameIndex` references a frame already present in the raw result, so a result
+with no frames (e.g. `collection_analyze`, `object_summarize`, which summarize a single
+object/collection rather than a call stack) has nothing for this model to reference. T069
+descoped applying it there for exactly this reason; see tasks.md.
 
 | Field | Type | Notes |
 |---|---|---|

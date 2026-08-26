@@ -90,7 +90,9 @@ public sealed class ExceptionGetContextTool
                 InnerExceptionsTruncated: result.InnerExceptionsTruncated,
                 Frames: result.Frames.Select(BuildFrameResponse).ToList(),
                 TotalFrames: result.TotalFrames,
-                ThrowingFrameIndex: result.ThrowingFrameIndex);
+                ThrowingFrameIndex: result.ThrowingFrameIndex,
+                Ranking: result.Enrichment?.Ranking,
+                RankingUnavailable: result.Enrichment?.Unavailable);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused at an exception", StringComparison.OrdinalIgnoreCase))
         {

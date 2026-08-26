@@ -3,6 +3,7 @@ using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Results;
 using DebugMcp.Services;
+using DebugMcp.Services.Inspection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -15,11 +16,13 @@ namespace DebugMcp.Tools;
 public sealed class StacktraceGetTool
 {
     private readonly IDebugSessionManager _sessionManager;
+    private readonly ISuspicionRanker _ranker;
     private readonly ILogger<StacktraceGetTool> _logger;
 
-    public StacktraceGetTool(IDebugSessionManager sessionManager, ILogger<StacktraceGetTool> logger)
+    public StacktraceGetTool(IDebugSessionManager sessionManager, ISuspicionRanker ranker, ILogger<StacktraceGetTool> logger)
     {
         _sessionManager = sessionManager;
+        _ranker = ranker;
         _logger = logger;
     }
 
@@ -103,13 +106,20 @@ public sealed class StacktraceGetTool
                 ? frames.Take(boundedFrames.Count).Select(BuildRawFrameResult).ToList()
                 : null;
 
+            // Same deterministic ranker as exception_get_context, run without exception context
+            // (stacktrace_get isn't necessarily called at a fault) — only the exception-independent
+            // heuristics can fire (FR-022-FR-026).
+            var enrichment = _ranker.Rank(frames.Select(BuildAutopsyFrame).ToList(), exception: null);
+
             return Task.FromResult(new StacktraceGetResult(
                 Success: true,
                 ThreadId: actualThreadId,
                 TotalFrames: totalFrames,
                 Frames: boundedFrames,
                 RawFrames: rawFrames,
-                Truncation: framesTruncation));
+                Truncation: framesTruncation,
+                Ranking: enrichment.Ranking,
+                RankingUnavailable: enrichment.Unavailable));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
@@ -186,5 +196,16 @@ public sealed class StacktraceGetTool
             Scope: arg.Scope.ToString().ToLowerInvariant(),
             HasChildren: arg.HasChildren,
             ChildrenCount: arg.ChildrenCount);
+    }
+
+    private static Models.Inspection.AutopsyFrame BuildAutopsyFrame(Models.Inspection.StackFrame frame)
+    {
+        return new Models.Inspection.AutopsyFrame(
+            Index: frame.Index,
+            Function: frame.Function,
+            Module: frame.Module,
+            IsExternal: frame.IsExternal,
+            Location: frame.Location,
+            Arguments: frame.Arguments);
     }
 }
