@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
@@ -37,9 +38,10 @@ public sealed class DebugLaunchTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Debug session information or error response.</returns>
     [McpServerTool(Name = "debug_launch", Title = "Launch Process",
-        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Launch a .NET executable under debugger control. Starts a new process, loads the CLR runtime, and pauses at the entry point (by default). Only one debug session can be active at a time — call debug_disconnect first if already attached. Returns: session object with processId, processName, executablePath, runtimeVersion, state, launchMode, attachedAt. Errors: ALREADY_ATTACHED if session exists, INVALID_PATH if program not found, PERMISSION_DENIED if insufficient privileges. Example response: {\"success\": true, \"session\": {\"processId\": 1234, \"processName\": \"MyApp\", \"state\": \"paused\", \"runtimeVersion\": \"10.0.0\", \"launchMode\": \"launch\", \"attachedAt\": \"2026-01-15T10:30:00Z\"}}. Clients that opt into the MCP Tasks extension may receive a task handle instead of an inline result even for a fast launch — poll or await it the same way as a slow one.")]
-    public async Task<string> LaunchAsync(
+    public async Task<DebugLaunchResult> LaunchAsync(
         [Description("Path to the .NET executable or DLL to debug")] string program,
         [Description("Command-line arguments to pass to the program")] string[]? args = null,
         [Description("Working directory for the launched process")] string? cwd = null,
@@ -58,21 +60,21 @@ public sealed class DebugLaunchTool
             if (string.IsNullOrWhiteSpace(program))
             {
                 _logger.ToolError("debug_launch", ErrorCodes.InvalidPath);
-                return CreateErrorResponse(ErrorCodes.InvalidPath, "Program path is required");
+                return CreateErrorResult(ErrorCodes.InvalidPath, "Program path is required");
             }
 
             // Validate timeout bounds
             if (timeout < 1000 || timeout > 300000)
             {
                 _logger.ToolError("debug_launch", ErrorCodes.Timeout);
-                return CreateErrorResponse(ErrorCodes.Timeout, $"Timeout must be between 1000 and 300000 milliseconds, got: {timeout}");
+                return CreateErrorResult(ErrorCodes.Timeout, $"Timeout must be between 1000 and 300000 milliseconds, got: {timeout}");
             }
 
             // Check if already attached
             if (_sessionManager.CurrentSession != null)
             {
                 _logger.ToolError("debug_launch", ErrorCodes.AlreadyAttached);
-                return CreateErrorResponse(
+                return CreateErrorResult(
                     ErrorCodes.AlreadyAttached,
                     $"Already attached to process {_sessionManager.CurrentSession.ProcessId}. Disconnect first.",
                     new { currentPid = _sessionManager.CurrentSession.ProcessId });
@@ -89,7 +91,7 @@ public sealed class DebugLaunchTool
                 catch (JsonException ex)
                 {
                     _logger.ToolError("debug_launch", "INVALID_ENV");
-                    return CreateErrorResponse("INVALID_ENV", $"Invalid environment variables JSON: {ex.Message}");
+                    return CreateErrorResult("INVALID_ENV", $"Invalid environment variables JSON: {ex.Message}");
                 }
             }
 
@@ -112,40 +114,34 @@ public sealed class DebugLaunchTool
             _logger.ToolCompleted("debug_launch", stopwatch.ElapsedMilliseconds);
 
             // Return success response
-            var response = new
-            {
-                success = true,
-                session = new
-                {
-                    processId = session.ProcessId,
-                    processName = session.ProcessName,
-                    executablePath = session.ExecutablePath,
-                    runtimeVersion = session.RuntimeVersion,
-                    state = session.State.ToString().ToLowerInvariant(),
-                    launchMode = session.LaunchMode.ToString().ToLowerInvariant(),
-                    attachedAt = session.AttachedAt.ToString("O"),
-                    pauseReason = session.PauseReason?.ToString().ToLowerInvariant(),
-                    commandLineArgs = session.CommandLineArgs,
-                    workingDirectory = session.WorkingDirectory
-                }
-            };
-
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+            return new DebugLaunchResult(
+                Success: true,
+                Session: new SessionSummary(
+                    ProcessId: session.ProcessId,
+                    ProcessName: session.ProcessName,
+                    ExecutablePath: session.ExecutablePath,
+                    RuntimeVersion: session.RuntimeVersion,
+                    State: session.State.ToString().ToLowerInvariant(),
+                    LaunchMode: session.LaunchMode.ToString().ToLowerInvariant(),
+                    AttachedAt: session.AttachedAt.ToString("O"),
+                    PauseReason: session.PauseReason?.ToString().ToLowerInvariant(),
+                    CommandLineArgs: session.CommandLineArgs,
+                    WorkingDirectory: session.WorkingDirectory));
         }
         catch (FileNotFoundException)
         {
             _logger.ToolError("debug_launch", ErrorCodes.InvalidPath);
-            return CreateErrorResponse(ErrorCodes.InvalidPath, $"Program not found: {program}", new { program });
+            return CreateErrorResult(ErrorCodes.InvalidPath, $"Program not found: {program}", new { program });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("already active"))
         {
             _logger.ToolError("debug_launch", ErrorCodes.AlreadyAttached);
-            return CreateErrorResponse(ErrorCodes.AlreadyAttached, ex.Message);
+            return CreateErrorResult(ErrorCodes.AlreadyAttached, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("dbgshim"))
         {
             _logger.ToolError("debug_launch", ErrorCodes.LaunchFailed);
-            return CreateErrorResponse(
+            return CreateErrorResult(
                 ErrorCodes.LaunchFailed,
                 "Could not find dbgshim library. Ensure .NET SDK is installed.",
                 new { program, originalError = ex.Message });
@@ -153,7 +149,7 @@ public sealed class DebugLaunchTool
         catch (UnauthorizedAccessException ex)
         {
             _logger.ToolError("debug_launch", ErrorCodes.PermissionDenied);
-            return CreateErrorResponse(
+            return CreateErrorResult(
                 ErrorCodes.PermissionDenied,
                 $"Insufficient privileges to launch process. You may need elevated permissions.",
                 new { program, originalError = ex.Message });
@@ -161,37 +157,24 @@ public sealed class DebugLaunchTool
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _logger.ToolError("debug_launch", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return CreateErrorResult(ErrorCodes.Timeout, "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("debug_launch", ErrorCodes.Timeout);
             _logger.OperationTimeout(timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, $"Launch operation timed out after {timeout}ms", new { program, timeout });
+            return CreateErrorResult(ErrorCodes.Timeout, $"Launch operation timed out after {timeout}ms", new { program, timeout });
         }
         catch (Exception ex)
         {
             _logger.ToolError("debug_launch", ErrorCodes.LaunchFailed);
-            return CreateErrorResponse(
+            return CreateErrorResult(
                 ErrorCodes.LaunchFailed,
                 $"Failed to launch process: {ex.Message}",
                 new { program, exceptionType = ex.GetType().Name });
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        var response = new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        };
-
-        return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static DebugLaunchResult CreateErrorResult(string code, string message, object? details = null) =>
+        new(Success: false, Error: new ToolError(code, message, details));
 }

@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -30,9 +30,10 @@ public sealed class DebugStepTool
     /// <param name="timeout">Timeout in milliseconds (default: 30000, min: 1000, max: 300000).</param>
     /// <returns>Updated session state after stepping.</returns>
     [McpServerTool(Name = "debug_step", Title = "Step Through Code",
-        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Step through code during debugging. The process must be paused. Modes: 'in' (step into function calls), 'over' (step over, staying in current scope), 'out' (step out to caller). Returns: updated session state with new source location after the step completes. The step blocks until the debuggee re-pauses at the next source line. Example response: {\"success\": true, \"stepMode\": \"over\", \"session\": {\"processId\": 1234, \"state\": \"paused\", \"pauseReason\": \"step\", \"location\": {\"file\": \"Program.cs\", \"line\": 43, \"functionName\": \"Main\"}}}")]
-    public async Task<string> StepAsync(
+    public async Task<DebugStepResult> StepAsync(
         [Description("Step mode: 'in', 'over', or 'out'")] string mode,
         [Description("Timeout in milliseconds")] int timeout = 30000,
         CancellationToken cancellationToken = default)
@@ -45,7 +46,7 @@ public sealed class DebugStepTool
             // Validate timeout bounds
             if (timeout < 1000 || timeout > 300000)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     $"Timeout must be between 1000 and 300000 milliseconds (got {timeout})",
                     new { parameter = "timeout", value = timeout });
             }
@@ -54,7 +55,7 @@ public sealed class DebugStepTool
             if (!TryParseStepMode(mode, out var stepMode))
             {
                 _logger.ToolError("debug_step", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     $"Invalid step mode: '{mode}'. Valid modes: in, over, out",
                     new { parameter = "mode", value = mode, validModes = new[] { "in", "over", "out" } });
             }
@@ -64,14 +65,14 @@ public sealed class DebugStepTool
             if (session == null)
             {
                 _logger.ToolError("debug_step", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return CreateErrorResult(ErrorCodes.NoSession, "No active debug session");
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("debug_step", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot step: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
                     new { currentState = session.State.ToString().ToLowerInvariant() });
             }
@@ -84,33 +85,31 @@ public sealed class DebugStepTool
             _logger.ToolCompleted("debug_step", stopwatch.ElapsedMilliseconds);
             _logger.LogInformation("Stepped {Mode} for process {ProcessId}", mode, updatedSession.ProcessId);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                stepMode = mode,
-                session = BuildSessionResponse(updatedSession)
-            }, new JsonSerializerOptions { WriteIndented = true });
+            return new DebugStepResult(
+                Success: true,
+                StepMode: mode,
+                Session: BuildSessionResponse(updatedSession));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _logger.ToolError("debug_step", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return CreateErrorResult(ErrorCodes.Timeout, "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("debug_step", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Step operation timed out");
+            return CreateErrorResult(ErrorCodes.Timeout, "Step operation timed out");
         }
         catch (InvalidOperationException ex)
         {
             var errorCode = ex.Message.Contains("not paused") ? ErrorCodes.NotPaused : ErrorCodes.StepFailed;
             _logger.ToolError("debug_step", errorCode);
-            return CreateErrorResponse(errorCode, ex.Message);
+            return CreateErrorResult(errorCode, ex.Message);
         }
         catch (Exception ex)
         {
             _logger.ToolError("debug_step", ErrorCodes.StepFailed);
-            return CreateErrorResponse(ErrorCodes.StepFailed, $"Failed to step: {ex.Message}");
+            return CreateErrorResult(ErrorCodes.StepFailed, $"Failed to step: {ex.Message}");
         }
     }
 
@@ -134,54 +133,44 @@ public sealed class DebugStepTool
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static DebugStepResult CreateErrorResult(string code, string message, object? details = null) =>
+        new(Success: false, Error: new ToolError(code, message, details));
 
-    private static object BuildSessionResponse(DebugSession session)
+    private static SessionStateInfo BuildSessionResponse(DebugSession session)
     {
-        var response = new Dictionary<string, object?>
-        {
-            ["processId"] = session.ProcessId,
-            ["processName"] = session.ProcessName,
-            ["state"] = session.State.ToString().ToLowerInvariant(),
-            ["launchMode"] = session.LaunchMode.ToString().ToLowerInvariant()
-        };
+        string? pauseReason = null;
+        LocationInfo? location = null;
+        int? activeThreadId = null;
 
         if (session.State == SessionState.Paused)
         {
             if (session.PauseReason.HasValue)
             {
-                response["pauseReason"] = session.PauseReason.Value.ToString().ToLowerInvariant();
+                pauseReason = session.PauseReason.Value.ToString().ToLowerInvariant();
             }
 
             if (session.CurrentLocation != null)
             {
-                response["location"] = new
-                {
-                    file = session.CurrentLocation.File,
-                    line = session.CurrentLocation.Line,
-                    column = session.CurrentLocation.Column,
-                    functionName = session.CurrentLocation.FunctionName
-                };
+                location = new LocationInfo(
+                    File: session.CurrentLocation.File,
+                    Line: session.CurrentLocation.Line,
+                    Column: session.CurrentLocation.Column,
+                    FunctionName: session.CurrentLocation.FunctionName);
             }
 
             if (session.ActiveThreadId.HasValue)
             {
-                response["activeThreadId"] = session.ActiveThreadId.Value;
+                activeThreadId = session.ActiveThreadId.Value;
             }
         }
 
-        return response;
+        return new SessionStateInfo(
+            ProcessId: session.ProcessId,
+            ProcessName: session.ProcessName,
+            State: session.State.ToString().ToLowerInvariant(),
+            LaunchMode: session.LaunchMode.ToString().ToLowerInvariant(),
+            PauseReason: pauseReason,
+            Location: location,
+            ActiveThreadId: activeThreadId);
     }
 }
