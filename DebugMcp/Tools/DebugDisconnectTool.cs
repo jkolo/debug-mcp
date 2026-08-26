@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -21,8 +22,6 @@ public sealed class DebugDisconnectTool
     /// </summary>
     private static readonly TimeSpan DisconnectTimeout = TimeSpan.FromSeconds(10);
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-
     private readonly IDebugSessionManager _sessionManager;
     private readonly ILogger<DebugDisconnectTool> _logger;
 
@@ -39,9 +38,10 @@ public sealed class DebugDisconnectTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Disconnect result.</returns>
     [McpServerTool(Name = "debug_disconnect", Title = "Disconnect Debug Session",
-        ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
+        ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Disconnect from the current debug session. For launched processes, optionally terminates the debuggee (terminateProcess=true). For attached processes, detaches and lets the process continue running. Safe to call when no session is active (returns success). Has a 10-second internal timeout — if the process doesn't respond, it is force-killed. Returns: disconnect status with previousSession info (processId, processName, launchMode). Example response: {\"success\": true, \"state\": \"disconnected\", \"wasTerminated\": true, \"previousSession\": {\"processId\": 1234, \"processName\": \"MyApp\", \"launchMode\": \"launch\"}}")]
-    public async Task<string> DisconnectAsync(
+    public async Task<DebugDisconnectResult> DisconnectAsync(
         [Description("Terminate the process instead of detaching (only for launched processes)")] bool terminateProcess = false,
         CancellationToken cancellationToken = default)
     {
@@ -58,22 +58,18 @@ public sealed class DebugDisconnectTool
                 stopwatch.Stop();
                 _logger.ToolCompleted("debug_disconnect", stopwatch.ElapsedMilliseconds);
 
-                return JsonSerializer.Serialize(new
-                {
-                    success = true,
-                    state = "disconnected",
-                    message = "No active debug session",
-                    previousSession = (object?)null
-                }, JsonOptions);
+                return new DebugDisconnectResult(
+                    Success: true,
+                    State: "disconnected",
+                    Message: "No active debug session",
+                    PreviousSession: null);
             }
 
             // Capture session info before disconnect
-            var previousSessionInfo = new
-            {
-                processId = currentSession.ProcessId,
-                processName = currentSession.ProcessName,
-                launchMode = currentSession.LaunchMode.ToString().ToLowerInvariant()
-            };
+            var previousSessionInfo = new PreviousSessionInfo(
+                ProcessId: currentSession.ProcessId,
+                ProcessName: currentSession.ProcessName,
+                LaunchMode: currentSession.LaunchMode.ToString().ToLowerInvariant());
 
             // Determine if process will be terminated
             var willTerminate = terminateProcess && currentSession.LaunchMode == LaunchMode.Launch;
@@ -96,41 +92,31 @@ public sealed class DebugDisconnectTool
                 ForceKillProcess(currentSession.ProcessId);
 
                 stopwatch.Stop();
-                return JsonSerializer.Serialize(new
-                {
-                    success = true,
-                    state = "disconnected",
-                    wasTerminated = true,
-                    timedOut = true,
-                    message = $"Disconnect timed out after {DisconnectTimeout.TotalSeconds}s. Process was force-killed.",
-                    previousSession = previousSessionInfo
-                }, JsonOptions);
+                return new DebugDisconnectResult(
+                    Success: true,
+                    State: "disconnected",
+                    WasTerminated: true,
+                    TimedOut: true,
+                    Message: $"Disconnect timed out after {DisconnectTimeout.TotalSeconds}s. Process was force-killed.",
+                    PreviousSession: previousSessionInfo);
             }
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_disconnect", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                state = "disconnected",
-                wasTerminated = willTerminate,
-                previousSession = previousSessionInfo
-            }, JsonOptions);
+            return new DebugDisconnectResult(
+                Success: true,
+                State: "disconnected",
+                WasTerminated: willTerminate,
+                PreviousSession: previousSessionInfo);
         }
         catch (Exception ex)
         {
             _logger.ToolError("debug_disconnect", "DISCONNECT_FAILED");
 
-            return JsonSerializer.Serialize(new
-            {
-                success = false,
-                error = new
-                {
-                    code = "DISCONNECT_FAILED",
-                    message = $"Failed to disconnect: {ex.Message}"
-                }
-            }, JsonOptions);
+            return new DebugDisconnectResult(
+                Success: false,
+                Error: new ToolError("DISCONNECT_FAILED", $"Failed to disconnect: {ex.Message}"));
         }
     }
 
