@@ -168,5 +168,5 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-specs/034-resharper-inspect/plan.md
+specs/069-mcp-surface-modernization/plan.md
 <!-- SPECKIT END -->
