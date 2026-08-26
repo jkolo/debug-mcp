@@ -81,7 +81,7 @@ public class SnapshotServiceCleanupTests
         sessionManagerMock.Setup(s => s.GetVariables(It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<string>()))
             .Returns(new List<Variable>());
         sessionManagerMock.Setup(s => s.GetStackFrames(It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>()))
-            .Returns((new List<Models.Inspection.StackFrame>(), 0));
+            .Returns((new List<DebugMcp.Models.Inspection.StackFrame>(), 0));
 
         var service = new SnapshotService(store, sessionManagerMock.Object, processDebuggerMock.Object, serviceLogger.Object);
 

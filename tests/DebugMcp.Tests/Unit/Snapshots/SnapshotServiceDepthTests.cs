@@ -49,7 +49,7 @@ public class SnapshotServiceDepthTests
         });
 
         _sessionManagerMock.Setup(s => s.GetStackFrames(It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>()))
-            .Returns((new List<Models.Inspection.StackFrame>(), 0));
+            .Returns((new List<DebugMcp.Models.Inspection.StackFrame>(), 0));
     }
 
     [Fact]

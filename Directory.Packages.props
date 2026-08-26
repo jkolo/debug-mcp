@@ -6,6 +6,7 @@
   <ItemGroup Label="MCP">
     <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.2.0" />
+    <PackageVersion Include="ModelContextProtocol.Extensions.Tasks" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup Label="Debugging">
@@ -47,5 +48,8 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Reqnroll.xUnit" Version="3.3.4" />
+    <!-- Test-only: validates outputSchema conformance (FR-020) against a real JSON Schema
+         implementation rather than a hand-rolled subset. Not referenced by DebugMcp itself. -->
+    <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
   </ItemGroup>
 </Project>
