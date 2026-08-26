@@ -36,7 +36,7 @@
 | 031 | Batch Evaluate | v0.17.0 | `batch_evaluate` tool — set transient breakpoints, run, and collect expression values across hits in a single call (36 tools total) |
 | 032 | Unified Debugging Timeline | v0.18.0 | `timeline_query` tool + `debugger://timeline` resource — chronological view of breakpoint hits, exceptions, module/thread events, and stdout/stderr (37 tools total) |
 | 034 | ReSharper Inspections | TBD | `resharper_inspect_solution` + `resharper_inspect_project` tools — runs JetBrains ReSharper's inspections (hundreds beyond Roslyn) via the auto-installed `jb inspectcode` engine; opt-out via `--no-resharper`, native severities, lazy self-installing version-pinned engine cache (39 tools total) |
-| 069 | MCP Surface Modernization | TBD | Progress reporting for long operations, deferred results via MCP Tasks, every tool migrated to typed structured output with a shared success/error/truncation contract, deterministic (model-free) suspicion ranking on exception context and stack traces, per-call timeouts on every blocking tool (39 tools total, all typed) |
+| 069 | MCP Surface Modernization | v0.20.0 | Progress reporting for long operations, deferred results via MCP Tasks, every tool migrated to typed structured output with a shared success/error/truncation contract, deterministic (model-free) suspicion ranking on exception context and stack traces, per-call timeouts on every blocking tool (39 tools total, all typed) |
 
 ## Proposed Features
 
