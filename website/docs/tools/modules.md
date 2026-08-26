@@ -11,64 +11,17 @@ Module tools let you browse loaded assemblies, explore types and their members, 
 
 Use module tools to understand the structure of the debugged application at the metadata level. These tools work with both **running** and **paused** sessions because they only read assembly metadata.
 
-**Typical flow:** `modules_list` → `modules_search` (find types) → `types_get` (browse a module) → `members_get` (inspect a type)
+**Typical flow:** *(browse loaded modules via the `debugger://modules` resource)* → `modules_search` (find types) → `types_get` (browse a module) → `members_get` (inspect a type)
+
+## Listing loaded modules
+
+There is no `modules_list` tool. Read the **`debugger://modules`** MCP resource instead — it
+returns the same information (name, path, version, whether symbols are loaded, module ID, base
+address, size) for every loaded assembly in the debuggee process, without a round-trip tool
+call. Use `modules_search` when you need to filter or search by name/pattern rather than list
+everything.
 
 ## Tools
-
-### modules_list
-
-List all loaded modules (assemblies) in the debugged process.
-
-**Requires:** Active session (running or paused)
-
-**When to use:** See what assemblies are loaded, check if your assembly has debug symbols, or filter to find application assemblies vs. framework assemblies.
-
-**Parameters:**
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `include_system` | boolean | No | Include system assemblies like mscorlib (default: true) |
-| `name_filter` | string | No | Filter modules by name pattern (supports `*` wildcard) |
-
-**Example:**
-```json
-{
-  "include_system": false,
-  "name_filter": "MyApp*"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "modules": [
-    {
-      "name": "MyApp",
-      "path": "/app/MyApp.dll",
-      "version": "1.0.0.0",
-      "hasSymbols": true,
-      "isOptimized": false,
-      "isDynamic": false,
-      "moduleId": "550e8400-e29b-41d4-a716-446655440000"
-    },
-    {
-      "name": "MyApp.Core",
-      "path": "/app/MyApp.Core.dll",
-      "version": "1.0.0.0",
-      "hasSymbols": true,
-      "isOptimized": false,
-      "isDynamic": false,
-      "moduleId": "550e8400-e29b-41d4-a716-446655440001"
-    }
-  ],
-  "count": 2
-}
-```
-
-**Real-world use case:** An AI agent wants to understand what libraries an application uses. It calls `modules_list` with `include_system: false` to see only application and third-party assemblies, then checks which ones have debug symbols available.
-
----
 
 ### modules_search
 

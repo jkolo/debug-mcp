@@ -132,33 +132,17 @@ End the debugging session.
 
 ---
 
-### debug_state
+## Checking the current state
 
-Get the current debugging state.
+There is no `debug_state` tool. Read the **`debugger://session`** MCP resource instead — it
+returns the same information (process info, state, pause reason, current location) without a
+round-trip tool call, and a client can subscribe to it to be notified when the state changes
+rather than polling. The server also pushes a `debugger/sessionStateChanged` notification
+whenever the session transitions (e.g. running → stopped), so an agent can react immediately
+instead of re-reading the resource on a timer.
 
-**Requires:** No session needed (works anytime)
-
-**When to use:** Check whether the process is running, stopped at a breakpoint, or has exited. This is the first tool to call when you need to understand what's happening before performing other operations.
-
-**Parameters:** None
-
-**Example response:**
-```json
-{
-  "state": "stopped",
-  "reason": "breakpoint",
-  "thread_id": 5,
-  "breakpoint_id": 1,
-  "location": {
-    "file": "/app/Services/UserService.cs",
-    "line": 42,
-    "column": 12,
-    "function": "GetUser"
-  }
-}
-```
-
-**State values:**
+**State values** (as reported by `debugger://session`'s `state` field, and previously by
+`debug_state`):
 
 | State | Description |
 |-------|-------------|

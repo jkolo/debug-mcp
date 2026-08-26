@@ -37,7 +37,7 @@ Resume execution.
 }
 ```
 
-**Real-world use case:** After inspecting variables at a breakpoint, an AI agent calls `debug_continue` and then `breakpoint_wait` to advance to the next breakpoint in the workflow.
+**Real-world use case:** After inspecting variables at a breakpoint, an AI agent calls `debug_continue` and then waits for the next `debugger/breakpointHit` notification to advance to the next breakpoint in the workflow.
 
 ---
 

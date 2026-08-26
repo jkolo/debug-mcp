@@ -30,16 +30,75 @@ When disabled, the `resharper_*` tools are not advertised and every other tool k
 Related flags: `--resharper-cache <dir>`, `--resharper-version <ver>` (and env vars
 `DEBUG_MCP_NO_RESHARPER`, `DEBUG_MCP_RESHARPER_CACHE`, `DEBUG_MCP_RESHARPER_VERSION`).
 
-## Parameters
+## Tools
 
-| Param | Tools | Description |
-|-------|-------|-------------|
-| `solutionPath` / `projectPath` | resp. | Absolute path to the `.sln` / `.csproj`. |
-| `severity` | both | Minimum **native** severity: `error` \| `warning` \| `suggestion` \| `hint`. |
-| `project` | solution | Restrict a solution inspection to one project. |
-| `noBuild` | both | Skip the engine's pre-analysis build when already built. |
-| `timeoutSeconds` | both | Per-call inspection budget (10–1800s); excludes the one-time engine download (separate budget). |
-| `maxResults` | both | Cap on returned findings (default/max 500). |
+### resharper_inspect_solution
+
+Run ReSharper's code inspections over an entire .NET solution.
+
+**Requires:** No session needed (works anytime — this is static analysis, not a debug session)
+
+**When to use:** You want ReSharper-grade findings (hundreds of inspections beyond the C#
+compiler / Roslyn) across every project in a solution at once. See [Self-installing
+engine](#self-installing-engine) and [Opt-out](#opt-out) above.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `solutionPath` | string | Yes | Absolute path to the `.sln` file |
+| `severity` | string | No | Minimum **native** severity: `error` \| `warning` \| `suggestion` \| `hint` |
+| `project` | string | No | Restrict the inspection to a single project within the solution |
+| `noBuild` | boolean | No | Skip the engine's pre-analysis build when already built (default: false) |
+| `timeoutSeconds` | integer | No | Per-call inspection budget, 10–1800s; excludes the one-time engine download (separate budget) |
+| `maxResults` | integer | No | Cap on returned findings (default/max 500) |
+
+**Example:**
+```json
+{
+  "solutionPath": "/abs/MyApp.sln",
+  "severity": "warning",
+  "project": "MyApp.Core"
+}
+```
+
+See [Example response](#example-response) and [Errors](#errors) below — both tools share the same response shape and error codes.
+
+**Real-world use case:** Before opening a pull request, an AI agent runs `resharper_inspect_solution` across the whole solution to catch redundancies, dead code, and style violations that Roslyn's built-in analyzers don't cover.
+
+---
+
+### resharper_inspect_project
+
+Run ReSharper's code inspections over a single .NET project.
+
+**Requires:** No session needed (works anytime — this is static analysis, not a debug session)
+
+**When to use:** You want ReSharper findings scoped to one project rather than a whole
+solution — faster turnaround when you only care about the project you're actively changing. See
+[Self-installing engine](#self-installing-engine) and [Opt-out](#opt-out) above.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectPath` | string | Yes | Absolute path to the `.csproj` file |
+| `severity` | string | No | Minimum **native** severity: `error` \| `warning` \| `suggestion` \| `hint` |
+| `noBuild` | boolean | No | Skip the engine's pre-analysis build when already built (default: false) |
+| `timeoutSeconds` | integer | No | Per-call inspection budget, 10–1800s; excludes the one-time engine download (separate budget) |
+| `maxResults` | integer | No | Cap on returned findings (default/max 500) |
+
+**Example:**
+```json
+{
+  "projectPath": "/abs/MyApp/MyApp.csproj",
+  "severity": "suggestion"
+}
+```
+
+See [Example response](#example-response) and [Errors](#errors) below — both tools share the same response shape and error codes.
+
+**Real-world use case:** An AI agent iterating on a single library project runs `resharper_inspect_project` after each change for fast feedback, saving the full-solution `resharper_inspect_solution` sweep for before a PR.
 
 ## Native severities
 
