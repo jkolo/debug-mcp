@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Models.Snapshots;
 using DebugMcp.Services.Snapshots;
@@ -37,12 +36,12 @@ public class SnapshotCreateToolTests
 
         var result = await _tool.CreateSnapshotAsync();
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeTrue();
-        root.GetProperty("snapshot").GetProperty("id").GetString().Should().Be("snap-abc");
-        root.GetProperty("snapshot").GetProperty("label").GetString().Should().Be("test");
-        root.GetProperty("snapshot").GetProperty("variableCount").GetInt32().Should().Be(1);
+        result.Success.Should().BeTrue();
+        result.Snapshot.Should().NotBeNull();
+        result.Snapshot!.Id.Should().Be("snap-abc");
+        result.Snapshot.Label.Should().Be("test");
+        result.Snapshot.VariableCount.Should().Be(1);
+        result.Error.Should().BeNull();
     }
 
     [Fact]
@@ -53,8 +52,7 @@ public class SnapshotCreateToolTests
 
         var result = await _tool.CreateSnapshotAsync(label: "my-snap", thread_id: 5, frame_index: 2, depth: 3);
 
-        using var doc = JsonDocument.Parse(result);
-        doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        result.Success.Should().BeTrue();
         _serviceMock.Verify(s => s.CreateSnapshot("my-snap", 5, 2, 3), Times.Once);
     }
 
@@ -66,10 +64,9 @@ public class SnapshotCreateToolTests
 
         var result = await _tool.CreateSnapshotAsync();
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeFalse();
-        root.GetProperty("error").GetProperty("code").GetString().Should().Be("NOT_PAUSED");
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("NOT_PAUSED");
     }
 
     [Fact]
@@ -80,10 +77,9 @@ public class SnapshotCreateToolTests
 
         var result = await _tool.CreateSnapshotAsync();
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeFalse();
-        root.GetProperty("error").GetProperty("code").GetString().Should().Be("NO_SESSION");
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("NO_SESSION");
     }
 
     [Fact]
@@ -94,9 +90,8 @@ public class SnapshotCreateToolTests
 
         var result = await _tool.CreateSnapshotAsync();
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeFalse();
-        root.GetProperty("error").GetProperty("code").GetString().Should().Be("VARIABLES_FAILED");
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("VARIABLES_FAILED");
     }
 }
