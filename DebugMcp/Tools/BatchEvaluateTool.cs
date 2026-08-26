@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DebugMcp.Models;
 using DebugMcp.Models.Batch;
 using DebugMcp.Models.Results;
 using DebugMcp.Services.Batch;
@@ -67,24 +68,24 @@ public sealed class BatchEvaluateTool
         }
         catch (ArgumentException ex)
         {
-            return Fail("validation_error", ex.Message);
+            return Fail(ErrorCodes.ValidationError, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("batch_already_running"))
         {
-            return Fail("batch_already_running", "A batch is already running. Only one batch can run at a time.");
+            return Fail(ErrorCodes.BatchAlreadyRunning, "A batch is already running. Only one batch can run at a time.");
         }
         catch (JsonException ex)
         {
-            return Fail("invalid_json", $"Could not parse experiments JSON: {ex.Message}");
+            return Fail(ErrorCodes.InvalidJson, $"Could not parse experiments JSON: {ex.Message}");
         }
         catch (OperationCanceledException)
         {
-            return Fail("cancelled", "Batch evaluation was cancelled");
+            return Fail(ErrorCodes.Cancelled, "Batch evaluation was cancelled");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error in batch_evaluate");
-            return Fail("internal_error", ex.Message);
+            return Fail(ErrorCodes.InternalError, ex.Message);
         }
     }
 

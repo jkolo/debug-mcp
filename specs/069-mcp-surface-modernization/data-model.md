@@ -82,6 +82,36 @@ the same call-tool pipeline the Tasks extension wraps.
 - `Success == false` ⟹ `Error` is non-null and `Data` is null.
 - `Error.Code` ∈ `ErrorCodes`. Enforced by a contract test, not by convention.
 
+### Accepted wire-shape deviations from FR-021 ("field names and meanings carried over unchanged")
+
+Migrating 39 tools onto one shared `ToolError`/envelope shape surfaced three cases where a
+byte-identical wire shape and the shared shape genuinely conflict. Rather than special-case the
+shared types per tool, each was resolved once, as policy:
+
+1. **Error fields with no home in `ToolError`.** `evaluate`/`evaluate_safe` legacy errors carried
+   `position` and `exception_type` as siblings of `code`/`message`. `ToolError` has no dedicated
+   fields for them (adding tool-specific fields to the shared error type would defeat FR-018's
+   "one shape for all 39 tools"). Resolution: both now live under `error.details.position` /
+   `error.details.exception_type` — same data, nested one level deeper. No information is lost.
+
+2. **Enum representation: bespoke wire records vs. reused domain types.** The SDK's default
+   structured-content serializer renders C# enums as strings (`"kind":"Method"`); legacy
+   hand-rolled JSON (no enum converter configured) emitted raw integers. Policy: a **bespoke wire
+   record** (one written specifically for the tool's result, e.g. `TimelineQueryEventWire`)
+   preserves the legacy representation exactly, including raw-int enums where that's what shipped
+   before. A tool whose result **reuses a shared domain type** with an enum property
+   (`WorkspaceInfo.Type`, `SymbolUsage.Kind`, `SymbolAssignment.Kind`, `DiagnosticInfo.Severity` —
+   all in the `code_*` tools, T048) follows the SDK serializer's string rendering instead; adding
+   `JsonConverter` attributes to those shared models would also change every MCP *resource* that
+   reuses them, which is out of scope here. The delta is accepted per-field, not fixed with a
+   converter.
+
+3. **Custom lowercase error codes.** `batch_evaluate`'s five codes (`validation_error`,
+   `batch_already_running`, `invalid_json`, `cancelled`, `internal_error`) predate this migration
+   and don't follow the `ErrorCodes` set's `UPPER_SNAKE_CASE` convention. Rather than document
+   this as a deviation from FR-019 ("codes drawn from `ErrorCodes`"), the five were added to
+   `ErrorCodes` verbatim, case preserved — this satisfies FR-019 with zero wire change.
+
 ---
 
 ## 2. Per-tool payload records
