@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -35,9 +36,10 @@ public sealed class BreakpointSetExceptionTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Exception breakpoint information or error response.</returns>
     [McpServerTool(Name = "breakpoint_set_exception", Title = "Set Exception Breakpoint",
-        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Set an exception breakpoint to break when specific exception types are thrown")]
-    public async Task<string> SetExceptionBreakpointAsync(
+    public async Task<BreakpointSetExceptionResult> SetExceptionBreakpointAsync(
         [Description("Full exception type name (e.g., System.NullReferenceException)")] string exception_type,
         [Description("Break on first-chance exception (before catch blocks)")] bool break_on_first_chance = true,
         [Description("Break on second-chance exception (unhandled)")] bool break_on_second_chance = true,
@@ -59,27 +61,29 @@ public sealed class BreakpointSetExceptionTool
             if (string.IsNullOrWhiteSpace(exception_type))
             {
                 _logger.ToolError("breakpoint_set_exception", ErrorCodes.InvalidCondition);
-                return CreateErrorResponse(
-                    ErrorCodes.InvalidCondition,
-                    "Exception type cannot be empty");
+                return new BreakpointSetExceptionResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidCondition, "Exception type cannot be empty"));
             }
 
             // Validate exception type format (basic check)
             if (!IsValidExceptionTypeName(exception_type))
             {
                 _logger.ToolError("breakpoint_set_exception", ErrorCodes.InvalidCondition);
-                return CreateErrorResponse(
-                    ErrorCodes.InvalidCondition,
-                    $"Invalid exception type format: '{exception_type}'. Expected fully qualified type name like 'System.NullReferenceException'");
+                return new BreakpointSetExceptionResult(
+                    Success: false,
+                    Error: new ToolError(
+                        ErrorCodes.InvalidCondition,
+                        $"Invalid exception type format: '{exception_type}'. Expected fully qualified type name like 'System.NullReferenceException'"));
             }
 
             // Must break on at least one type of exception
             if (!break_on_first_chance && !break_on_second_chance)
             {
                 _logger.ToolError("breakpoint_set_exception", ErrorCodes.InvalidCondition);
-                return CreateErrorResponse(
-                    ErrorCodes.InvalidCondition,
-                    "Must break on at least first-chance or second-chance exceptions");
+                return new BreakpointSetExceptionResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidCondition, "Must break on at least first-chance or second-chance exceptions"));
             }
 
             // Set the exception breakpoint
@@ -95,28 +99,30 @@ public sealed class BreakpointSetExceptionTool
             _logger.LogInformation("Set exception breakpoint {Id} for {Type} (first: {First}, second: {Second}, subtypes: {Subtypes})",
                 exceptionBreakpoint.Id, exception_type, break_on_first_chance, break_on_second_chance, include_subtypes);
 
-            // Return success response. The type name is accepted without resolving it against
-            // loaded modules (exception types frequently live in assemblies that load later); make
-            // that explicit so a typo'd type isn't mistaken for an armed, matchable breakpoint (BUG-008).
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                breakpoint = SerializeExceptionBreakpoint(exceptionBreakpoint),
-                note = $"Exception type '{exception_type}' was not verified to exist; this breakpoint only fires if/when an exception of this type (by name) is thrown."
-            }, new JsonSerializerOptions { WriteIndented = true });
+            // The type name is accepted without resolving it against loaded modules (exception
+            // types frequently live in assemblies that load later); make that explicit so a
+            // typo'd type isn't mistaken for an armed, matchable breakpoint (BUG-008).
+            return new BreakpointSetExceptionResult(
+                Success: true,
+                Breakpoint: exceptionBreakpoint,
+                Note: $"Exception type '{exception_type}' was not verified to exist; this breakpoint only fires if/when an exception of this type (by name) is thrown.");
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("breakpoint_set_exception", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return new BreakpointSetExceptionResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, "Operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("breakpoint_set_exception", ErrorCodes.InvalidCondition);
-            return CreateErrorResponse(
-                ErrorCodes.InvalidCondition,
-                $"Failed to set exception breakpoint: {ex.Message}",
-                new { exception_type, exceptionType = ex.GetType().Name });
+            return new BreakpointSetExceptionResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.InvalidCondition,
+                    $"Failed to set exception breakpoint: {ex.Message}",
+                    new { exception_type, exceptionType = ex.GetType().Name }));
         }
     }
 
@@ -155,36 +161,5 @@ public sealed class BreakpointSetExceptionTool
         }
 
         return true;
-    }
-
-    private static object SerializeExceptionBreakpoint(Models.Breakpoints.ExceptionBreakpoint ebp)
-    {
-        return new
-        {
-            id = ebp.Id,
-            exceptionType = ebp.ExceptionType,
-            breakOnFirstChance = ebp.BreakOnFirstChance,
-            breakOnSecondChance = ebp.BreakOnSecondChance,
-            includeSubtypes = ebp.IncludeSubtypes,
-            enabled = ebp.Enabled,
-            verified = ebp.Verified,
-            hitCount = ebp.HitCount
-        };
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        var response = new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        };
-
-        return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
     }
 }
