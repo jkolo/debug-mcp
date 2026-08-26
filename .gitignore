@@ -42,3 +42,6 @@ appsettings.*.json
 Thumbs.db
 *.tmp
 *.swp
+
+# Agent worktrees (ephemeral, per-session)
+.claude/worktrees/

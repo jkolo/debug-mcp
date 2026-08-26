@@ -3,6 +3,7 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -34,9 +35,10 @@ public sealed class BreakpointEnableTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Updated breakpoint information or error response.</returns>
     [McpServerTool(Name = "breakpoint_enable", Title = "Enable/Disable Breakpoint",
-        ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Enable or disable a breakpoint by ID")]
-    public async Task<string> EnableBreakpointAsync(
+    public async Task<BreakpointEnableResult> EnableBreakpointAsync(
         [Description("Breakpoint ID to enable or disable")] string id,
         [Description("True to enable, false to disable")] bool enabled = true,
         CancellationToken cancellationToken = default)
@@ -50,9 +52,9 @@ public sealed class BreakpointEnableTool
             if (string.IsNullOrWhiteSpace(id))
             {
                 _logger.ToolError("breakpoint_enable", ErrorCodes.BreakpointNotFound);
-                return CreateErrorResponse(
-                    ErrorCodes.BreakpointNotFound,
-                    "Breakpoint ID cannot be empty");
+                return new BreakpointEnableResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.BreakpointNotFound, "Breakpoint ID cannot be empty"));
             }
 
             // Enable/disable the breakpoint
@@ -65,73 +67,45 @@ public sealed class BreakpointEnableTool
             if (updatedBreakpoint == null)
             {
                 _logger.ToolError("breakpoint_enable", ErrorCodes.BreakpointNotFound);
-                return CreateErrorResponse(
-                    ErrorCodes.BreakpointNotFound,
-                    $"No breakpoint with ID '{id}'");
+                return new BreakpointEnableResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.BreakpointNotFound, $"No breakpoint with ID '{id}'"));
             }
 
             _logger.LogInformation("Breakpoint {BreakpointId} {Action}",
                 id, enabled ? "enabled" : "disabled");
 
-            // Return success response
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                breakpoint = SerializeBreakpoint(updatedBreakpoint)
-            }, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+            return new BreakpointEnableResult(
+                Success: true,
+                Breakpoint: ToBreakpointInfo(updatedBreakpoint));
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("breakpoint_enable", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return new BreakpointEnableResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, "Operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("breakpoint_enable", ErrorCodes.BreakpointNotFound);
-            return CreateErrorResponse(
-                ErrorCodes.BreakpointNotFound,
-                $"Failed to enable/disable breakpoint: {ex.Message}",
-                new { id, exceptionType = ex.GetType().Name });
+            return new BreakpointEnableResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.BreakpointNotFound,
+                    $"Failed to enable/disable breakpoint: {ex.Message}",
+                    new { id, exceptionType = ex.GetType().Name }));
         }
     }
 
-    private static object SerializeBreakpoint(Breakpoint bp)
-    {
-        return new
-        {
-            id = bp.Id,
-            location = new
-            {
-                file = bp.Location.File,
-                line = bp.Location.Line,
-                column = bp.Location.Column,
-                endLine = bp.Location.EndLine,
-                endColumn = bp.Location.EndColumn,
-                functionName = bp.Location.FunctionName,
-                moduleName = bp.Location.ModuleName
-            },
-            state = bp.State.ToString().ToLowerInvariant(),
-            enabled = bp.Enabled,
-            verified = bp.Verified,
-            condition = bp.Condition,
-            hitCount = bp.HitCount,
-            message = bp.Message
-        };
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        var response = new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        };
-
-        return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static BreakpointInfo ToBreakpointInfo(Breakpoint bp) =>
+        new(
+            Id: bp.Id,
+            Location: bp.Location,
+            State: bp.State.ToString().ToLowerInvariant(),
+            Enabled: bp.Enabled,
+            Verified: bp.Verified,
+            HitCount: bp.HitCount,
+            Condition: bp.Condition,
+            Message: bp.Message);
 }
