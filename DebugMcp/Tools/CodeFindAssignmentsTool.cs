@@ -4,6 +4,7 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.CodeAnalysis;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -18,8 +19,6 @@ public sealed class CodeFindAssignmentsTool
 {
     private readonly ICodeAnalysisService _codeAnalysisService;
     private readonly ILogger<CodeFindAssignmentsTool> _logger;
-
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public CodeFindAssignmentsTool(ICodeAnalysisService codeAnalysisService, ILogger<CodeFindAssignmentsTool> logger)
     {
@@ -38,9 +37,10 @@ public sealed class CodeFindAssignmentsTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of assignment locations or error response.</returns>
     [McpServerTool(Name = "code_find_assignments", Title = "Find Assignments",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Find all assignments to a variable, field, or property. Includes simple assignments, compound (+=, -=), increment/decrement (++, --), and out/ref parameters.")]
-    public async Task<string> FindAssignmentsAsync(
+    public async Task<CodeFindAssignmentsResult> FindAssignmentsAsync(
         [Description("Fully qualified symbol name. Mutually exclusive with file/line/column.")] string? name = null,
         [Description("Optional symbol kind filter: Field, Property, Local, Parameter")] string? symbolKind = null,
         [Description("Absolute path to source file containing the symbol. Used with line/column.")] string? file = null,
@@ -57,7 +57,7 @@ public sealed class CodeFindAssignmentsTool
             if (_codeAnalysisService.CurrentWorkspace is null)
             {
                 _logger.ToolError("code_find_assignments", ErrorCodes.NoWorkspace);
-                return CreateErrorResponse(ErrorCodes.NoWorkspace, "No workspace loaded. Call code_load first.");
+                return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, "No workspace loaded. Call code_load first."));
             }
 
             // Validate parameters
@@ -67,13 +67,13 @@ public sealed class CodeFindAssignmentsTool
             if (!hasName && !hasLocation)
             {
                 _logger.ToolError("code_find_assignments", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, "Either 'name' or 'file'+'line'+'column' must be provided.");
+                return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, "Either 'name' or 'file'+'line'+'column' must be provided."));
             }
 
             if (hasName && hasLocation)
             {
                 _logger.ToolError("code_find_assignments", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, "Provide either 'name' or 'file'+'line'+'column', not both.");
+                return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, "Provide either 'name' or 'file'+'line'+'column', not both."));
             }
 
             // Parse symbol kind if provided
@@ -83,14 +83,14 @@ public sealed class CodeFindAssignmentsTool
                 if (!Enum.TryParse<SymbolKind>(symbolKind, ignoreCase: true, out var kind))
                 {
                     _logger.ToolError("code_find_assignments", ErrorCodes.InvalidParameter);
-                    return CreateErrorResponse(ErrorCodes.InvalidParameter, $"Invalid symbol kind: {symbolKind}. Valid values: Field, Property, Local, Parameter.");
+                    return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, $"Invalid symbol kind: {symbolKind}. Valid values: Field, Property, Local, Parameter."));
                 }
 
                 // Validate it's an assignable symbol kind
                 if (kind is not (SymbolKind.Field or SymbolKind.Property or SymbolKind.Local or SymbolKind.Parameter))
                 {
                     _logger.ToolError("code_find_assignments", ErrorCodes.InvalidParameter);
-                    return CreateErrorResponse(ErrorCodes.InvalidParameter, $"Symbol kind {symbolKind} is not assignable. Use Field, Property, Local, or Parameter.");
+                    return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, $"Symbol kind {symbolKind} is not assignable. Use Field, Property, Local, or Parameter."));
                 }
 
                 parsedKind = kind;
@@ -111,11 +111,13 @@ public sealed class CodeFindAssignmentsTool
             if (symbol is null)
             {
                 _logger.ToolError("code_find_assignments", ErrorCodes.SymbolNotFound);
-                return CreateErrorResponse(
-                    ErrorCodes.SymbolNotFound,
-                    hasName
-                        ? $"Symbol not found: {name}"
-                        : $"No symbol found at {file}:{line}:{column}");
+                return new CodeFindAssignmentsResult(
+                    Success: false,
+                    Error: new ToolError(
+                        ErrorCodes.SymbolNotFound,
+                        hasName
+                            ? $"Symbol not found: {name}"
+                            : $"No symbol found at {file}:{line}:{column}"));
             }
 
             // Find all assignments
@@ -124,53 +126,37 @@ public sealed class CodeFindAssignmentsTool
             stopwatch.Stop();
             _logger.ToolCompleted("code_find_assignments", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                data = new
+            return new CodeFindAssignmentsResult(
+                Success: true,
+                Data: new CodeFindAssignmentsData
                 {
-                    symbol = new
+                    Symbol = new FindAssignmentsSymbolSummary
                     {
-                        name = symbol.Name,
-                        fully_qualified_name = symbol.FullyQualifiedName,
-                        kind = symbol.Kind.ToString(),
-                        containing_type = symbol.ContainingType,
-                        declaration_file = symbol.DeclarationFile,
-                        declaration_line = symbol.DeclarationLine
+                        Name = symbol.Name,
+                        FullyQualifiedName = symbol.FullyQualifiedName,
+                        Kind = symbol.Kind.ToString(),
+                        ContainingType = symbol.ContainingType,
+                        DeclarationFile = symbol.DeclarationFile,
+                        DeclarationLine = symbol.DeclarationLine
                     },
-                    assignments_count = assignments.Count,
-                    assignments
-                }
-            }, JsonOptions);
+                    AssignmentsCount = assignments.Count,
+                    Assignments = assignments
+                });
         }
         catch (InvalidOperationException ex)
         {
             _logger.ToolError("code_find_assignments", ErrorCodes.NoWorkspace);
-            return CreateErrorResponse(ErrorCodes.NoWorkspace, ex.Message);
+            return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, ex.Message));
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("code_find_assignments", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Find assignments operation was cancelled");
+            return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, "Find assignments operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("code_find_assignments", ErrorCodes.AnalysisFailed);
-            return CreateErrorResponse(ErrorCodes.AnalysisFailed, $"Find assignments failed: {ex.Message}");
+            return new CodeFindAssignmentsResult(Success: false, Error: new ToolError(ErrorCodes.AnalysisFailed, $"Find assignments failed: {ex.Message}"));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new ErrorResponse
-            {
-                Code = code,
-                Message = message,
-                Details = details
-            }
-        }, JsonOptions);
     }
 }
