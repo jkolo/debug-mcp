@@ -40,6 +40,7 @@ Search for types and methods across all loaded modules.
 | `module_filter` | string | No | Limit to specific module (supports `*` wildcard) |
 | `case_sensitive` | boolean | No | Case-sensitive matching (default: false) |
 | `max_results` | integer | No | Max results (max: 100, default: 50) |
+| `timeout_ms` | integer | No | Maximum time to wait for the module search, in milliseconds (default: 30000) |
 
 **Example:**
 ```json
@@ -113,6 +114,7 @@ Get types defined in a module, organized by namespace.
 | `visibility` | string | No | Filter: `public`, `internal`, `private`, `protected` |
 | `max_results` | integer | No | Max types to return (default: 100) |
 | `continuation_token` | string | No | Token for pagination |
+| `timeout_ms` | integer | No | Maximum time to wait for the type listing, in milliseconds (default: 30000) |
 
 **Example:**
 ```json
@@ -171,6 +173,7 @@ Get members (methods, properties, fields, events) of a type.
 | `visibility` | string | No | Filter: `public`, `internal`, `private`, `protected` |
 | `include_static` | boolean | No | Include static members (default: true) |
 | `include_instance` | boolean | No | Include instance members (default: true) |
+| `timeout_ms` | integer | No | Maximum time to wait for the member listing, in milliseconds (default: 30000) |
 
 **Example:**
 ```json

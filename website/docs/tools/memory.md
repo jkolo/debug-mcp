@@ -30,6 +30,7 @@ Read raw memory bytes from the debuggee process.
 | `address` | string | Yes | Memory address in hex (e.g., `0x00007FF8A1234560`) or decimal |
 | `size` | integer | No | Number of bytes to read (default: 256, max: 65536) |
 | `format` | string | No | Output format: `hex`, `hex_ascii` (default), `raw` |
+| `timeout_ms` | integer | No | Maximum time to wait for the memory read, in milliseconds (default: 30000) |
 
 **Example:**
 ```json
@@ -80,6 +81,7 @@ Get the memory layout of a type including field offsets, sizes, and padding.
 | `include_padding` | boolean | No | Include padding analysis (default: true) |
 | `thread_id` | integer | No | Thread ID (default: current) |
 | `frame_index` | integer | No | Frame index (default: 0) |
+| `timeout_ms` | integer | No | Maximum time to wait for the layout retrieval, in milliseconds (default: 30000) |
 
 **Example:**
 ```json
@@ -167,6 +169,7 @@ Analyze object references — find what objects a target references (outbound).
 | `include_arrays` | boolean | No | Include array element references (default: true) |
 | `thread_id` | integer | No | Thread ID (default: current) |
 | `frame_index` | integer | No | Frame index (default: 0) |
+| `timeout_ms` | integer | No | Maximum time to wait for the reference analysis, in milliseconds (default: 30000) |
 
 **Example:**
 ```json

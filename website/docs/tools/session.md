@@ -32,6 +32,7 @@ Launch a .NET application under the debugger.
 | `cwd` | string | No | Working directory |
 | `env` | object | No | Environment variables |
 | `stop_at_entry` | boolean | No | Break on entry point (default: false) |
+| `timeout` | integer | No | Maximum time to wait for launch, in milliseconds (default: 30000) |
 
 **Example request:**
 ```json
@@ -73,6 +74,7 @@ Attach to a running .NET process.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `pid` | integer | Yes | Process ID to attach to |
+| `timeout` | integer | No | Maximum time to wait for attachment, in milliseconds (default: 30000) |
 
 **Example request:**
 ```json
@@ -114,6 +116,7 @@ End the debugging session.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `terminate` | boolean | No | Kill the process (default: false) |
+| `timeout` | integer | No | Maximum time to wait for disconnect before force-killing the process, in milliseconds (default: 10000) |
 
 **Example request:**
 ```json

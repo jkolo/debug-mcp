@@ -38,6 +38,7 @@ Get the stack trace for a thread.
 | `thread_id` | integer | No | Thread ID (default: current) |
 | `start_frame` | integer | No | Start from frame N (default: 0) |
 | `max_frames` | integer | No | Max frames to return (default: 20) |
+| `timeout_ms` | integer | No | Maximum time to wait for the stack trace, in milliseconds (default: 30000). Accepted for consistency with the other inspection tools; the underlying call is synchronous and returns immediately, so this parameter currently has no effect. |
 
 **Response:**
 ```json
@@ -93,6 +94,7 @@ Get variables for a stack frame.
 | `frame_index` | integer | No | Frame index (default: 0 = top) |
 | `scope` | string | No | `locals`, `arguments`, `this`, or `all` (default: `all`) |
 | `expand` | string | No | Variable path to expand children |
+| `timeout_ms` | integer | No | Maximum time to wait for variable retrieval, in milliseconds (default: 30000). Accepted for consistency with the other inspection tools; the underlying call is synchronous and returns immediately, so this parameter currently has no effect. |
 
 **Response:**
 ```json
@@ -169,6 +171,7 @@ Evaluate a C# expression in the context of a stopped thread.
 | `thread_id` | integer | No | Thread context |
 | `frame_index` | integer | No | Stack frame context |
 | `format` | string | No | Output format: `default`, `hex`, `binary` |
+| `timeout_ms` | integer | No | Evaluation timeout in ms (default: 5000) |
 
 **Examples:**
 
@@ -277,6 +280,7 @@ Inspect a heap object's contents including all fields, sizes, and addresses.
 | `depth` | integer | No | Max depth for nested expansion (1-10, default: 1) |
 | `thread_id` | integer | No | Thread ID (default: current) |
 | `frame_index` | integer | No | Frame index (default: 0) |
+| `timeout_ms` | integer | No | Maximum time to wait for the object inspection, in milliseconds (default: 30000) |
 
 **Example:**
 ```json

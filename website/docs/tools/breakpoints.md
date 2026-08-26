@@ -41,6 +41,7 @@ Set a breakpoint in source code.
 | `condition` | string | No | Condition expression |
 | `hit_count` | integer | No | Break after N hits |
 | `log_message` | string | No | Log message (logpoint — doesn't break) |
+| `timeout_ms` | integer | No | Maximum time to wait for the breakpoint to be set/verified, in milliseconds (default: 30000) |
 
 *Either `file`+`line` or `function` is required.
 
@@ -246,6 +247,7 @@ Set a tracepoint (non-blocking observation point) at a source location.
 | `log_message` | string | No | Log message template with `{expression}` placeholders |
 | `hit_count_multiple` | integer | No | Notify only every Nth hit (0 = every hit) |
 | `max_notifications` | integer | No | Auto-disable after N notifications (0 = unlimited) |
+| `timeout_ms` | integer | No | Maximum time to wait for the tracepoint to be set/verified, in milliseconds (default: 30000) |
 
 **Examples:**
 
@@ -341,6 +343,7 @@ Get full exception context when paused at an exception.
 | `max_frames` | integer | No | Maximum stack frames to return (1–100, default: 10) |
 | `include_variables_for_frames` | integer | No | Number of top frames to include local variables for (0–10, default: 1). Set to 0 to skip variable collection. |
 | `max_inner_exceptions` | integer | No | Maximum inner exception chain depth (0–20, default: 5). Set to 0 to skip inner exceptions. |
+| `timeout_ms` | integer | No | Maximum time to wait for exception context retrieval, in milliseconds (default: 30000) |
 
 **Example request:**
 ```json

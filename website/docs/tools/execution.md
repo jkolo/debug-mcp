@@ -28,6 +28,7 @@ Resume execution.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `thread_id` | integer | No | Resume specific thread only |
+| `timeout` | integer | No | Timeout, in milliseconds (default: 30000) |
 
 **Response:**
 ```json
@@ -49,7 +50,11 @@ Pause execution.
 
 **When to use:** The process is running and you need to stop it immediately — for example, to inspect what's happening in a loop or a long-running operation.
 
-**Parameters:** None
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `timeout` | integer | No | Maximum time to wait for the process to pause, in milliseconds (default: 30000) |
 
 **Response:**
 ```json
@@ -82,6 +87,7 @@ Step through code. Supports three modes: step over (next line), step into (enter
 |------|------|----------|-------------|
 | `action` | string | Yes | `over`, `into`, or `out` |
 | `thread_id` | integer | No | Thread to step (default: current) |
+| `timeout` | integer | No | Timeout, in milliseconds (default: 30000) |
 
 **Example (step over):**
 ```json

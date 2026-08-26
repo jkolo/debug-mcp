@@ -34,6 +34,7 @@ Load a solution or project file into the analysis workspace.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `path` | string | Yes | Absolute path to .sln or .csproj file |
+| `timeoutMs` | integer | No | Maximum time to wait for the workspace to load, in milliseconds (default: 30000) |
 
 **Response:**
 ```json
@@ -84,6 +85,7 @@ Find all usages of a symbol across the workspace.
 | `file` | string | No* | Absolute path to source file (use with line/column) |
 | `line` | integer | No* | 1-based line number (use with file/column) |
 | `column` | integer | No* | 1-based column number (use with file/line) |
+| `timeoutMs` | integer | No | Maximum time to wait for the usage search, in milliseconds (default: 30000) |
 
 *Either `name` OR `file`+`line`+`column` must be provided.
 
@@ -185,6 +187,7 @@ Find all assignments to a variable, field, or property.
 | `file` | string | No* | Absolute path to source file |
 | `line` | integer | No* | 1-based line number |
 | `column` | integer | No* | 1-based column number |
+| `timeoutMs` | integer | No | Maximum time to wait for the assignment search, in milliseconds (default: 30000) |
 
 *Either `name` OR `file`+`line`+`column` must be provided.
 
@@ -283,6 +286,7 @@ Get compilation diagnostics (errors and warnings) for projects.
 | `projectName` | string | No | Filter to specific project |
 | `minSeverity` | string | No | Minimum severity: Hidden, Info, Warning (default), Error |
 | `maxResults` | integer | No | Max diagnostics to return (default: 100, max: 500) |
+| `timeoutMs` | integer | No | Maximum time to wait for diagnostics retrieval, in milliseconds (default: 30000) |
 
 **Example:**
 ```json
@@ -356,6 +360,7 @@ Navigate to the definition of a symbol.
 | `file` | string | Yes | Absolute path to source file |
 | `line` | integer | Yes | 1-based line number where symbol appears |
 | `column` | integer | Yes | 1-based column number where symbol appears |
+| `timeoutMs` | integer | No | Maximum time to wait for the definition lookup, in milliseconds (default: 30000) |
 
 **Example:**
 ```json

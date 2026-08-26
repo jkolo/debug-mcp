@@ -50,7 +50,7 @@ engine](#self-installing-engine) and [Opt-out](#opt-out) above.
 | `severity` | string | No | Minimum **native** severity: `error` \| `warning` \| `suggestion` \| `hint` |
 | `project` | string | No | Restrict the inspection to a single project within the solution |
 | `noBuild` | boolean | No | Skip the engine's pre-analysis build when already built (default: false) |
-| `timeoutSeconds` | integer | No | Per-call inspection budget, 10–1800s; excludes the one-time engine download (separate budget) |
+| `timeoutSeconds` | integer | No | Per-call inspection budget, 10–1800s; excludes the one-time engine download (separate budget) (default: 300) |
 | `maxResults` | integer | No | Cap on returned findings (default/max 500) |
 
 **Example:**
@@ -85,7 +85,7 @@ solution — faster turnaround when you only care about the project you're activ
 | `projectPath` | string | Yes | Absolute path to the `.csproj` file |
 | `severity` | string | No | Minimum **native** severity: `error` \| `warning` \| `suggestion` \| `hint` |
 | `noBuild` | boolean | No | Skip the engine's pre-analysis build when already built (default: false) |
-| `timeoutSeconds` | integer | No | Per-call inspection budget, 10–1800s; excludes the one-time engine download (separate budget) |
+| `timeoutSeconds` | integer | No | Per-call inspection budget, 10–1800s; excludes the one-time engine download (separate budget) (default: 300) |
 | `maxResults` | integer | No | Cap on returned findings (default/max 500) |
 
 **Example:**

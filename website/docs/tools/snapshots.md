@@ -36,6 +36,7 @@ a later point in execution — for example, before continuing past a suspected m
 | `thread_id` | integer | No | Thread to capture variables from (default: active thread) |
 | `frame_index` | integer | No | Stack frame index, 0 = top of stack (default: 0) |
 | `depth` | integer | No | Expansion depth for nested objects, 0 = top-level only (default: 0) |
+| `timeout_ms` | integer | No | Maximum time to wait for the snapshot to be created, in milliseconds (default: 30000). Accepted for consistency with the other inspection tools; the underlying call is synchronous and returns immediately, so this parameter currently has no effect. |
 
 **Example:**
 ```json
