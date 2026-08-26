@@ -42,6 +42,35 @@ instead — read once, or subscribe to be notified on change:
 server additionally pushes a `debugger/sessionStateChanged` notification whenever the session's
 state transitions.
 
+## Long operations: progress and deferred results
+
+Five tools — `resharper_inspect_solution`, `resharper_inspect_project`, `batch_evaluate`,
+`debug_launch`, `code_load` — can genuinely take a while (a first-run ~180 MB ReSharper engine
+download, a full solution build, many experiments in one batch). These report named progress
+stages as they run, and a client that declares the MCP Tasks capability gets back a pollable,
+cancellable handle instead of blocking the request on the whole operation. A client that does
+neither sees no difference from any other tool call — both behaviors are opt-in per request. See
+[Architecture: Cross-Cutting Concerns](/docs/architecture#cross-cutting-concerns-mcp-surface-modernization)
+for the full design.
+
+## Every response, every error, one shape
+
+All 39 tools share one envelope — `{success, ...fields, error?}` on success or failure — and one
+error shape, `{code, message, details?}`. A handful of tools that return unbounded collections
+(`variables_get`, `types_get`, `code_get_diagnostics`, and others) can additionally carry a
+`truncation` field, `{returned, available, reason}`, when a 256 KB response-size budget trims the
+result — never silently.
+
+## Timeouts
+
+Every tool whose work waits on the debuggee, a build, a symbol server, or the ReSharper engine
+accepts an optional timeout parameter — see that tool's own **Parameters** table for its exact
+name and default (most default to 30 seconds; a few keep their own longer or shorter default that
+predates this concern). Exhausting the budget returns a `TIMEOUT` error naming the elapsed time
+and leaves the session usable for the next call. Tools that only read already-captured, in-memory
+server state (listed under "No tool call needed" above, plus a few others like `snapshot_diff`)
+don't accept a timeout — there's nothing external for one to bound.
+
 ## Session State Requirements
 
 Tools require different session states to work:
