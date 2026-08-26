@@ -37,7 +37,7 @@ Every tool entry gains an `outputSchema` describing its success payload. `inputS
         }
       }
     },
-    "required": ["success", "variables"]
+    "required": ["success"]
   },
   "annotations": { /* unchanged */ }
 }
@@ -47,6 +47,12 @@ Every tool entry gains an `outputSchema` describing its success payload. `inputS
 - Every tool **MUST** publish an `outputSchema`. A tool without one fails the build (FR-016, FR-020).
 - The spec is binding here: *"If an output schema is provided: Servers MUST provide structured
   results that conform to this schema."* Conformance is asserted by contract test, not assumed.
+- **Only `success` may be schema-required.** Every other property — including `error` — must
+  declare a default (`= null` on the record parameter) so the generated schema does not require
+  it. Corrected after an implementation-time pilot: a failure result omits every domain field, and
+  a positional record parameter without a default is schema-required regardless of its C#
+  nullability, so `"required": ["success", "variables"]` (this doc's earlier example) made every
+  failure result fail its own schema. `variables` is now correctly omitted from `required`.
 
 ---
 
@@ -121,7 +127,9 @@ Every tool entry gains an `outputSchema` describing its success payload. `inputS
 - `isError: true` **MUST** be set. This is new: today failure is signalled only by the `success`
   field inside the text payload, so a client cannot distinguish success from failure without
   parsing. The spec reserves `isError` for tool *execution* errors, which clients **SHOULD** feed
-  back to the model for self-correction.
+  back to the model for self-correction. Implemented as one `AddCallToolFilter` in `Program.cs`
+  (T053) that reads `success` off every tool's `StructuredContent` after the call — no tool sets
+  `isError` itself, so a tool cannot forget it.
 - `success: false` is **retained** alongside `isError` so existing consumers keep working.
 
 ### Protocol errors are different

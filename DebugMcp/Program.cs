@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Reflection;
 using DebugMcp.Infrastructure;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
@@ -284,7 +285,8 @@ rootCommand.SetAction(async parseResult =>
         })
         .WithTasks(
             new ExpiryAwareTaskStore(new InMemoryMcpTaskStore { DefaultTimeToLive = TimeSpan.FromHours(1) }),
-            opts => opts.ExecutionModeSelector = TaskExecutionPolicy.SelectMode);
+            opts => opts.ExecutionModeSelector = TaskExecutionPolicy.SelectMode)
+        .WithRequestFilters(f => f.AddCallToolFilter(ToolResultSerializer.IsErrorFilter));
 
     // Add MCP logger provider (must be after AddMcpServer)
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();

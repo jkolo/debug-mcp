@@ -12,7 +12,34 @@ Project conventions apply throughout: **positional records**, immutable updates 
 Replaces the hand-assembled `JsonSerializer.Serialize(new { success = ..., ... })` that every
 tool builds today.
 
-### `ToolResult<T>`
+**Corrected during US3 implementation, after an empirical pilot (`SnapshotDeleteTool`) against
+SDK 2.2.0.** `ToolResult<T>` (below) does **not** become the wire-serialized type any tool
+returns. Verified via `[McpServerTool(UseStructuredContent = true)]` + `McpServerTool.Create` /
+a real client over `tests/DebugMcp.Tests/Support/InProcessMcpHarness.cs`: the SDK derives both
+`outputSchema` and `structuredContent` directly from the tool method's C# return type by
+reflection, with **no flattening step** — a method returning `Task<ToolResult<VariablesResult>>`
+would publish (and emit) a schema with `data` as a **nested** object, but
+[contracts/tool-result-contract.md](./contracts/tool-result-contract.md)'s wire examples are
+**flat** (`success` and `variables` as siblings). Reconciling the two would need a custom
+`JsonConverter` that flattens `Data`'s properties into the parent object at write time *and*
+teaches the SDK's schema generator to do the same at discovery time — verified unnecessary: each
+tool instead defines **its own flat record**, combining `Success`, its domain fields, and
+`Error` as siblings, and returns that record directly. `ToolResult<T>` remains in
+`DebugMcp/Models/Results/ToolResult.cs` — its invariant-checking constructor and its own unit
+tests (T004) are still valid and useful as a general-purpose validation aid — but no tool's
+method signature uses it as a return type. `ToolError` and `TruncationInfo` **are** reused
+directly, unchanged, as the nested `error`/`truncation` wire shapes every flat record embeds.
+
+**Requiredness pitfall, also found on the pilot**: a positional record parameter with no default
+becomes `required` in the generated schema regardless of its C# nullability annotation (`string?`
+without `= null` is still schema-required). Since a failure result omits every domain field, only
+`Success` may lack a default — every other property, including `Error`, **MUST** declare
+`= null` (or an equivalent default) or the tool's own failure results fail their own schema
+(caught by T040). This also corrects this contract's earlier `"required": ["success",
+"variables"]` example, which is unachievable once failure results are validated against the same
+schema — `contracts/tool-result-contract.md` is corrected accordingly.
+
+### `ToolResult<T>` — validation helper, not a wire type (see correction above)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -22,9 +49,17 @@ tool builds today.
 | `Warnings` | `IReadOnlyList<string>` | Empty by default. Serves the constitution's "partial success: return data with warnings array". |
 | `Truncation` | `TruncationInfo?` | Present only when the result was bounded. Never silent — see edge case in spec. |
 
-The protocol-level `isError` flag is set from `Success == false`; it is **not** a field on the
-record. Both signals are emitted: `isError` for clients that read the protocol, `Success` for
-clients that read the payload.
+**Per-tool flat records** carry the equivalent shape directly: `Success`, the tool's own domain
+fields (each defaulted to `null`), `Error`, and — for the tools FR-035 lists — `Truncation`.
+`Warnings` is included only on tools that actually use it.
+
+The protocol-level `isError` flag is set from `Success == false` by **one central mechanism**,
+not per tool (T053): a `McpRequestFilterBuilderExtensions.AddCallToolFilter` registered once in
+`Program.cs`, which inspects the outgoing `CallToolResult.StructuredContent` for a top-level
+`success` boolean and sets `IsError` accordingly after the tool method returns. Verified this
+composes correctly with MCP Tasks deferral (T031/T032): a deferred call's stored task `Result`
+carries the same `isError` the synchronous path would have, because the filter runs as part of
+the same call-tool pipeline the Tasks extension wraps.
 
 ### `ToolError`
 

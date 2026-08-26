@@ -160,13 +160,49 @@ block for backward compatibility, and fail in one shared shape.
 tool's `structuredContent` validates against it; assert a client reading only `content[0].text`
 works unchanged.
 
+> **Pilot completed before fan-out (advisor-directed), `snapshot_delete` migrated for real.**
+> Two mechanism unknowns were resolved empirically (real client+server over
+> `InProcessMcpHarness`, plus `McpServerTool.Create` for schema-only reflection) before touching
+> the other 38 tools:
+> - `[McpServerTool(UseStructuredContent = true)]` + a method returning `Task<TFlatRecord>`
+>   directly is sufficient — the SDK derives **both** `outputSchema` and `structuredContent`
+>   (and `content[0].text`, byte-identical to `structuredContent`, compact not indented) from the
+>   C# return type by reflection. **`ToolResult<T>` (T004) is not that return type** — its `Data`
+>   would serialize nested under a `"data"` key, contradicting the flat wire shape
+>   `contracts/tool-result-contract.md` specifies. Each tool instead gets its **own flat record**
+>   (`Success`, its domain fields, `Error`), reusing the shared `ToolError`/`TruncationInfo`
+>   types. `ToolResult<T>` remains as a validation helper only — see data-model.md §1's
+>   correction.
+> - **Requiredness pitfall**: a record parameter without `= default` becomes schema-`required`
+>   regardless of C# nullability. Every field except `Success` **MUST** declare a default, or a
+>   failure result (which omits every domain field) fails its own schema. Caught by T040 on the
+>   pilot; `contracts/tool-result-contract.md`'s `required` example is corrected.
+> - Default naming policy is **camelCase** (`RemainingCount` → `remainingCount`), matching most
+>   existing tools already. Tools with legacy **snake_case** fields (`batch_evaluate` above all)
+>   need explicit `[JsonPropertyName("...")]` per field — camelCase will not reproduce them.
+> - `isError` is **not** inferred automatically from any field — confirmed both flags stayed
+>   unset on the pilot until a central `AddCallToolFilter` (T053, implemented alongside the
+>   pilot as `DebugMcp/Models/Results/ToolResultSerializer.IsErrorFilter`, wired in `Program.cs`)
+>   reads `StructuredContent.success` after every call and sets it. Verified this composes
+>   correctly with MCP Tasks deferral (T031/T032): a deferred domain failure's stored task
+>   `Result` carries `isError:true` too.
+>
+> T044–T052 prompts must carry this pattern explicitly, plus: enum-ish fields stay lowercase
+> `string` exactly as today, never a C# enum, in the wire record; nullable-with-default
+> reproduces today's conditional-key-omission (confirmed — the SDK omits `null` properties);
+> keep existing `CancellationToken`/`IProgress`/logging/try-catch, with catch blocks now
+> constructing the typed failure record instead of a JSON string; convert that tool's existing
+> unit tests off string-parsing; and add one case per tool to `LegacyTextContractTests.cs`
+> alongside the migration, following the `snapshot_delete` cases already there as the worked
+> example (so T050's group only has `SnapshotCreateTool`/`SnapshotDiffTool` left).
+
 ### Tests for User Story 3 ⚠️ Write first, watch them fail
 
-- [ ] T039 [P] [US3] Write a failing contract test asserting all 39 tools publish an `outputSchema` in `tests/DebugMcp.Tests/Contract/OutputSchemaPresenceTests.cs`
-- [ ] T040 [P] [US3] Write a failing contract test validating each tool's result against its own published schema, using the T007 helper, in `tests/DebugMcp.Tests/Contract/OutputSchemaConformanceTests.cs`
-- [ ] T041 [P] [US3] Write a failing contract test asserting every failure carries `isError: true` **and** `success: false` **and** a code drawn from `ErrorCodes` in `tests/DebugMcp.Tests/Contract/ErrorShapeContractTests.cs`
-- [ ] T042 [P] [US3] Write a failing backward-compatibility test that parses only `content[0].text` and asserts field names and meanings are unchanged from today, in `tests/DebugMcp.Tests/Contract/LegacyTextContractTests.cs`
-- [ ] T043 [P] [US3] Write a failing documentation-coverage test asserting every tool is named in `website/docs/tools/*.md` and no documented tool is missing, in `tests/DebugMcp.Tests/Contract/ToolDocCoverageTests.cs`
+- [X] T039 [P] [US3] Written in `tests/DebugMcp.Tests/Contract/OutputSchemaPresenceTests.cs` — reflection-only (no DI), asserts every tool's attribute has `UseStructuredContent = true` and `McpServerTool.Create` produces a non-null `OutputSchema`. RED for every unmigrated tool (all `UseStructuredContent = false` today), GREEN for `snapshot_delete` after the pilot
+- [X] T040 [P] [US3] Written in `tests/DebugMcp.Tests/Contract/OutputSchemaConformanceTests.cs`, using the T007 `SchemaValidator` plus the new `ToolResultShape` reflection helper (`tests/DebugMcp.Tests/Support/ToolResultShape.cs`) to construct a representative "success" and "failure" instance of each tool's result record and validate both against the tool's own schema — this is what caught the requiredness pitfall above
+- [X] T041 [P] [US3] Scoped structurally (a live 39-tool invocation isn't practical pre-migration): `tests/DebugMcp.Tests/Contract/ErrorShapeContractTests.cs` asserts every migrated tool's result type exposes an `Error` property of exactly the shared `ToolError` type — "one shape for all 39 tools" by construction. `code ∈ ErrorCodes` remains enforced the existing way, at each `ErrorCodes.*` call site
+- [X] T042 [P] [US3] Written in `tests/DebugMcp.Tests/Contract/LegacyTextContractTests.cs` as a characterization test (passes today, must keep passing through the refactor — not a RED-first feature test): calls the real tool, serializes its result the way the SDK does, and asserts on specific known field names/values. Seeded with the `snapshot_delete` pilot's two cases; each T044–T052 group adds its own tool's case here
+- [X] T043 [P] [US3] Written in `tests/DebugMcp.Tests/Contract/ToolDocCoverageTests.cs` — scans `### tool_name` headings across `website/docs/tools/*.md` (excluding `index.md`) and diffs both directions against `McpToolDiscovery`. RED today (`batch_evaluate` and others undocumented — pre-existing gap, not something this migration introduces) until T055
 
 ### Implementation for User Story 3
 
@@ -180,10 +216,10 @@ carried over unchanged (FR-021). All are `[P]` — disjoint file sets.
 - [ ] T047 [P] [US3] Migrate 6 further inspection tools (`CollectionAnalyzeTool`, `ExceptionGetContextTool`, `LayoutGetTool`, `MembersGetTool`, `ReferencesGetTool`, `TypesGetTool`) in `DebugMcp/Tools/`
 - [ ] T048 [P] [US3] Migrate the 5 code-analysis tools (`CodeLoadTool`, `CodeGoToDefinitionTool`, `CodeFindUsagesTool`, `CodeFindAssignmentsTool`, `CodeGetDiagnosticsTool`) in `DebugMcp/Tools/`
 - [ ] T049 [P] [US3] Migrate the 2 ReSharper tools (`ReSharperInspectSolutionTool`, `ReSharperInspectProjectTool`) in `DebugMcp/Tools/`
-- [ ] T050 [P] [US3] Migrate the 3 snapshot tools (`SnapshotCreateTool`, `SnapshotDeleteTool`, `SnapshotDiffTool`) in `DebugMcp/Tools/`
+- [X] T050 [P] [US3] **`SnapshotDeleteTool` migrated as the pilot** (`DebugMcp/Models/Results/SnapshotDeleteResult.cs`). Remaining: `SnapshotCreateTool`, `SnapshotDiffTool` in `DebugMcp/Tools/`
 - [ ] T051 [P] [US3] Migrate the 2 process-I/O tools (`ProcessReadOutputTool`, `ProcessWriteInputTool`) in `DebugMcp/Tools/`
 - [ ] T052 [P] [US3] Migrate `MemoryReadTool`, `ModulesSearchTool`, `BatchEvaluateTool` and `TimelineQueryTool` in `DebugMcp/Tools/`
-- [ ] T053 [US3] In `DebugMcp/Models/Results/ToolResultSerializer.cs`, set protocol-level `isError` from `ToolResult.Success` centrally so no tool sets it individually, **and** guarantee the serialized-JSON text block accompanies `structuredContent` on every result — FR-017 is a spec-level SHOULD that the SDK may not honour by itself, so this task owns it rather than leaving T042 as a test with no implementation behind it
+- [X] T053 [US3] Central `isError` mechanism implemented alongside the pilot: `DebugMcp/Models/Results/ToolResultSerializer.IsErrorFilter`, an `AddCallToolFilter` wired once in `Program.cs`, reading `StructuredContent.success` after every call. The FR-017 text-block guarantee needed no extra code — confirmed the SDK always mirrors `structuredContent` into `content[0].text` when `UseStructuredContent = true`
 - [ ] T054 [US3] Implement the 256 KB serialized-result budget from FR-035 in `DebugMcp/Models/Results/ToolResultSerializer.cs`, and attach `TruncationInfo` in the 14 collection-returning tools FR-035 enumerates, replacing any silent trimming. Tools outside that list must not truncate
 - [ ] T055 [US3] Update `website/docs/tools/*.md` so every tool name is present and none is stale, making T043 pass
 - [ ] T056 [US3] Wire T039–T043 into the build so divergence fails it, per the four conditions in [contracts/tool-result-contract.md](./contracts/tool-result-contract.md)
