@@ -132,16 +132,32 @@ public sealed class ModulesSearchTool
                     Visibility: m.Method.Visibility.ToString().ToLowerInvariant(),
                     IsStatic: m.Method.IsStatic))).ToList();
 
+            const int perCollectionBudget = ResultTruncation.DefaultBudgetBytes / 2;
+            var (boundedTypes, typesTruncation) = ResultTruncation.Bound(
+                typeList, "types exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (boundedMethods, methodsTruncation) = ResultTruncation.Bound(
+                methodList, "methods exceeded its share of the 256 KB size budget", perCollectionBudget);
+
+            var truncations = new[] { typesTruncation, methodsTruncation }
+                .Where(t => t is not null).Cast<TruncationInfo>().ToList();
+            var combinedTruncation = truncations.Count == 0
+                ? null
+                : new TruncationInfo(
+                    Returned: truncations.Sum(t => t.Returned),
+                    Available: truncations.Sum(t => t.Available ?? 0),
+                    Reason: string.Join("; ", truncations.Select(t => t.Reason)));
+
             return new ModulesSearchResult(
                 Success: true,
                 Query: result.Query,
                 SearchType: result.SearchType.ToString().ToLowerInvariant(),
-                Types: typeList,
-                Methods: methodList,
+                Types: boundedTypes,
+                Methods: boundedMethods,
                 TotalMatches: result.TotalMatches,
-                ReturnedMatches: result.ReturnedMatches,
-                Truncated: result.Truncated,
-                ContinuationToken: result.ContinuationToken);
+                ReturnedMatches: combinedTruncation is null ? result.ReturnedMatches : boundedTypes.Count + boundedMethods.Count,
+                Truncated: result.Truncated || combinedTruncation is not null,
+                ContinuationToken: result.ContinuationToken,
+                Truncation: combinedTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not attached"))
         {

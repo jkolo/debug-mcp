@@ -7,7 +7,8 @@ namespace DebugMcp.Models.Results;
 public sealed record CodeGetDiagnosticsResult(
     bool Success,
     CodeGetDiagnosticsData? Data = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>The <c>data</c> object for <c>code_get_diagnostics</c>.</summary>
 public sealed record CodeGetDiagnosticsData

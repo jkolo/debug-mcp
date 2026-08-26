@@ -81,7 +81,7 @@ public sealed class CodeGetDiagnosticsTool
                 limit,
                 cancellationToken);
 
-            // Group by severity for summary
+            // Group by severity for summary (computed from the full set, before size-truncation)
             var summary = diagnostics
                 .GroupBy(d => d.Severity)
                 .ToDictionary(g => g.Key.ToString().ToLowerInvariant(), g => g.Count());
@@ -89,15 +89,21 @@ public sealed class CodeGetDiagnosticsTool
             stopwatch.Stop();
             _logger.ToolCompleted("code_get_diagnostics", stopwatch.ElapsedMilliseconds);
 
+            // maxResults is the primary bounding mechanism; this is an additional byte-budget
+            // safety net for pathologically large individual diagnostic messages/locations.
+            var (boundedDiagnostics, truncation) = ResultTruncation.Bound(
+                diagnostics.ToList(), "code_get_diagnostics result exceeded the 256 KB size budget");
+
             return new CodeGetDiagnosticsResult(
                 Success: true,
                 Data: new CodeGetDiagnosticsData
                 {
                     TotalCount = diagnostics.Count,
-                    LimitedTo = limit,
+                    LimitedTo = truncation is null ? limit : boundedDiagnostics.Count,
                     Summary = summary,
-                    Diagnostics = diagnostics
-                });
+                    Diagnostics = boundedDiagnostics
+                },
+                Truncation: truncation);
         }
         catch (ArgumentException ex)
         {

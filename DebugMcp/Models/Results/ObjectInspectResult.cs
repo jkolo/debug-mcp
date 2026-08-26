@@ -4,7 +4,8 @@ namespace DebugMcp.Models.Results;
 public sealed record ObjectInspectResult(
     bool Success,
     ObjectInspectionResult? Inspection = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>
 /// The <c>inspection</c> payload. When the inspected reference is null, only

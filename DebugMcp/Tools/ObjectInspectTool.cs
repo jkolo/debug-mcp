@@ -107,6 +107,17 @@ public sealed class ObjectInspectTool
             _logger.LogInformation("Inspected object '{ObjectRef}': {TypeName} with {FieldCount} fields",
                 object_ref, inspection.TypeName, inspection.Fields.Count);
 
+            var (boundedFields, truncation) = ResultTruncation.Bound(
+                inspection.Fields.Select(f => new InspectedFieldResult(
+                    Name: f.Name,
+                    TypeName: f.TypeName,
+                    Value: f.Value,
+                    Offset: f.Offset,
+                    Size: f.Size,
+                    HasChildren: f.HasChildren,
+                    ChildCount: f.ChildCount)).ToList(),
+                "object_inspect result exceeded the 256 KB size budget");
+
             return new ObjectInspectResult(
                 Success: true,
                 Inspection: new ObjectInspectionResult(
@@ -114,16 +125,10 @@ public sealed class ObjectInspectTool
                     TypeName: inspection.TypeName,
                     Address: inspection.Address,
                     Size: inspection.Size,
-                    Fields: inspection.Fields.Select(f => new InspectedFieldResult(
-                        Name: f.Name,
-                        TypeName: f.TypeName,
-                        Value: f.Value,
-                        Offset: f.Offset,
-                        Size: f.Size,
-                        HasChildren: f.HasChildren,
-                        ChildCount: f.ChildCount)).ToList(),
+                    Fields: boundedFields,
                     HasCircularRef: inspection.HasCircularRef,
-                    Truncated: inspection.Truncated));
+                    Truncated: inspection.Truncated || truncation is not null),
+                Truncation: truncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {

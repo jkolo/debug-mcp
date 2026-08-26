@@ -13,7 +13,8 @@ public sealed record MembersGetResult(
     int? PropertyCount = null,
     int? FieldCount = null,
     int? EventCount = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>
 /// A method member. <see cref="Visibility"/> holds the same lowercased string the legacy tool

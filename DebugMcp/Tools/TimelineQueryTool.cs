@@ -65,11 +65,19 @@ public sealed class TimelineQueryTool
                 ThreadId: e.ThreadId,
                 Payload: new TimelineQueryPayloadWire())).ToList();
 
+            // maxEvents is the primary bounding mechanism; this is an additional byte-budget
+            // safety net for pathologically large individual event payloads.
+            var (boundedEvents, truncation) = ResultTruncation.Bound(
+                events, "timeline_query result exceeded the 256 KB size budget");
+
             return Task.FromResult(new TimelineQueryResult(
                 Success: true,
-                Events: events,
+                Events: boundedEvents,
                 TotalEvents: response.TotalEvents,
-                EventsDropped: response.EventsDropped));
+                EventsDropped: truncation is null
+                    ? response.EventsDropped
+                    : response.EventsDropped + (events.Count - boundedEvents.Count),
+                Truncation: truncation));
         }
         catch (Exception ex)
         {

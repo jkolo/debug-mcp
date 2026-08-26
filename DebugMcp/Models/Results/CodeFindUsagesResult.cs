@@ -7,7 +7,8 @@ namespace DebugMcp.Models.Results;
 public sealed record CodeFindUsagesResult(
     bool Success,
     CodeFindUsagesData? Data = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>The <c>data</c> object for <c>code_find_usages</c>.</summary>
 public sealed record CodeFindUsagesData

@@ -4,7 +4,8 @@ namespace DebugMcp.Models.Results;
 public sealed record CollectionAnalyzeResult(
     bool Success,
     CollectionAnalyzeSummary? Summary = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>The <c>summary</c> object nested under a successful <c>collection_analyze</c> result.</summary>
 public sealed record CollectionAnalyzeSummary(

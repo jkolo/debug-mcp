@@ -139,16 +139,23 @@ public sealed class TypesGetTool
                 BaseType: t.BaseType,
                 Interfaces: t.Interfaces)).ToList();
 
+            // Item-count pagination (max_results/continuation_token) is the primary bounding
+            // mechanism here; this is an additional byte-budget safety net for pathologically
+            // large individual type entries (long interface/generic-parameter lists).
+            var (boundedTypes, sizeTruncation) = ResultTruncation.Bound(
+                typeList, "types_get result exceeded the 256 KB size budget");
+
             return new TypesGetResult(
                 Success: true,
                 ModuleName: result.ModuleName,
                 NamespaceFilter: result.NamespaceFilter,
-                Types: typeList,
+                Types: boundedTypes,
                 Namespaces: result.Namespaces,
                 TotalCount: result.TotalCount,
-                ReturnedCount: result.ReturnedCount,
-                Truncated: result.Truncated,
-                ContinuationToken: result.ContinuationToken);
+                ReturnedCount: sizeTruncation is null ? result.ReturnedCount : boundedTypes.Count,
+                Truncated: result.Truncated || sizeTruncation is not null,
+                ContinuationToken: result.ContinuationToken,
+                Truncation: sizeTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not attached"))
         {

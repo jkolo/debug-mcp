@@ -93,9 +93,14 @@ public sealed class VariablesGetTool
             _logger.LogInformation("Retrieved {VariableCount} variables for frame {FrameIndex}",
                 variables.Count, frame_index);
 
+            var (bounded, truncation) = ResultTruncation.Bound(
+                variables.Select(BuildVariableResult).ToList(),
+                "variables_get result exceeded the 256 KB size budget");
+
             return Task.FromResult(new VariablesGetResult(
                 Success: true,
-                Variables: variables.Select(BuildVariableResult).ToList()));
+                Variables: bounded,
+                Truncation: truncation));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {

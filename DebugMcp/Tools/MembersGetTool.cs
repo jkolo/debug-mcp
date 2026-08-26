@@ -169,18 +169,43 @@ public sealed class MembersGetTool
                 AddMethod: e.AddMethod,
                 RemoveMethod: e.RemoveMethod)).ToList();
 
+            // Four independent unbounded collections share the 256 KB budget in equal quarters —
+            // simpler and more predictable than a cross-collection proportional split, at the
+            // cost of occasionally trimming one collection while another has headroom to spare.
+            const int perCollectionBudget = ResultTruncation.DefaultBudgetBytes / 4;
+            var (boundedMethods, methodsTruncation) = ResultTruncation.Bound(
+                methodList, "methods exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (boundedProperties, propertiesTruncation) = ResultTruncation.Bound(
+                propertyList, "properties exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (boundedFields, fieldsTruncation) = ResultTruncation.Bound(
+                fieldList, "fields exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (boundedEvents, eventsTruncation) = ResultTruncation.Bound(
+                eventList, "events exceeded its share of the 256 KB size budget", perCollectionBudget);
+
+            var truncations = new[] { methodsTruncation, propertiesTruncation, fieldsTruncation, eventsTruncation }
+                .Where(t => t is not null)
+                .Cast<TruncationInfo>()
+                .ToList();
+            var combinedTruncation = truncations.Count == 0
+                ? null
+                : new TruncationInfo(
+                    Returned: truncations.Sum(t => t.Returned),
+                    Available: truncations.Sum(t => t.Available ?? 0),
+                    Reason: string.Join("; ", truncations.Select(t => t.Reason)));
+
             return new MembersGetResult(
                 Success: true,
                 TypeName: result.TypeName,
-                Methods: methodList,
-                Properties: propertyList,
-                Fields: fieldList,
-                Events: eventList,
+                Methods: boundedMethods,
+                Properties: boundedProperties,
+                Fields: boundedFields,
+                Events: boundedEvents,
                 IncludesInherited: result.IncludesInherited,
                 MethodCount: result.MethodCount,
                 PropertyCount: result.PropertyCount,
                 FieldCount: result.FieldCount,
-                EventCount: result.EventCount);
+                EventCount: result.EventCount,
+                Truncation: combinedTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not attached"))
         {

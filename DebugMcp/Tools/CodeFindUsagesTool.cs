@@ -118,6 +118,9 @@ public sealed class CodeFindUsagesTool
             stopwatch.Stop();
             _logger.ToolCompleted("code_find_usages", stopwatch.ElapsedMilliseconds);
 
+            var (boundedUsages, truncation) = ResultTruncation.Bound(
+                usages.ToList(), "code_find_usages result exceeded the 256 KB size budget");
+
             return new CodeFindUsagesResult(
                 Success: true,
                 Data: new CodeFindUsagesData
@@ -134,8 +137,9 @@ public sealed class CodeFindUsagesTool
                         DeclarationColumn = symbol.DeclarationColumn
                     },
                     UsagesCount = usages.Count,
-                    Usages = usages
-                });
+                    Usages = boundedUsages
+                },
+                Truncation: truncation);
         }
         catch (InvalidOperationException ex)
         {

@@ -113,17 +113,20 @@ public sealed class ReferencesGetTool
             _logger.LogInformation("Found {Count} outbound references for '{ObjectRef}'",
                 references.OutboundCount, object_ref);
 
+            var (boundedOutbound, outboundTruncation) = ResultTruncation.Bound(
+                references.Outbound.ToList(), "references_get result exceeded the 256 KB size budget");
+
             var info = new ReferencesInfo(
                 TargetAddress: references.TargetAddress,
                 TargetType: references.TargetType,
-                Outbound: references.Outbound,
+                Outbound: boundedOutbound,
                 OutboundCount: references.OutboundCount,
                 Truncated: references.Truncated,
                 Inbound: direction is "inbound" or "both" ? Array.Empty<ReferenceInfo>() : null,
                 InboundCount: direction is "inbound" or "both" ? 0 : null,
                 InboundNote: direction is "inbound" or "both" ? "Inbound reference analysis is not yet implemented" : null);
 
-            return new ReferencesGetResult(Success: true, References: info);
+            return new ReferencesGetResult(Success: true, References: info, Truncation: outboundTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {

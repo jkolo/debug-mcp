@@ -56,6 +56,33 @@ public sealed class CollectionAnalyzeTool
             stopwatch.Stop();
             _logger.ToolCompleted("collection_analyze", stopwatch.ElapsedMilliseconds);
 
+            const int perCollectionBudget = ResultTruncation.DefaultBudgetBytes / 4;
+            var (firstElements, firstTruncation) = ResultTruncation.Bound(
+                summary.FirstElements.Select(e => new CollectionElementPreview(e.Index, e.Value, e.Type)).ToList(),
+                "firstElements exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (lastElements, lastTruncation) = ResultTruncation.Bound(
+                summary.LastElements.Select(e => new CollectionElementPreview(e.Index, e.Value, e.Type)).ToList(),
+                "lastElements exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (typeDistribution, typeDistTruncation) = summary.TypeDistribution is { } td
+                ? ResultTruncation.Bound(
+                    td.Select(t => new CollectionTypeCount(t.TypeName, t.Count)).ToList(),
+                    "typeDistribution exceeded its share of the 256 KB size budget", perCollectionBudget)
+                : (null, null);
+            var (keyValuePairs, kvpTruncation) = summary.KeyValuePairs is { } kvp
+                ? ResultTruncation.Bound(
+                    kvp.Select(k => new CollectionKeyValuePreview(k.Key, k.KeyType, k.Value, k.ValueType)).ToList(),
+                    "keyValuePairs exceeded its share of the 256 KB size budget", perCollectionBudget)
+                : (null, null);
+
+            var truncations = new[] { firstTruncation, lastTruncation, typeDistTruncation, kvpTruncation }
+                .Where(t => t is not null).Cast<TruncationInfo>().ToList();
+            var combinedTruncation = truncations.Count == 0
+                ? null
+                : new TruncationInfo(
+                    Returned: truncations.Sum(t => t.Returned),
+                    Available: truncations.Sum(t => t.Available ?? 0),
+                    Reason: string.Join("; ", truncations.Select(t => t.Reason)));
+
             return new CollectionAnalyzeResult(
                 Success: true,
                 Summary: new CollectionAnalyzeSummary(
@@ -65,11 +92,12 @@ public sealed class CollectionAnalyzeTool
                     Kind: summary.Kind.ToString(),
                     NullCount: summary.NullCount,
                     NumericStats: summary.NumericStats is { } ns ? new CollectionNumericStats(ns.Min, ns.Max, ns.Average) : null,
-                    TypeDistribution: summary.TypeDistribution?.Select(td => new CollectionTypeCount(td.TypeName, td.Count)).ToList(),
-                    FirstElements: summary.FirstElements.Select(e => new CollectionElementPreview(e.Index, e.Value, e.Type)).ToList(),
-                    LastElements: summary.LastElements.Select(e => new CollectionElementPreview(e.Index, e.Value, e.Type)).ToList(),
-                    KeyValuePairs: summary.KeyValuePairs?.Select(kv => new CollectionKeyValuePreview(kv.Key, kv.KeyType, kv.Value, kv.ValueType)).ToList(),
-                    IsSampled: summary.IsSampled));
+                    TypeDistribution: typeDistribution,
+                    FirstElements: firstElements,
+                    LastElements: lastElements,
+                    KeyValuePairs: keyValuePairs,
+                    IsSampled: summary.IsSampled),
+                Truncation: combinedTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not a recognized collection"))
         {

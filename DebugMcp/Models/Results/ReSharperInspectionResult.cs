@@ -12,4 +12,5 @@ namespace DebugMcp.Models.Results;
 public sealed record ReSharperInspectionResult(
     bool Success,
     InspectionResult? Data = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);

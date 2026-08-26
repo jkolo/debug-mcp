@@ -74,7 +74,20 @@ internal static class ReSharperToolHelper
             stopwatch.Stop();
             logger.ToolCompleted(toolName, stopwatch.ElapsedMilliseconds);
 
-            return new ReSharperInspectionResult(Success: true, Data: result);
+            // effectiveMax (capped at MaxResultsCap) is the primary bounding mechanism; this is
+            // an additional byte-budget safety net for pathologically long finding messages.
+            var (boundedFindings, sizeTruncation) = ResultTruncation.Bound(
+                result.Findings, $"{toolName} result exceeded the 256 KB size budget");
+            var boundedResult = sizeTruncation is null
+                ? result
+                : result with
+                {
+                    Findings = boundedFindings,
+                    ReturnedCount = boundedFindings.Count,
+                    Truncated = true,
+                };
+
+            return new ReSharperInspectionResult(Success: true, Data: boundedResult, Truncation: sizeTruncation);
         }
         catch (ReSharperException ex)
         {

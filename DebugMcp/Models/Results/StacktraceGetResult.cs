@@ -9,7 +9,8 @@ public sealed record StacktraceGetResult(
     [property: JsonPropertyName("total_frames")] int? TotalFrames = null,
     IReadOnlyList<StackFrameResult>? Frames = null,
     [property: JsonPropertyName("raw_frames")] IReadOnlyList<RawStackFrameResult>? RawFrames = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>A single logical stack frame (async-reconstructed), as emitted in <c>frames</c>.</summary>
 public sealed record StackFrameResult(

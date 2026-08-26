@@ -6,7 +6,8 @@ namespace DebugMcp.Models.Results;
 public sealed record VariablesGetResult(
     bool Success,
     IReadOnlyList<VariableResult>? Variables = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>
 /// A single variable, as emitted by <c>variables_get</c> and (reused, minus <see cref="Path"/>)

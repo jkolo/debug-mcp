@@ -6,7 +6,8 @@ namespace DebugMcp.Models.Results;
 public sealed record ReferencesGetResult(
     bool Success,
     ReferencesInfo? References = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>
 /// The <c>references</c> object nested under a successful <c>references_get</c> result.

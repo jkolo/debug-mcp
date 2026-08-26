@@ -13,7 +13,8 @@ public sealed record TypesGetResult(
     int? ReturnedCount = null,
     bool? Truncated = null,
     string? ContinuationToken = null,
-    ToolError? Error = null);
+    ToolError? Error = null,
+    TruncationInfo? Truncation = null);
 
 /// <summary>
 /// A type summary. <see cref="Kind"/>/<see cref="Visibility"/> hold the same lowercased strings the

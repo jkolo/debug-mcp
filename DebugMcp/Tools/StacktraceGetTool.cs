@@ -92,18 +92,24 @@ public sealed class StacktraceGetTool
             _logger.LogInformation("Retrieved {FrameCount} stack frames (total: {TotalFrames}) for thread {ThreadId}",
                 frames.Count, totalFrames, actualThreadId);
 
+            var (boundedFrames, framesTruncation) = ResultTruncation.Bound(
+                frames.Select(BuildFrameResult).ToList(), "stacktrace_get result exceeded the 256 KB size budget");
+
             // Raw frames show the physical stack without logical async reconstruction.
             // Currently identical to frames since continuation chain (US2) isn't implemented yet.
+            // Capped to the same count as the (possibly truncated) logical frames rather than
+            // budgeted independently, since the two lists describe the same underlying stack.
             var rawFrames = include_raw
-                ? frames.Select(BuildRawFrameResult).ToList()
+                ? frames.Take(boundedFrames.Count).Select(BuildRawFrameResult).ToList()
                 : null;
 
             return Task.FromResult(new StacktraceGetResult(
                 Success: true,
                 ThreadId: actualThreadId,
                 TotalFrames: totalFrames,
-                Frames: frames.Select(BuildFrameResult).ToList(),
-                RawFrames: rawFrames));
+                Frames: boundedFrames,
+                RawFrames: rawFrames,
+                Truncation: framesTruncation));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {

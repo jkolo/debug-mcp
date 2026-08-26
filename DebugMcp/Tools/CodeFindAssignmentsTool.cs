@@ -126,6 +126,9 @@ public sealed class CodeFindAssignmentsTool
             stopwatch.Stop();
             _logger.ToolCompleted("code_find_assignments", stopwatch.ElapsedMilliseconds);
 
+            var (boundedAssignments, truncation) = ResultTruncation.Bound(
+                assignments.ToList(), "code_find_assignments result exceeded the 256 KB size budget");
+
             return new CodeFindAssignmentsResult(
                 Success: true,
                 Data: new CodeFindAssignmentsData
@@ -140,8 +143,9 @@ public sealed class CodeFindAssignmentsTool
                         DeclarationLine = symbol.DeclarationLine
                     },
                     AssignmentsCount = assignments.Count,
-                    Assignments = assignments
-                });
+                    Assignments = boundedAssignments
+                },
+                Truncation: truncation);
         }
         catch (InvalidOperationException ex)
         {
