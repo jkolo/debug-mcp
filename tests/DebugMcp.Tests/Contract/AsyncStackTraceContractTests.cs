@@ -20,7 +20,7 @@ public class AsyncStackTraceContractTests
     /// T006: Every frame in the stacktrace_get response must include a frame_kind field.
     /// </summary>
     [Fact]
-    public void StacktraceGet_Response_IncludesFrameKindOnEveryFrame()
+    public async Task StacktraceGet_Response_IncludesFrameKindOnEveryFrame()
     {
         // Arrange
         var frames = new List<StackFrame>
@@ -34,7 +34,7 @@ public class AsyncStackTraceContractTests
         var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
 
         // Act
-        var result = tool.GetStackTrace();
+        var result = await tool.GetStackTraceAsync();
         var json = JsonDocument.Parse(result);
         var framesArray = json.RootElement.GetProperty("frames");
 
@@ -52,7 +52,7 @@ public class AsyncStackTraceContractTests
     /// T007: The include_raw parameter should be accepted without error.
     /// </summary>
     [Fact]
-    public void StacktraceGet_IncludeRawParameter_AcceptedWithoutError()
+    public async Task StacktraceGet_IncludeRawParameter_AcceptedWithoutError()
     {
         // Arrange
         var frames = new List<StackFrame>
@@ -64,7 +64,7 @@ public class AsyncStackTraceContractTests
         var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
 
         // Act
-        var result = tool.GetStackTrace(include_raw: true);
+        var result = await tool.GetStackTraceAsync(include_raw: true);
         var json = JsonDocument.Parse(result);
 
         // Assert
@@ -78,7 +78,7 @@ public class AsyncStackTraceContractTests
     [Fact]
     public void StacktraceGet_IncludeRawParameter_ExistsOnToolMethod()
     {
-        var method = typeof(StacktraceGetTool).GetMethod("GetStackTrace");
+        var method = typeof(StacktraceGetTool).GetMethod("GetStackTraceAsync");
         method.Should().NotBeNull();
 
         var param = method!.GetParameters().FirstOrDefault(p => p.Name == "include_raw");
@@ -93,7 +93,7 @@ public class AsyncStackTraceContractTests
     /// and frames[] with index, function, module, is_external.
     /// </summary>
     [Fact]
-    public void StacktraceGet_Response_BackwardCompatible()
+    public async Task StacktraceGet_Response_BackwardCompatible()
     {
         // Arrange
         var frames = new List<StackFrame>
@@ -108,7 +108,7 @@ public class AsyncStackTraceContractTests
         var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
 
         // Act
-        var result = tool.GetStackTrace();
+        var result = await tool.GetStackTraceAsync();
         var json = JsonDocument.Parse(result);
         var root = json.RootElement;
 
@@ -132,7 +132,7 @@ public class AsyncStackTraceContractTests
     /// T008 (continued): New fields are additive — they don't break the existing schema.
     /// </summary>
     [Fact]
-    public void StacktraceGet_Response_NewFieldsAreAdditive()
+    public async Task StacktraceGet_Response_NewFieldsAreAdditive()
     {
         // Arrange
         var frames = new List<StackFrame>
@@ -145,7 +145,7 @@ public class AsyncStackTraceContractTests
         var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
 
         // Act
-        var result = tool.GetStackTrace();
+        var result = await tool.GetStackTraceAsync();
         var json = JsonDocument.Parse(result);
         var frame = json.RootElement.GetProperty("frames").EnumerateArray().First();
 
@@ -178,7 +178,7 @@ public class AsyncStackTraceContractTests
     /// logical_function should be omitted from response when null.
     /// </summary>
     [Fact]
-    public void StacktraceGet_Response_OmitsNullLogicalFunction()
+    public async Task StacktraceGet_Response_OmitsNullLogicalFunction()
     {
         // Arrange
         var frames = new List<StackFrame>
@@ -190,7 +190,7 @@ public class AsyncStackTraceContractTests
         var tool = new StacktraceGetTool(sessionManager, NullLogger<StacktraceGetTool>.Instance);
 
         // Act
-        var result = tool.GetStackTrace();
+        var result = await tool.GetStackTraceAsync();
         var json = JsonDocument.Parse(result);
         var frame = json.RootElement.GetProperty("frames").EnumerateArray().First();
 

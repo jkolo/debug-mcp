@@ -42,7 +42,8 @@ public sealed class ReferencesGetTool
         [Description("Maximum references to return (max: 100)")] int max_results = 50,
         [Description("Include array element references")] bool include_arrays = true,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
-        [Description("Frame index (0 = top of stack)")] int frame_index = 0)
+        [Description("Frame index (0 = top of stack)")] int frame_index = 0,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("references_get",
@@ -104,7 +105,7 @@ public sealed class ReferencesGetTool
 
             // Get references (currently only outbound is supported)
             var references = await _sessionManager.GetOutboundReferencesAsync(
-                object_ref, include_arrays, max_results, thread_id, frame_index);
+                object_ref, include_arrays, max_results, thread_id, frame_index, cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("references_get", stopwatch.ElapsedMilliseconds);

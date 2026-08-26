@@ -47,12 +47,12 @@ connection.
 
 ```jsonc
 { "jsonrpc": "2.0", "method": "notifications/progress",
-  "params": { "progressToken": 11, "progress": 1, "total": 5,
-              "message": "acquiring ReSharper engine" } }
+  "params": { "progressToken": 11, "progress": null, "total": null,
+              "message": "acquiring engine" } }
 
 { "jsonrpc": "2.0", "method": "notifications/progress",
-  "params": { "progressToken": 11, "progress": 3, "total": 5,
-              "message": "building solution" } }
+  "params": { "progressToken": 11, "progress": null, "total": null,
+              "message": "running inspection" } }
 ```
 
 **Then the ordinary result**, unchanged in shape.
@@ -63,15 +63,19 @@ connection.
 
 ## Stage inventory
 
-Stage names are user-facing strings and part of this contract.
+Stage names are user-facing strings and part of this contract. **Corrected during
+implementation** (T008 ground-truthing, before the Red-phase tests were written) — an earlier
+draft claimed sub-stages (`restoring`, `building solution`/`building project`, `attaching`,
+`resolving symbols`) that are not safely or honestly observable; see data-model.md §4's note for
+why each one collapsed.
 
 | Tool | Stages | Countable? |
 |---|---|---|
-| `resharper_inspect_solution` | acquiring engine → restoring → building solution → inspecting → parsing report | yes, 5 |
-| `resharper_inspect_project` | acquiring engine → restoring → building project → inspecting → parsing report | yes, 5 |
-| `batch_evaluate` | evaluating expression *n* of *m* | yes, *m* |
-| `debug_launch` | starting process → attaching → resolving symbols → ready | yes, 4 |
-| `code_load` | locating MSBuild → loading workspace → project *n* of *m* | partly |
+| `resharper_inspect_solution` | acquiring engine → running inspection → parsing report | no — each of the first two is one opaque child-process call; heartbeats carry liveness |
+| `resharper_inspect_project` | acquiring engine → running inspection → parsing report | same as above |
+| `batch_evaluate` | experiment triggered *n* of *m* | yes, *m* — corrected from "evaluating expression n of m": experiments trigger reactively as the debuggee's breakpoints fire, not in an evaluation loop; see `BatchRunner.RunAsync`'s `allTriggeredCount` |
+| `debug_launch` | starting process → ready | no — `attaching`/`resolving symbols` live inside the ICorDebug-callback-driven core (research.md R7); a heartbeat during the wait satisfies SC-001 without instrumenting that boundary |
+| `code_load` | loading workspace, project *n* of ? | project count only, no total — `MSBuildWorkspace.OpenSolutionAsync`/`OpenProjectAsync` accept a real `IProgress<ProjectLoadProgress>`, but it reports projects as they're discovered; a `.csproj`'s transitive `ProjectReference` graph isn't known upfront without duplicating MSBuild's own evaluation, so `Total` stays null throughout (data-model.md §4's "not knowable in advance" case). `locating MSBuild` dropped — `MSBuildLocator.RegisterDefaults()` runs once in `CodeAnalysisService`'s static constructor, not inside `LoadAsync` |
 
 Tools outside this list have no distinguishable stages and emit no progress. **Absent progress is
 never an error** — that is a spec-level edge case, not a defect.
@@ -86,11 +90,12 @@ never an error** — that is a spec-level edge case, not a defect.
 | Update on stage change | always |
 | Maximum silence | **60 seconds** |
 
-The 60-second ceiling has a real consequence: engine acquisition downloads hundreds of megabytes
-and the underlying tool is silent throughout. Satisfying the ceiling requires **re-emitting the
-current stage as a heartbeat**, optionally with byte counts, rather than only emitting on
-transitions. This is a deliberate implementation obligation, called out here so it is not
-discovered late.
+The 60-second ceiling has a real consequence: three of the five qualifying stages — ReSharper
+engine acquisition, the `jb inspectcode` run, and the `debug_launch` wait — are each one opaque
+external call (a child process or an ICorDebug-driven internal call) with no natural sub-progress
+to report. Satisfying the ceiling for these requires **re-emitting the current stage as a
+heartbeat** rather than only emitting on transitions. This is a deliberate implementation
+obligation, called out here so it is not discovered late.
 
 ---
 

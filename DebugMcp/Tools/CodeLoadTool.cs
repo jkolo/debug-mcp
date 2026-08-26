@@ -4,7 +4,9 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Services.CodeAnalysis;
+using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace DebugMcp.Tools;
@@ -37,7 +39,8 @@ public sealed class CodeLoadTool
     [Description("Load a .sln or .csproj file into the analysis workspace. Replaces any previously loaded workspace.")]
     public async Task<string> LoadAsync(
         [Description("Absolute path to .sln or .csproj file")] string path,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressNotificationValue>? progress = null)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_load", JsonSerializer.Serialize(new { path }));
@@ -67,7 +70,8 @@ public sealed class CodeLoadTool
             }
 
             // Load the workspace
-            var workspaceInfo = await _codeAnalysisService.LoadAsync(path, cancellationToken);
+            var workspaceInfo = await _codeAnalysisService.LoadAsync(
+                path, cancellationToken, ProgressReporterAdapter.Create(progress));
 
             stopwatch.Stop();
             _logger.ToolCompleted("code_load", stopwatch.ElapsedMilliseconds);

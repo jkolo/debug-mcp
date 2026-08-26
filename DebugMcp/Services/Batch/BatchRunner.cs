@@ -4,6 +4,7 @@ using DebugMcp.Models;
 using DebugMcp.Models.Batch;
 using DebugMcp.Models.Breakpoints;
 using DebugMcp.Services.Breakpoints;
+using DebugMcp.Services.Progress;
 using DebugMcp.Services.SafeEval;
 using Microsoft.Extensions.Logging;
 
@@ -38,7 +39,8 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
 
     public bool IsRunning => _isRunning;
 
-    public async Task<BatchResult> RunAsync(BatchRequest request, CancellationToken cancellationToken = default)
+    public async Task<BatchResult> RunAsync(
+        BatchRequest request, CancellationToken cancellationToken = default, IProgressReporter? progress = null)
     {
         if (_isRunning)
             throw new InvalidOperationException("batch_already_running");
@@ -133,6 +135,7 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
                 experimentStatus[i] = ExperimentStatus.Error;
                 experimentErrors[i] = ex.Message;
                 allTriggeredCount++; // error counts as "done" for completion check
+                progress?.ReportStage("experiment triggered", allTriggeredCount, request.Experiments.Count);
             }
         }
 
@@ -154,6 +157,7 @@ public sealed class BatchRunner : IBatchRunner, IDisposable
                 if (hits.Count >= exp.MaxHits)
                 {
                     allTriggeredCount++;
+                    progress?.ReportStage("experiment triggered", allTriggeredCount, request.Experiments.Count);
                     if (allTriggeredCount >= request.Experiments.Count)
                     {
                         completionReason = BatchCompletionReason.AllTriggered;

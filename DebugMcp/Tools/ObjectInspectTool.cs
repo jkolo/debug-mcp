@@ -38,7 +38,8 @@ public sealed class ObjectInspectTool
         [Description("Object reference (variable name or expression)")] string object_ref,
         [Description("Maximum depth for nested object expansion (1-10)")] int depth = 1,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
-        [Description("Frame index (0 = top of stack)")] int frame_index = 0)
+        [Description("Frame index (0 = top of stack)")] int frame_index = 0,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("object_inspect",
@@ -86,7 +87,7 @@ public sealed class ObjectInspectTool
             }
 
             // Inspect object
-            var inspection = await _sessionManager.InspectObjectAsync(object_ref, depth, thread_id, frame_index);
+            var inspection = await _sessionManager.InspectObjectAsync(object_ref, depth, thread_id, frame_index, cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("object_inspect", stopwatch.ElapsedMilliseconds);

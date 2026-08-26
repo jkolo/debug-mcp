@@ -3,7 +3,9 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Services;
+using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace DebugMcp.Tools;
@@ -44,7 +46,8 @@ public sealed class DebugLaunchTool
         [Description("Environment variables to set for the process (JSON object)")] string? env = null,
         [Description("Pause at entry point before executing user code")] bool stopAtEntry = true,
         [Description("Maximum time to wait for launch in milliseconds")] int timeout = 30000,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressNotificationValue>? progress = null)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_launch", JsonSerializer.Serialize(new { program, args, cwd, stopAtEntry, timeout }));
@@ -102,7 +105,8 @@ public sealed class DebugLaunchTool
                 envDict,
                 stopAtEntry,
                 TimeSpan.FromMilliseconds(timeout),
-                linkedCts.Token);
+                linkedCts.Token,
+                ProgressReporterAdapter.Create(progress));
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_launch", stopwatch.ElapsedMilliseconds);

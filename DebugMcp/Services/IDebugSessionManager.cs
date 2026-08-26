@@ -1,5 +1,6 @@
 using DebugMcp.Models;
 using DebugMcp.Models.Memory;
+using DebugMcp.Services.Progress;
 
 namespace DebugMcp.Services;
 
@@ -40,7 +41,8 @@ public interface IDebugSessionManager
         Dictionary<string, string>? env = null,
         bool stopAtEntry = true,
         TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgressReporter? progress = null);
 
     /// <summary>
     /// Gets the current state of the debug session.

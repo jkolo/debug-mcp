@@ -48,7 +48,8 @@ public sealed class TypesGetTool
         [Description("Filter by type kind: class, interface, struct, enum, delegate")] string? kind = null,
         [Description("Filter by visibility: public, internal, private, protected")] string? visibility = null,
         [Description("Maximum types to return (max: 1000)")] int max_results = 100,
-        [Description("Token from previous response for pagination")] string? continuation_token = null)
+        [Description("Token from previous response for pagination")] string? continuation_token = null,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("types_get",
@@ -113,7 +114,8 @@ public sealed class TypesGetTool
                 kindFilter,
                 visibilityFilter,
                 max_results,
-                continuation_token);
+                continuation_token,
+                cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("types_get", stopwatch.ElapsedMilliseconds);

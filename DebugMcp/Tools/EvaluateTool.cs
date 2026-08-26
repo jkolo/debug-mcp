@@ -39,7 +39,8 @@ public sealed class EvaluateTool
         [Description("C# expression to evaluate")] string expression,
         [Description("Thread context (default: current thread)")] int? thread_id = null,
         [Description("Stack frame context (0 = top)")] int frame_index = 0,
-        [Description("Evaluation timeout in milliseconds")] int timeout_ms = 5000)
+        [Description("Evaluation timeout in milliseconds")] int timeout_ms = 5000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("evaluate",
@@ -86,8 +87,9 @@ public sealed class EvaluateTool
             }
 
             // Evaluate expression
-            using var cts = new CancellationTokenSource(timeout_ms);
-            var result = await _sessionManager.EvaluateAsync(expression, thread_id, frame_index, timeout_ms, cts.Token);
+            using var timeoutCts = new CancellationTokenSource(timeout_ms);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var result = await _sessionManager.EvaluateAsync(expression, thread_id, frame_index, timeout_ms, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("evaluate", stopwatch.ElapsedMilliseconds);
@@ -122,6 +124,11 @@ public sealed class EvaluateTool
         {
             _logger.ToolError("evaluate", ErrorCodes.NotPaused);
             return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("evaluate", "eval_timeout");
+            return CreateErrorResponse("eval_timeout", "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {

@@ -21,7 +21,7 @@ public class SnapshotDiffToolTests
     }
 
     [Fact]
-    public void DiffSnapshots_ReturnsSuccessJson_WithDiffStructure()
+    public async Task DiffSnapshots_ReturnsSuccessJson_WithDiffStructure()
     {
         var diff = new SnapshotDiff(
             "snap-a", "snap-b",
@@ -34,7 +34,7 @@ public class SnapshotDiffToolTests
 
         _serviceMock.Setup(s => s.DiffSnapshots("snap-a", "snap-b")).Returns(diff);
 
-        var result = _tool.DiffSnapshots("snap-a", "snap-b");
+        var result = await _tool.DiffSnapshotsAsync("snap-a", "snap-b");
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -53,12 +53,12 @@ public class SnapshotDiffToolTests
     }
 
     [Fact]
-    public void DiffSnapshots_SnapshotNotFound_ReturnsErrorJson()
+    public async Task DiffSnapshots_SnapshotNotFound_ReturnsErrorJson()
     {
         _serviceMock.Setup(s => s.DiffSnapshots("snap-a", "snap-missing"))
             .Throws(new KeyNotFoundException("Snapshot 'snap-missing' not found."));
 
-        var result = _tool.DiffSnapshots("snap-a", "snap-missing");
+        var result = await _tool.DiffSnapshotsAsync("snap-a", "snap-missing");
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -67,12 +67,12 @@ public class SnapshotDiffToolTests
     }
 
     [Fact]
-    public void DiffSnapshots_UnexpectedError_ReturnsGenericError()
+    public async Task DiffSnapshots_UnexpectedError_ReturnsGenericError()
     {
         _serviceMock.Setup(s => s.DiffSnapshots("a", "b"))
             .Throws(new InvalidOperationException("boom"));
 
-        var result = _tool.DiffSnapshots("a", "b");
+        var result = await _tool.DiffSnapshotsAsync("a", "b");
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -81,7 +81,7 @@ public class SnapshotDiffToolTests
     }
 
     [Fact]
-    public void DiffSnapshots_ModifiedEntry_HasOldAndNewValues()
+    public async Task DiffSnapshots_ModifiedEntry_HasOldAndNewValues()
     {
         var diff = new SnapshotDiff(
             "snap-a", "snap-b",
@@ -94,7 +94,7 @@ public class SnapshotDiffToolTests
 
         _serviceMock.Setup(s => s.DiffSnapshots("snap-a", "snap-b")).Returns(diff);
 
-        var result = _tool.DiffSnapshots("snap-a", "snap-b");
+        var result = await _tool.DiffSnapshotsAsync("snap-a", "snap-b");
 
         using var doc = JsonDocument.Parse(result);
         var modified = doc.RootElement.GetProperty("diff").GetProperty("modified");

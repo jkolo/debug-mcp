@@ -1,4 +1,5 @@
 using DebugMcp.Models.ReSharper;
+using DebugMcp.Services.Progress;
 
 namespace DebugMcp.Services.ReSharper;
 
@@ -23,5 +24,6 @@ public interface IReSharperInspectionService
         bool noBuild,
         int inspectionTimeoutSeconds,
         int maxResults,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        IProgressReporter? progress = null);
 }

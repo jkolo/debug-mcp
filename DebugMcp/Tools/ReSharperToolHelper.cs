@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Services.Progress;
 using DebugMcp.Services.ReSharper;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 
 namespace DebugMcp.Tools;
 
@@ -30,7 +32,8 @@ internal static class ReSharperToolHelper
         ReSharperOptions options,
         ILogger logger,
         JsonSerializerOptions jsonOptions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<ProgressNotificationValue>? progress = null)
     {
         var stopwatch = Stopwatch.StartNew();
         logger.ToolInvoked(toolName, JsonSerializer.Serialize(new { target, severity, project, noBuild, timeoutSeconds, maxResults }));
@@ -65,7 +68,8 @@ internal static class ReSharperToolHelper
             }
 
             var result = await service.InspectAsync(
-                Path.GetFullPath(target), severity, project, noBuild, effectiveTimeout, effectiveMax, cancellationToken);
+                Path.GetFullPath(target), severity, project, noBuild, effectiveTimeout, effectiveMax,
+                cancellationToken, ProgressReporterAdapter.Create(progress));
 
             stopwatch.Stop();
             logger.ToolCompleted(toolName, stopwatch.ElapsedMilliseconds);

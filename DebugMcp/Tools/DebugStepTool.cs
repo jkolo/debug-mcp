@@ -34,7 +34,8 @@ public sealed class DebugStepTool
     [Description("Step through code during debugging. The process must be paused. Modes: 'in' (step into function calls), 'over' (step over, staying in current scope), 'out' (step out to caller). Returns: updated session state with new source location after the step completes. The step blocks until the debuggee re-pauses at the next source line. Example response: {\"success\": true, \"stepMode\": \"over\", \"session\": {\"processId\": 1234, \"state\": \"paused\", \"pauseReason\": \"step\", \"location\": {\"file\": \"Program.cs\", \"line\": 43, \"functionName\": \"Main\"}}}")]
     public async Task<string> StepAsync(
         [Description("Step mode: 'in', 'over', or 'out'")] string mode,
-        [Description("Timeout in milliseconds")] int timeout = 30000)
+        [Description("Timeout in milliseconds")] int timeout = 30000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_step", $"{{\"mode\": \"{mode}\", \"timeout\": {timeout}}}");
@@ -75,8 +76,9 @@ public sealed class DebugStepTool
                     new { currentState = session.State.ToString().ToLowerInvariant() });
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
-            var updatedSession = await _sessionManager.StepAsync(stepMode, cts.Token);
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var updatedSession = await _sessionManager.StepAsync(stepMode, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_step", stopwatch.ElapsedMilliseconds);
@@ -88,6 +90,11 @@ public sealed class DebugStepTool
                 stepMode = mode,
                 session = BuildSessionResponse(updatedSession)
             }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("debug_step", ErrorCodes.Timeout);
+            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {

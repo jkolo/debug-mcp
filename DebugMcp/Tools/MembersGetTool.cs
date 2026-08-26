@@ -50,7 +50,8 @@ public sealed class MembersGetTool
         [Description("Comma-separated list of member kinds: methods, properties, fields, events")] string? member_kinds = null,
         [Description("Filter by visibility: public, internal, private, protected")] string? visibility = null,
         [Description("Include static members")] bool include_static = true,
-        [Description("Include instance members")] bool include_instance = true)
+        [Description("Include instance members")] bool include_instance = true,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("members_get",
@@ -114,7 +115,8 @@ public sealed class MembersGetTool
                 memberKindsArray,
                 visibilityFilter,
                 include_static,
-                include_instance);
+                include_instance,
+                cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("members_get", stopwatch.ElapsedMilliseconds);

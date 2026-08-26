@@ -32,7 +32,7 @@ public sealed class SnapshotCreateTool
     [McpServerTool(Name = "snapshot_create", Title = "Create State Snapshot",
         ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Capture the current debug state (variables, arguments, this) as a named snapshot. Must be called while paused.")]
-    public string CreateSnapshot(
+    public Task<string> CreateSnapshotAsync(
         [Description("Human-readable label for the snapshot (auto-generated if omitted)")]
         string? label = null,
         [Description("Thread to capture variables from (default: active thread)")]
@@ -40,8 +40,11 @@ public sealed class SnapshotCreateTool
         [Description("Stack frame index, 0 = top of stack")]
         int frame_index = 0,
         [Description("Expansion depth for nested objects (0 = top-level only)")]
-        int depth = 0)
+        int depth = 0,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("snapshot_create", JsonSerializer.Serialize(new { label, thread_id, frame_index, depth }));
 
@@ -52,7 +55,7 @@ public sealed class SnapshotCreateTool
             stopwatch.Stop();
             _logger.ToolCompleted("snapshot_create", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
+            return Task.FromResult(JsonSerializer.Serialize(new
             {
                 success = true,
                 snapshot = new
@@ -66,25 +69,25 @@ public sealed class SnapshotCreateTool
                     variableCount = snapshot.Variables.Count,
                     depth = snapshot.Depth
                 }
-            }, new JsonSerializerOptions { WriteIndented = true });
+            }, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("paused"))
         {
             _logger.ToolError("snapshot_create", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused,
-                "Cannot create snapshot while process is running. Pause at a breakpoint first.");
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.NotPaused,
+                "Cannot create snapshot while process is running. Pause at a breakpoint first."));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("session"))
         {
             _logger.ToolError("snapshot_create", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.NoSession, ex.Message));
         }
         catch (Exception ex)
         {
             _logger.ToolError("snapshot_create", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.VariablesFailed,
                 $"Failed to create snapshot: {ex.Message}",
-                new { exceptionType = ex.GetType().Name });
+                new { exceptionType = ex.GetType().Name }));
         }
     }
 

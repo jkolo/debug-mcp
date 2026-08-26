@@ -121,7 +121,7 @@ Advisory and fire-and-forget. Carries no data the final result does not also car
 
 | Field | Type | Notes |
 |---|---|---|
-| `Stage` | `string` | Human-readable, e.g. `"acquiring ReSharper engine"`, `"building solution"`. |
+| `Stage` | `string` | Human-readable, e.g. `"acquiring engine"`, `"running inspection"`. |
 | `Completed` | `int?` | Null when the operation has no countable unit of work. |
 | `Total` | `int?` | Null when the total is not knowable in advance — common for downloads of unknown size. |
 
@@ -138,13 +138,41 @@ Advisory and fire-and-forget. Carries no data the final result does not also car
 
 ### Stage inventory for the qualifying tools
 
-| Tool | Stages |
-|---|---|
-| `resharper_inspect_solution` | acquiring engine → restoring → building solution → inspecting → parsing report |
-| `resharper_inspect_project` | acquiring engine → restoring → building project → inspecting → parsing report |
-| `batch_evaluate` | *n* of *m* expressions evaluated (countable) |
-| `debug_launch` | starting process → attaching → resolving symbols → ready |
-| `code_load` | locating MSBuild → loading workspace → *n* of *m* projects loaded (countable) |
+**Corrected against the actual implementation** (an earlier draft claimed sub-stages —
+`restoring`, `building solution`, `attaching`, `resolving symbols` — that turned out not to be
+safely or honestly observable; see the note below the table):
+
+| Tool | Stages | Countable? |
+|---|---|---|
+| `resharper_inspect_solution` | acquiring engine → running inspection → parsing report | no — engine acquisition and the `jb inspectcode` run are each one opaque child-process call; heartbeats (rule 3) carry liveness during both |
+| `resharper_inspect_project` | acquiring engine → running inspection → parsing report | same as above |
+| `batch_evaluate` | experiment triggered *n* of *m* | yes — corrected from "evaluating expression n of m": experiments trigger reactively as the debuggee's breakpoints fire (`BatchRunner.RunAsync`'s `allTriggeredCount`), not in an evaluation loop |
+| `debug_launch` | starting process → ready | no — heartbeat carries liveness; see the note below |
+| `code_load` | loading workspace, project *n* of ? | count only, no total — `MSBuildWorkspace.OpenSolutionAsync`/`OpenProjectAsync` accept a real `IProgress<ProjectLoadProgress>`, each reported project increments `Completed`, but `Total` stays null: a `.csproj`'s transitive project graph isn't known before the load finishes |
+
+**Why `resharper_inspect_*` collapsed from 5 stages to 3**: `restoring`, `building solution` /
+`building project`, and `inspecting` all happen *inside* the single `jb inspectcode` child-process
+call (`ReSharperCliRunner.RunInspectCodeAsync`). Distinguishing them would require parsing that
+process's stdout for phase-marker text whose exact wording was never verified against a live run —
+fabricating named sub-stages we cannot actually observe would misrepresent what happened, which is
+worse than reporting one honest "running inspection" stage with a heartbeat. `parsing report`
+remains a real, separately-observable step (`IInspectionReportParser.Parse`, after the process
+exits).
+
+**Why `debug_launch` collapsed from 4 stages to 2**: `attaching` and `resolving symbols` happen
+inside `ProcessDebugger.LaunchAsync`, the ICorDebug-callback-driven core the project's own
+lock-ordering invariant protects (research.md R7). Instrumenting mid-flight progress there means a
+progress call site inside code that runs partly on the ICorDebug callback thread — exactly where
+R7 forbids introducing new `await` points around `_lock`/`_stateLock`. The honest, safe stages are
+what `DebugSessionManager.LaunchAsync` can observe from outside that boundary — it holds no lock
+across its single `await _processDebugger.LaunchAsync(...)` call, so wrapping *that* call is safe:
+before and after. A heartbeat during the (usually fast, occasionally symbol-server-bound) wait
+satisfies SC-001's 60-second ceiling without touching ICorDebug callback code.
+
+**Why `code_load` dropped `locating MSBuild`**: `MSBuildLocator.RegisterDefaults()` runs once, in
+`CodeAnalysisService`'s **static** constructor — triggered by the CLR before the singleton's first
+instance is constructed, not inside `LoadAsync`. There is no per-call phase to report; the
+`code_load` stage sequence is `loading workspace, project n of m` only.
 
 ---
 

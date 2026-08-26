@@ -33,12 +33,15 @@ public sealed class StacktraceGetTool
     [McpServerTool(Name = "stacktrace_get", Title = "Get Stack Trace",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Get the call stack for a thread. The process must be paused. Returns ordered stack frames from top (index 0, most recent call) to bottom (entry point). Each frame includes: index, function name, module, is_external flag, source location (file/line/column), and arguments. Supports pagination via start_frame and max_frames. Use variables_get with a specific frame_index to inspect locals at any frame depth. Example response: {\"success\": true, \"thread_id\": 1, \"total_frames\": 5, \"frames\": [{\"index\": 0, \"function\": \"MyApp.Program.Main()\", \"module\": \"MyApp.dll\", \"is_external\": false, \"location\": {\"file\": \"Program.cs\", \"line\": 42}}]}")]
-    public string GetStackTrace(
+    public Task<string> GetStackTraceAsync(
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Start from frame N (for pagination)")] int start_frame = 0,
         [Description("Maximum frames to return")] int max_frames = 20,
-        [Description("Include raw physical frames alongside logical frames")] bool include_raw = false)
+        [Description("Include raw physical frames alongside logical frames")] bool include_raw = false,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("stacktrace_get",
             $"{{\"thread_id\": {(thread_id?.ToString() ?? "null")}, \"start_frame\": {start_frame}, \"max_frames\": {max_frames}}}");
@@ -48,16 +51,16 @@ public sealed class StacktraceGetTool
             // Validate parameters
             if (start_frame < 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return Task.FromResult(CreateErrorResponse(ErrorCodes.InvalidParameter,
                     "start_frame must be >= 0",
-                    new { parameter = "start_frame", value = start_frame });
+                    new { parameter = "start_frame", value = start_frame }));
             }
 
             if (max_frames < 1 || max_frames > 1000)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return Task.FromResult(CreateErrorResponse(ErrorCodes.InvalidParameter,
                     "max_frames must be between 1 and 1000",
-                    new { parameter = "max_frames", value = max_frames });
+                    new { parameter = "max_frames", value = max_frames }));
             }
 
             // Check for active session
@@ -65,16 +68,16 @@ public sealed class StacktraceGetTool
             if (session == null)
             {
                 _logger.ToolError("stacktrace_get", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return Task.FromResult(CreateErrorResponse(ErrorCodes.NoSession, "No active debug session"));
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("stacktrace_get", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return Task.FromResult(CreateErrorResponse(ErrorCodes.NotPaused,
                     $"Cannot get stack trace: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
-                    new { currentState = session.State.ToString().ToLowerInvariant() });
+                    new { currentState = session.State.ToString().ToLowerInvariant() }));
             }
 
             // Get stack frames
@@ -103,29 +106,29 @@ public sealed class StacktraceGetTool
                 response["raw_frames"] = frames.Select(f => BuildRawFrameResponse(f)).ToList();
             }
 
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+            return Task.FromResult(JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.NoSession, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.NotPaused, ex.Message));
         }
         catch (ArgumentException ex) when (ex.Message.Contains("thread"))
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.InvalidThread);
-            return CreateErrorResponse(ErrorCodes.InvalidThread, ex.Message,
-                new { thread_id });
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.InvalidThread, ex.Message,
+                new { thread_id }));
         }
         catch (Exception ex)
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.StackTraceFailed);
-            return CreateErrorResponse(ErrorCodes.StackTraceFailed,
-                $"Failed to retrieve stack trace: {ex.Message}");
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.StackTraceFailed,
+                $"Failed to retrieve stack trace: {ex.Message}"));
         }
     }
 

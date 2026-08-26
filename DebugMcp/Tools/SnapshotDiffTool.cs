@@ -32,12 +32,15 @@ public sealed class SnapshotDiffTool
     [McpServerTool(Name = "snapshot_diff", Title = "Compare Two Snapshots",
         ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Compare two snapshots and return structured differences (added, removed, modified variables with before/after values)")]
-    public string DiffSnapshots(
+    public Task<string> DiffSnapshotsAsync(
         [Description("First snapshot ID (baseline)")]
         string snapshot_id_1,
         [Description("Second snapshot ID (comparison)")]
-        string snapshot_id_2)
+        string snapshot_id_2,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("snapshot_diff", JsonSerializer.Serialize(new { snapshot_id_1, snapshot_id_2 }));
 
@@ -48,7 +51,7 @@ public sealed class SnapshotDiffTool
             stopwatch.Stop();
             _logger.ToolCompleted("snapshot_diff", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
+            return Task.FromResult(JsonSerializer.Serialize(new
             {
                 success = true,
                 diff = new
@@ -72,19 +75,19 @@ public sealed class SnapshotDiffTool
             {
                 WriteIndented = true,
                 DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-            });
+            }));
         }
         catch (KeyNotFoundException ex)
         {
             _logger.ToolError("snapshot_diff", ErrorCodes.SnapshotNotFound);
-            return CreateErrorResponse(ErrorCodes.SnapshotNotFound, ex.Message);
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.SnapshotNotFound, ex.Message));
         }
         catch (Exception ex)
         {
             _logger.ToolError("snapshot_diff", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.VariablesFailed,
                 $"Failed to diff snapshots: {ex.Message}",
-                new { exceptionType = ex.GetType().Name });
+                new { exceptionType = ex.GetType().Name }));
         }
     }
 

@@ -34,10 +34,13 @@ public sealed class SnapshotDeleteTool
     [McpServerTool(Name = "snapshot_delete", Title = "Delete Snapshot(s)",
         ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Delete a specific snapshot by ID, or clear all snapshots if no ID is provided")]
-    public string DeleteSnapshot(
+    public Task<string> DeleteSnapshotAsync(
         [Description("Snapshot ID to delete. If omitted, deletes all snapshots.")]
-        string? snapshot_id = null)
+        string? snapshot_id = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("snapshot_delete", JsonSerializer.Serialize(new { snapshot_id }));
 
@@ -48,19 +51,19 @@ public sealed class SnapshotDeleteTool
                 if (!_snapshotService.DeleteSnapshot(snapshot_id))
                 {
                     _logger.ToolError("snapshot_delete", ErrorCodes.SnapshotNotFound);
-                    return CreateErrorResponse(ErrorCodes.SnapshotNotFound,
-                        $"Snapshot '{snapshot_id}' not found.");
+                    return Task.FromResult(CreateErrorResponse(ErrorCodes.SnapshotNotFound,
+                        $"Snapshot '{snapshot_id}' not found."));
                 }
 
                 stopwatch.Stop();
                 _logger.ToolCompleted("snapshot_delete", stopwatch.ElapsedMilliseconds);
 
-                return JsonSerializer.Serialize(new
+                return Task.FromResult(JsonSerializer.Serialize(new
                 {
                     success = true,
                     deleted = snapshot_id,
                     remaining = _snapshotStore.Count
-                }, new JsonSerializerOptions { WriteIndented = true });
+                }, new JsonSerializerOptions { WriteIndented = true }));
             }
             else
             {
@@ -69,20 +72,20 @@ public sealed class SnapshotDeleteTool
                 stopwatch.Stop();
                 _logger.ToolCompleted("snapshot_delete", stopwatch.ElapsedMilliseconds);
 
-                return JsonSerializer.Serialize(new
+                return Task.FromResult(JsonSerializer.Serialize(new
                 {
                     success = true,
                     deleted = "all",
                     remaining = 0
-                }, new JsonSerializerOptions { WriteIndented = true });
+                }, new JsonSerializerOptions { WriteIndented = true }));
             }
         }
         catch (Exception ex)
         {
             _logger.ToolError("snapshot_delete", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
+            return Task.FromResult(CreateErrorResponse(ErrorCodes.VariablesFailed,
                 $"Failed to delete snapshot: {ex.Message}",
-                new { exceptionType = ex.GetType().Name });
+                new { exceptionType = ex.GetType().Name }));
         }
     }
 

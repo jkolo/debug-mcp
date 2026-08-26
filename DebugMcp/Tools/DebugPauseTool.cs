@@ -31,7 +31,7 @@ public sealed class DebugPauseTool
     [McpServerTool(Name = "debug_pause", Title = "Pause Execution",
         ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Pause execution of the running debuggee process")]
-    public async Task<string> PauseAsync()
+    public async Task<string> PauseAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_pause", "{}");
@@ -63,7 +63,7 @@ public sealed class DebugPauseTool
             }
 
             // Pause the process
-            var threads = await _sessionManager.PauseAsync();
+            var threads = await _sessionManager.PauseAsync(cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_pause", stopwatch.ElapsedMilliseconds);

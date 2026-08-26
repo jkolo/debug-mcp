@@ -41,7 +41,8 @@ public sealed class ReSharperInspectSolutionTool
         [Description("Skip the engine's pre-analysis build (default: false)")] bool noBuild = false,
         [Description("Per-call inspection timeout in seconds (10–1800; excludes one-time engine download)")] int? timeoutSeconds = null,
         [Description("Maximum findings to return (default 500, max 500)")] int? maxResults = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<ModelContextProtocol.ProgressNotificationValue>? progress = null)
     {
         return await ReSharperToolHelper.RunAsync(
             toolName: "resharper_inspect_solution",
@@ -56,6 +57,7 @@ public sealed class ReSharperInspectSolutionTool
             options: _options,
             logger: _logger,
             jsonOptions: JsonOptions,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            progress: progress);
     }
 }

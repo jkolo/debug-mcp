@@ -30,12 +30,12 @@ public class SnapshotCreateToolTests
             });
 
     [Fact]
-    public void CreateSnapshot_ReturnsSuccessJson_WithSnapshotMetadata()
+    public async Task CreateSnapshot_ReturnsSuccessJson_WithSnapshotMetadata()
     {
         var snapshot = MakeSnapshot();
         _serviceMock.Setup(s => s.CreateSnapshot(null, null, 0, 0)).Returns(snapshot);
 
-        var result = _tool.CreateSnapshot();
+        var result = await _tool.CreateSnapshotAsync();
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -46,12 +46,12 @@ public class SnapshotCreateToolTests
     }
 
     [Fact]
-    public void CreateSnapshot_PassesParametersThrough()
+    public async Task CreateSnapshot_PassesParametersThrough()
     {
         var snapshot = MakeSnapshot(label: "my-snap", threadId: 5, frameIndex: 2, depth: 3);
         _serviceMock.Setup(s => s.CreateSnapshot("my-snap", 5, 2, 3)).Returns(snapshot);
 
-        var result = _tool.CreateSnapshot(label: "my-snap", thread_id: 5, frame_index: 2, depth: 3);
+        var result = await _tool.CreateSnapshotAsync(label: "my-snap", thread_id: 5, frame_index: 2, depth: 3);
 
         using var doc = JsonDocument.Parse(result);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
@@ -59,12 +59,12 @@ public class SnapshotCreateToolTests
     }
 
     [Fact]
-    public void CreateSnapshot_NotPaused_ReturnsErrorJson()
+    public async Task CreateSnapshot_NotPaused_ReturnsErrorJson()
     {
         _serviceMock.Setup(s => s.CreateSnapshot(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>()))
             .Throws(new InvalidOperationException("Cannot create snapshot while process is not paused."));
 
-        var result = _tool.CreateSnapshot();
+        var result = await _tool.CreateSnapshotAsync();
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -73,12 +73,12 @@ public class SnapshotCreateToolTests
     }
 
     [Fact]
-    public void CreateSnapshot_NoSession_ReturnsErrorJson()
+    public async Task CreateSnapshot_NoSession_ReturnsErrorJson()
     {
         _serviceMock.Setup(s => s.CreateSnapshot(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>()))
             .Throws(new InvalidOperationException("No active debug session."));
 
-        var result = _tool.CreateSnapshot();
+        var result = await _tool.CreateSnapshotAsync();
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -87,12 +87,12 @@ public class SnapshotCreateToolTests
     }
 
     [Fact]
-    public void CreateSnapshot_UnexpectedError_ReturnsGenericError()
+    public async Task CreateSnapshot_UnexpectedError_ReturnsGenericError()
     {
         _serviceMock.Setup(s => s.CreateSnapshot(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>()))
             .Throws(new ArgumentException("bad arg"));
 
-        var result = _tool.CreateSnapshot();
+        var result = await _tool.CreateSnapshotAsync();
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;

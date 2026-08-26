@@ -32,7 +32,8 @@ public sealed class DebugContinueTool
         ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Continue execution of the paused process. The process must be in the 'paused' state (from a breakpoint hit, step completion, or debug_pause). After continuing, the process runs until it hits another breakpoint, throws an exception, or exits. Returns: updated session state (typically 'running'). Use breakpoint_wait to wait for the next pause event. Example response: {\"success\": true, \"session\": {\"processId\": 1234, \"processName\": \"MyApp\", \"state\": \"running\", \"launchMode\": \"launch\"}}")]
     public async Task<string> ContinueAsync(
-        [Description("Timeout in milliseconds")] int timeout = 30000)
+        [Description("Timeout in milliseconds")] int timeout = 30000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_continue", $"{{\"timeout\": {timeout}}}");
@@ -64,8 +65,9 @@ public sealed class DebugContinueTool
                     new { currentState = session.State.ToString().ToLowerInvariant() });
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
-            var updatedSession = await _sessionManager.ContinueAsync(cts.Token);
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var updatedSession = await _sessionManager.ContinueAsync(linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_continue", stopwatch.ElapsedMilliseconds);
@@ -76,6 +78,11 @@ public sealed class DebugContinueTool
                 success = true,
                 session = BuildSessionResponse(updatedSession)
             }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("debug_continue", ErrorCodes.Timeout);
+            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {

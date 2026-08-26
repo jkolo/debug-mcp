@@ -23,7 +23,8 @@ public sealed class EvaluateSafeTool(
         [Description("C# expression to evaluate safely")] string expression,
         [Description("Thread context (default: current thread)")] int? thread_id = null,
         [Description("Stack frame context (0 = top)")] int frame_index = 0,
-        [Description("Evaluation timeout in milliseconds (applied only if expression passes safety check)")] int timeout_ms = 5000)
+        [Description("Evaluation timeout in milliseconds (applied only if expression passes safety check)")] int timeout_ms = 5000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         logger.ToolInvoked("evaluate_safe",
@@ -71,8 +72,9 @@ public sealed class EvaluateSafeTool(
                     $"Cannot evaluate expression: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})");
             }
 
-            using var cts = new CancellationTokenSource(timeout_ms);
-            var result = await sessionManager.EvaluateAsync(expression, thread_id, frame_index, timeout_ms, cts.Token);
+            using var timeoutCts = new CancellationTokenSource(timeout_ms);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var result = await sessionManager.EvaluateAsync(expression, thread_id, frame_index, timeout_ms, linkedCts.Token);
 
             stopwatch.Stop();
             logger.ToolCompleted("evaluate_safe", stopwatch.ElapsedMilliseconds);
@@ -89,6 +91,11 @@ public sealed class EvaluateSafeTool(
             }
 
             return CreateEvaluationErrorResponse(result.Error!);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.ToolError("evaluate_safe", "eval_timeout");
+            return CreateErrorResponse("eval_timeout", "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {

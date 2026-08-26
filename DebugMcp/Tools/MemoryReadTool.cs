@@ -36,7 +36,8 @@ public sealed class MemoryReadTool
     public async Task<string> ReadMemory(
         [Description("Memory address in hex (0x...) or decimal")] string address,
         [Description("Number of bytes to read (max: 65536)")] int size = 256,
-        [Description("Output format: hex, hex_ascii, raw")] string format = "hex_ascii")
+        [Description("Output format: hex, hex_ascii, raw")] string format = "hex_ascii",
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("memory_read",
@@ -92,7 +93,7 @@ public sealed class MemoryReadTool
             }
 
             // Read memory
-            var memory = await _sessionManager.ReadMemoryAsync(address, size);
+            var memory = await _sessionManager.ReadMemoryAsync(address, size, cancellationToken);
 
             // A read that returned zero bytes is a failure, not a success — surface it as an
             // error envelope instead of success:true with an embedded error string (BUG-014).

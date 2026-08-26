@@ -40,7 +40,8 @@ public sealed class LayoutGetTool
         [Description("Include inherited fields from base classes")] bool include_inherited = true,
         [Description("Include padding analysis between fields")] bool include_padding = true,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
-        [Description("Frame index (0 = top of stack)")] int frame_index = 0)
+        [Description("Frame index (0 = top of stack)")] int frame_index = 0,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("layout_get",
@@ -82,7 +83,7 @@ public sealed class LayoutGetTool
 
             // Get layout
             var layout = await _sessionManager.GetTypeLayoutAsync(
-                type_name, include_inherited, include_padding, thread_id, frame_index);
+                type_name, include_inherited, include_padding, thread_id, frame_index, cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("layout_get", stopwatch.ElapsedMilliseconds);

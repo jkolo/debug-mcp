@@ -46,7 +46,8 @@ public sealed class ModulesSearchTool
         [Description("What to search: types, methods, or both")] string search_type = "both",
         [Description("Limit search to specific module (supports * wildcard)")] string? module_filter = null,
         [Description("Enable case-sensitive matching")] bool case_sensitive = false,
-        [Description("Maximum results to return (max: 100)")] int max_results = 50)
+        [Description("Maximum results to return (max: 100)")] int max_results = 50,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("modules_search",
@@ -103,7 +104,8 @@ public sealed class ModulesSearchTool
                 searchType,
                 module_filter,
                 case_sensitive,
-                max_results);
+                max_results,
+                cancellationToken);
 
             stopwatch.Stop();
             _logger.ToolCompleted("modules_search", stopwatch.ElapsedMilliseconds);

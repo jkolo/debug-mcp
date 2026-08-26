@@ -1,4 +1,5 @@
 using DebugMcp.Models.CodeAnalysis;
+using DebugMcp.Services.Progress;
 
 namespace DebugMcp.Services.CodeAnalysis;
 
@@ -19,8 +20,9 @@ public interface ICodeAnalysisService
     /// </summary>
     /// <param name="path">Absolute path to .sln or .csproj file.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="progress">Optional stage reporter (feature 069, US1). Null is always safe.</param>
     /// <returns>Information about the loaded workspace.</returns>
-    Task<WorkspaceInfo> LoadAsync(string path, CancellationToken cancellationToken = default);
+    Task<WorkspaceInfo> LoadAsync(string path, CancellationToken cancellationToken = default, IProgressReporter? progress = null);
 
     /// <summary>
     /// Gets the symbol at a specific source code location.

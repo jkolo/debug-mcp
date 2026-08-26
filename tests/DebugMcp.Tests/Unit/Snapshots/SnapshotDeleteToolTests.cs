@@ -22,12 +22,12 @@ public class SnapshotDeleteToolTests
     }
 
     [Fact]
-    public void DeleteSnapshot_ById_ReturnsSuccessWithRemaining()
+    public async Task DeleteSnapshot_ById_ReturnsSuccessWithRemaining()
     {
         _serviceMock.Setup(s => s.DeleteSnapshot("snap-1")).Returns(true);
         _storeMock.Setup(s => s.Count).Returns(4);
 
-        var result = _tool.DeleteSnapshot("snap-1");
+        var result = await _tool.DeleteSnapshotAsync("snap-1");
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -37,11 +37,11 @@ public class SnapshotDeleteToolTests
     }
 
     [Fact]
-    public void DeleteSnapshot_NotFound_ReturnsErrorJson()
+    public async Task DeleteSnapshot_NotFound_ReturnsErrorJson()
     {
         _serviceMock.Setup(s => s.DeleteSnapshot("snap-missing")).Returns(false);
 
-        var result = _tool.DeleteSnapshot("snap-missing");
+        var result = await _tool.DeleteSnapshotAsync("snap-missing");
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;
@@ -50,9 +50,9 @@ public class SnapshotDeleteToolTests
     }
 
     [Fact]
-    public void DeleteSnapshot_NoId_ClearsAll()
+    public async Task DeleteSnapshot_NoId_ClearsAll()
     {
-        var result = _tool.DeleteSnapshot(null);
+        var result = await _tool.DeleteSnapshotAsync(null);
 
         _serviceMock.Verify(s => s.ClearAll(), Times.Once);
 
@@ -64,12 +64,12 @@ public class SnapshotDeleteToolTests
     }
 
     [Fact]
-    public void DeleteSnapshot_UnexpectedError_ReturnsGenericError()
+    public async Task DeleteSnapshot_UnexpectedError_ReturnsGenericError()
     {
         _serviceMock.Setup(s => s.DeleteSnapshot("snap-x"))
             .Throws(new InvalidOperationException("boom"));
 
-        var result = _tool.DeleteSnapshot("snap-x");
+        var result = await _tool.DeleteSnapshotAsync("snap-x");
 
         using var doc = JsonDocument.Parse(result);
         var root = doc.RootElement;

@@ -32,10 +32,13 @@ public sealed class ProcessReadOutputTool
     [McpServerTool(Name = "process_read_output", Title = "Read Process Output",
         ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description("Read accumulated stdout and/or stderr output from the debugged process")]
-    public string ReadOutput(
+    public Task<string> ReadOutputAsync(
         [Description("Which stream to read: 'stdout', 'stderr', or 'both' (default)")] string stream = "both",
-        [Description("Clear the buffer after reading")] bool clear = false)
+        [Description("Clear the buffer after reading")] bool clear = false,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("process_read_output", JsonSerializer.Serialize(new { stream, clear }));
 
@@ -45,18 +48,18 @@ public sealed class ProcessReadOutputTool
             if (stream != "both" && stream != "stdout" && stream != "stderr")
             {
                 _logger.ToolError("process_read_output", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(
+                return Task.FromResult(CreateErrorResponse(
                     ErrorCodes.InvalidParameter,
-                    $"Invalid stream: '{stream}'. Must be 'stdout', 'stderr', or 'both'");
+                    $"Invalid stream: '{stream}'. Must be 'stdout', 'stderr', or 'both'"));
             }
 
             // Check if process is attached
             if (!_ioManager.HasProcess)
             {
                 _logger.ToolError("process_read_output", ErrorCodes.NoSession);
-                return CreateErrorResponse(
+                return Task.FromResult(CreateErrorResponse(
                     ErrorCodes.NoSession,
-                    "No process attached. Use debug_launch first.");
+                    "No process attached. Use debug_launch first."));
             }
 
             // Read output
@@ -92,17 +95,17 @@ public sealed class ProcessReadOutputTool
                 }
             };
 
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions
+            return Task.FromResult(JsonSerializer.Serialize(response, new JsonSerializerOptions
             {
                 WriteIndented = true
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.ToolError("process_read_output", ErrorCodes.IoFailed);
-            return CreateErrorResponse(
+            return Task.FromResult(CreateErrorResponse(
                 ErrorCodes.IoFailed,
-                $"Failed to read output: {ex.Message}");
+                $"Failed to read output: {ex.Message}"));
         }
     }
 

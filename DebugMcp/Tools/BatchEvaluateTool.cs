@@ -4,7 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using DebugMcp.Models.Batch;
 using DebugMcp.Services.Batch;
+using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace DebugMcp.Tools;
@@ -29,7 +31,8 @@ public sealed class BatchEvaluateTool
         [Description("Timeout in seconds before batch returns partial results (default 30)")] int timeoutSeconds = 30,
         [Description("Evaluation safety mode: safe (default, blocks unsafe expressions) or full (allows all expressions)")] string evalMode = "safe",
         [Description("Maximum total hits across all experiments before ending early (default 500)")] int maxTotalHits = 500,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<ProgressNotificationValue>? progress = null)
     {
         try
         {
@@ -39,7 +42,7 @@ public sealed class BatchEvaluateTool
                 : EvalMode.Safe;
 
             var request = new BatchRequest(experimentList, timeoutSeconds, evalModeEnum, maxTotalHits);
-            var result = await _batchRunner.RunAsync(request, cancellationToken);
+            var result = await _batchRunner.RunAsync(request, cancellationToken, ProgressReporterAdapter.Create(progress));
 
             return JsonSerializer.Serialize(new
             {
