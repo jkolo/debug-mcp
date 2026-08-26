@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
+using DebugMcp.Services.Progress;
 using RoslynWorkspaceDiagnostic = Microsoft.CodeAnalysis.WorkspaceDiagnostic;
 using WorkspaceInfo = DebugMcp.Models.CodeAnalysis.WorkspaceInfo;
 using WorkspaceType = DebugMcp.Models.CodeAnalysis.WorkspaceType;
@@ -70,7 +71,8 @@ public sealed class CodeAnalysisService : ICodeAnalysisService, IDisposable
     internal Solution? Solution => _solution;
 
     /// <inheritdoc />
-    public async Task<WorkspaceInfo> LoadAsync(string path, CancellationToken cancellationToken = default)
+    public async Task<WorkspaceInfo> LoadAsync(
+        string path, CancellationToken cancellationToken = default, IProgressReporter? progress = null)
     {
         if (!File.Exists(path))
         {
@@ -99,13 +101,27 @@ public sealed class CodeAnalysisService : ICodeAnalysisService, IDisposable
 
         try
         {
+            // ProjectLoadProgress reports projects as they're discovered — a .csproj's
+            // transitive ProjectReference graph isn't known upfront, so Total stays null
+            // throughout (unlike batch_evaluate's closed experiment count).
+            var loadedPaths = new HashSet<string>();
+            var loadProgress = progress is null
+                ? null
+                : new SynchronousProgress<Microsoft.CodeAnalysis.MSBuild.ProjectLoadProgress>(p =>
+                {
+                    if (loadedPaths.Add(p.FilePath))
+                    {
+                        progress.ReportStage("loading workspace", loadedPaths.Count, total: null);
+                    }
+                });
+
             if (isSolution)
             {
-                _solution = await _workspace.OpenSolutionAsync(path, cancellationToken: cancellationToken);
+                _solution = await _workspace.OpenSolutionAsync(path, loadProgress, cancellationToken);
             }
             else
             {
-                var project = await _workspace.OpenProjectAsync(path, cancellationToken: cancellationToken);
+                var project = await _workspace.OpenProjectAsync(path, loadProgress, cancellationToken);
                 _solution = project.Solution;
             }
 

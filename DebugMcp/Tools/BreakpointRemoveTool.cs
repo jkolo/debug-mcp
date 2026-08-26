@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -32,9 +33,10 @@ public sealed class BreakpointRemoveTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Success message or error response.</returns>
     [McpServerTool(Name = "breakpoint_remove", Title = "Remove Breakpoint",
-        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Remove a breakpoint by ID")]
-    public async Task<string> RemoveBreakpointAsync(
+    public async Task<BreakpointRemoveResult> RemoveBreakpointAsync(
         [Description("Breakpoint ID to remove")] string id,
         CancellationToken cancellationToken = default)
     {
@@ -47,9 +49,9 @@ public sealed class BreakpointRemoveTool
             if (string.IsNullOrWhiteSpace(id))
             {
                 _logger.ToolError("breakpoint_remove", ErrorCodes.BreakpointNotFound);
-                return CreateErrorResponse(
-                    ErrorCodes.BreakpointNotFound,
-                    "Breakpoint ID cannot be empty");
+                return new BreakpointRemoveResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.BreakpointNotFound, "Breakpoint ID cannot be empty"));
             }
 
             // Route to the correct removal method based on ID prefix
@@ -63,47 +65,33 @@ public sealed class BreakpointRemoveTool
             if (!removed)
             {
                 _logger.ToolError("breakpoint_remove", ErrorCodes.BreakpointNotFound);
-                return CreateErrorResponse(
-                    ErrorCodes.BreakpointNotFound,
-                    $"No breakpoint with ID '{id}'");
+                return new BreakpointRemoveResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.BreakpointNotFound, $"No breakpoint with ID '{id}'"));
             }
 
             _logger.LogInformation("Removed breakpoint {BreakpointId}", id);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                message = $"Breakpoint {id} removed"
-            }, new JsonSerializerOptions { WriteIndented = true });
+            return new BreakpointRemoveResult(
+                Success: true,
+                Message: $"Breakpoint {id} removed");
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("breakpoint_remove", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return new BreakpointRemoveResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, "Operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("breakpoint_remove", ErrorCodes.BreakpointNotFound);
-            return CreateErrorResponse(
-                ErrorCodes.BreakpointNotFound,
-                $"Failed to remove breakpoint: {ex.Message}",
-                new { id, exceptionType = ex.GetType().Name });
+            return new BreakpointRemoveResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.BreakpointNotFound,
+                    $"Failed to remove breakpoint: {ex.Message}",
+                    new { id, exceptionType = ex.GetType().Name }));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        var response = new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        };
-
-        return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
     }
 }

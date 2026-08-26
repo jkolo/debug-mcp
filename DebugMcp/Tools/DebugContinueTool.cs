@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -29,10 +29,12 @@ public sealed class DebugContinueTool
     /// <param name="timeout">Timeout in milliseconds (default: 30000, min: 1000, max: 300000).</param>
     /// <returns>Updated session state after continuing.</returns>
     [McpServerTool(Name = "debug_continue", Title = "Continue Execution",
-        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Continue execution of the paused process. The process must be in the 'paused' state (from a breakpoint hit, step completion, or debug_pause). After continuing, the process runs until it hits another breakpoint, throws an exception, or exits. Returns: updated session state (typically 'running'). Use breakpoint_wait to wait for the next pause event. Example response: {\"success\": true, \"session\": {\"processId\": 1234, \"processName\": \"MyApp\", \"state\": \"running\", \"launchMode\": \"launch\"}}")]
-    public async Task<string> ContinueAsync(
-        [Description("Timeout in milliseconds")] int timeout = 30000)
+    public async Task<DebugContinueResult> ContinueAsync(
+        [Description("Timeout in milliseconds (default: 30000)")] int timeout = 30000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_continue", $"{{\"timeout\": {timeout}}}");
@@ -42,7 +44,7 @@ public sealed class DebugContinueTool
             // Validate timeout bounds
             if (timeout < 1000 || timeout > 300000)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     $"Timeout must be between 1000 and 300000 milliseconds (got {timeout})",
                     new { parameter = "timeout", value = timeout });
             }
@@ -52,96 +54,90 @@ public sealed class DebugContinueTool
             if (session == null)
             {
                 _logger.ToolError("debug_continue", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return CreateErrorResult(ErrorCodes.NoSession, "No active debug session");
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("debug_continue", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot continue: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
                     new { currentState = session.State.ToString().ToLowerInvariant() });
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
-            var updatedSession = await _sessionManager.ContinueAsync(cts.Token);
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var updatedSession = await _sessionManager.ContinueAsync(linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_continue", stopwatch.ElapsedMilliseconds);
             _logger.LogInformation("Continued execution for process {ProcessId}", updatedSession.ProcessId);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                session = BuildSessionResponse(updatedSession)
-            }, new JsonSerializerOptions { WriteIndented = true });
+            return new DebugContinueResult(
+                Success: true,
+                Session: BuildSessionResponse(updatedSession));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("debug_continue", ErrorCodes.Timeout);
+            return CreateErrorResult(ErrorCodes.Timeout, "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("debug_continue", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Continue operation timed out");
+            return CreateErrorResult(ErrorCodes.Timeout, "Continue operation timed out");
         }
         catch (InvalidOperationException ex)
         {
             _logger.ToolError("debug_continue", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return CreateErrorResult(ErrorCodes.NotPaused, ex.Message);
         }
         catch (Exception ex)
         {
             _logger.ToolError("debug_continue", "CONTINUE_FAILED");
-            return CreateErrorResponse("CONTINUE_FAILED", $"Failed to continue: {ex.Message}");
+            return CreateErrorResult("CONTINUE_FAILED", $"Failed to continue: {ex.Message}");
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static DebugContinueResult CreateErrorResult(string code, string message, object? details = null) =>
+        new(Success: false, Error: new ToolError(code, message, details));
 
-    private static object BuildSessionResponse(DebugSession session)
+    private static SessionStateInfo BuildSessionResponse(DebugSession session)
     {
-        var response = new Dictionary<string, object?>
-        {
-            ["processId"] = session.ProcessId,
-            ["processName"] = session.ProcessName,
-            ["state"] = session.State.ToString().ToLowerInvariant(),
-            ["launchMode"] = session.LaunchMode.ToString().ToLowerInvariant()
-        };
+        string? pauseReason = null;
+        LocationInfo? location = null;
+        int? activeThreadId = null;
 
         if (session.State == SessionState.Paused)
         {
             if (session.PauseReason.HasValue)
             {
-                response["pauseReason"] = session.PauseReason.Value.ToString().ToLowerInvariant();
+                pauseReason = session.PauseReason.Value.ToString().ToLowerInvariant();
             }
 
             if (session.CurrentLocation != null)
             {
-                response["location"] = new
-                {
-                    file = session.CurrentLocation.File,
-                    line = session.CurrentLocation.Line,
-                    column = session.CurrentLocation.Column,
-                    functionName = session.CurrentLocation.FunctionName
-                };
+                location = new LocationInfo(
+                    File: session.CurrentLocation.File,
+                    Line: session.CurrentLocation.Line,
+                    Column: session.CurrentLocation.Column,
+                    FunctionName: session.CurrentLocation.FunctionName);
             }
 
             if (session.ActiveThreadId.HasValue)
             {
-                response["activeThreadId"] = session.ActiveThreadId.Value;
+                activeThreadId = session.ActiveThreadId.Value;
             }
         }
 
-        return response;
+        return new SessionStateInfo(
+            ProcessId: session.ProcessId,
+            ProcessName: session.ProcessName,
+            State: session.State.ToString().ToLowerInvariant(),
+            LaunchMode: session.LaunchMode.ToString().ToLowerInvariant(),
+            PauseReason: pauseReason,
+            Location: location,
+            ActiveThreadId: activeThreadId);
     }
 }

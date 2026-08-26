@@ -1,8 +1,9 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
+using DebugMcp.Services.Inspection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -15,11 +16,13 @@ namespace DebugMcp.Tools;
 public sealed class StacktraceGetTool
 {
     private readonly IDebugSessionManager _sessionManager;
+    private readonly ISuspicionRanker _ranker;
     private readonly ILogger<StacktraceGetTool> _logger;
 
-    public StacktraceGetTool(IDebugSessionManager sessionManager, ILogger<StacktraceGetTool> logger)
+    public StacktraceGetTool(IDebugSessionManager sessionManager, ISuspicionRanker ranker, ILogger<StacktraceGetTool> logger)
     {
         _sessionManager = sessionManager;
+        _ranker = ranker;
         _logger = logger;
     }
 
@@ -31,14 +34,24 @@ public sealed class StacktraceGetTool
     /// <param name="max_frames">Maximum frames to return (default: 20, min: 1, max: 1000).</param>
     /// <returns>Stack frames with source locations and arguments.</returns>
     [McpServerTool(Name = "stacktrace_get", Title = "Get Stack Trace",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Get the call stack for a thread. The process must be paused. Returns ordered stack frames from top (index 0, most recent call) to bottom (entry point). Each frame includes: index, function name, module, is_external flag, source location (file/line/column), and arguments. Supports pagination via start_frame and max_frames. Use variables_get with a specific frame_index to inspect locals at any frame depth. Example response: {\"success\": true, \"thread_id\": 1, \"total_frames\": 5, \"frames\": [{\"index\": 0, \"function\": \"MyApp.Program.Main()\", \"module\": \"MyApp.dll\", \"is_external\": false, \"location\": {\"file\": \"Program.cs\", \"line\": 42}}]}")]
-    public string GetStackTrace(
+    public Task<StacktraceGetResult> GetStackTraceAsync(
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Start from frame N (for pagination)")] int start_frame = 0,
         [Description("Maximum frames to return")] int max_frames = 20,
-        [Description("Include raw physical frames alongside logical frames")] bool include_raw = false)
+        [Description("Include raw physical frames alongside logical frames")] bool include_raw = false,
+        // FR-034: the underlying IDebugSessionManager.GetStackFrames call is synchronous (no
+        // CancellationToken parameter) and touches the live ICorDebug session directly. There is
+        // nothing to race a timeout against without abandoning that call on a background thread
+        // while another call could start — which would violate this codebase's _lock/_stateLock
+        // threading invariant. So this parameter is validated but not wired to a CancellationTokenSource.
+        [Description("Maximum time to wait for the stack trace, in milliseconds (default: 30000, min: 1, max: 300000)")] int timeout_ms = 30000,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("stacktrace_get",
             $"{{\"thread_id\": {(thread_id?.ToString() ?? "null")}, \"start_frame\": {start_frame}, \"max_frames\": {max_frames}}}");
@@ -48,16 +61,23 @@ public sealed class StacktraceGetTool
             // Validate parameters
             if (start_frame < 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
                     "start_frame must be >= 0",
-                    new { parameter = "start_frame", value = start_frame });
+                    new { parameter = "start_frame", value = start_frame }));
             }
 
             if (max_frames < 1 || max_frames > 1000)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
                     "max_frames must be between 1 and 1000",
-                    new { parameter = "max_frames", value = max_frames });
+                    new { parameter = "max_frames", value = max_frames }));
+            }
+
+            if (timeout_ms < 1 || timeout_ms > 300000)
+            {
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
+                    "timeout_ms must be between 1 and 300000",
+                    new { parameter = "timeout_ms", value = timeout_ms }));
             }
 
             // Check for active session
@@ -65,16 +85,16 @@ public sealed class StacktraceGetTool
             if (session == null)
             {
                 _logger.ToolError("stacktrace_get", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return Task.FromResult(CreateErrorResult(ErrorCodes.NoSession, "No active debug session"));
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("stacktrace_get", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return Task.FromResult(CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot get stack trace: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
-                    new { currentState = session.State.ToString().ToLowerInvariant() });
+                    new { currentState = session.State.ToString().ToLowerInvariant() }));
             }
 
             // Get stack frames
@@ -88,130 +108,117 @@ public sealed class StacktraceGetTool
             _logger.LogInformation("Retrieved {FrameCount} stack frames (total: {TotalFrames}) for thread {ThreadId}",
                 frames.Count, totalFrames, actualThreadId);
 
-            var response = new Dictionary<string, object?>
-            {
-                ["success"] = true,
-                ["thread_id"] = actualThreadId,
-                ["total_frames"] = totalFrames,
-                ["frames"] = frames.Select(f => BuildFrameResponse(f)).ToList()
-            };
+            var (boundedFrames, framesTruncation) = ResultTruncation.Bound(
+                frames.Select(BuildFrameResult).ToList(), "stacktrace_get result exceeded the 256 KB size budget");
 
-            if (include_raw)
-            {
-                // Raw frames show the physical stack without logical async reconstruction.
-                // Currently identical to frames since continuation chain (US2) isn't implemented yet.
-                response["raw_frames"] = frames.Select(f => BuildRawFrameResponse(f)).ToList();
-            }
+            // Raw frames show the physical stack without logical async reconstruction.
+            // Currently identical to frames since continuation chain (US2) isn't implemented yet.
+            // Capped to the same count as the (possibly truncated) logical frames rather than
+            // budgeted independently, since the two lists describe the same underlying stack.
+            var rawFrames = include_raw
+                ? frames.Take(boundedFrames.Count).Select(BuildRawFrameResult).ToList()
+                : null;
 
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+            // Same deterministic ranker as exception_get_context, run without exception context
+            // (stacktrace_get isn't necessarily called at a fault) — only the exception-independent
+            // heuristics can fire (FR-022-FR-026).
+            var enrichment = _ranker.Rank(frames.Select(BuildAutopsyFrame).ToList(), exception: null);
+
+            return Task.FromResult(new StacktraceGetResult(
+                Success: true,
+                ThreadId: actualThreadId,
+                TotalFrames: totalFrames,
+                Frames: boundedFrames,
+                RawFrames: rawFrames,
+                Truncation: framesTruncation,
+                Ranking: enrichment.Ranking,
+                RankingUnavailable: enrichment.Unavailable));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return Task.FromResult(CreateErrorResult(ErrorCodes.NoSession, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return Task.FromResult(CreateErrorResult(ErrorCodes.NotPaused, ex.Message));
         }
         catch (ArgumentException ex) when (ex.Message.Contains("thread"))
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.InvalidThread);
-            return CreateErrorResponse(ErrorCodes.InvalidThread, ex.Message,
-                new { thread_id });
+            return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidThread, ex.Message,
+                new { thread_id }));
         }
         catch (Exception ex)
         {
             _logger.ToolError("stacktrace_get", ErrorCodes.StackTraceFailed);
-            return CreateErrorResponse(ErrorCodes.StackTraceFailed,
-                $"Failed to retrieve stack trace: {ex.Message}");
+            return Task.FromResult(CreateErrorResult(ErrorCodes.StackTraceFailed,
+                $"Failed to retrieve stack trace: {ex.Message}"));
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
+    private static StacktraceGetResult CreateErrorResult(string code, string message, object? details = null)
     {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
+        return new StacktraceGetResult(Success: false, Error: new ToolError(code, message, details));
     }
 
-    private static object BuildFrameResponse(Models.Inspection.StackFrame frame)
+    private static StackFrameResult BuildFrameResult(Models.Inspection.StackFrame frame)
     {
-        var response = new Dictionary<string, object?>
-        {
-            ["index"] = frame.Index,
-            ["function"] = frame.Function,
-            ["module"] = frame.Module,
-            ["is_external"] = frame.IsExternal,
-            ["frame_kind"] = frame.FrameKind,
-            ["is_awaiting"] = frame.IsAwaiting
-        };
-
-        if (frame.LogicalFunction != null)
-        {
-            response["logical_function"] = frame.LogicalFunction;
-        }
-
-        if (frame.Location != null)
-        {
-            response["location"] = new
-            {
-                file = frame.Location.File,
-                line = frame.Location.Line,
-                column = frame.Location.Column,
-                function = frame.Location.FunctionName
-            };
-        }
-
-        if (frame.Arguments?.Count > 0)
-        {
-            response["arguments"] = frame.Arguments.Select(arg => new
-            {
-                name = arg.Name,
-                type = arg.Type,
-                value = arg.Value,
-                scope = arg.Scope.ToString().ToLowerInvariant(),
-                has_children = arg.HasChildren,
-                children_count = arg.ChildrenCount
-            });
-        }
-
-        return response;
+        return new StackFrameResult(
+            Index: frame.Index,
+            Function: frame.Function,
+            Module: frame.Module,
+            IsExternal: frame.IsExternal,
+            FrameKind: frame.FrameKind,
+            IsAwaiting: frame.IsAwaiting,
+            LogicalFunction: frame.LogicalFunction,
+            Location: BuildLocationResult(frame.Location),
+            Arguments: frame.Arguments?.Count > 0
+                ? frame.Arguments.Select(BuildArgumentResult).ToList()
+                : null);
     }
 
     /// <summary>
     /// Builds a raw frame response showing physical stack frame data without logical async transformations.
     /// </summary>
-    private static object BuildRawFrameResponse(Models.Inspection.StackFrame frame)
+    private static RawStackFrameResult BuildRawFrameResult(Models.Inspection.StackFrame frame)
     {
-        var response = new Dictionary<string, object?>
-        {
-            ["index"] = frame.Index,
-            ["function"] = frame.Function,
-            ["module"] = frame.Module,
-            ["is_external"] = frame.IsExternal,
-            ["frame_kind"] = frame.FrameKind
-        };
+        return new RawStackFrameResult(
+            Index: frame.Index,
+            Function: frame.Function,
+            Module: frame.Module,
+            IsExternal: frame.IsExternal,
+            FrameKind: frame.FrameKind,
+            Location: BuildLocationResult(frame.Location));
+    }
 
-        if (frame.Location != null)
-        {
-            response["location"] = new
-            {
-                file = frame.Location.File,
-                line = frame.Location.Line,
-                column = frame.Location.Column,
-                function = frame.Location.FunctionName
-            };
-        }
+    private static FrameLocationResult? BuildLocationResult(Models.SourceLocation? location)
+    {
+        return location == null
+            ? null
+            : new FrameLocationResult(location.File, location.Line, location.Column, location.FunctionName);
+    }
 
-        return response;
+    private static VariableResult BuildArgumentResult(Models.Inspection.Variable arg)
+    {
+        return new VariableResult(
+            Name: arg.Name,
+            Type: arg.Type,
+            Value: arg.Value,
+            Scope: arg.Scope.ToString().ToLowerInvariant(),
+            HasChildren: arg.HasChildren,
+            ChildrenCount: arg.ChildrenCount);
+    }
+
+    private static Models.Inspection.AutopsyFrame BuildAutopsyFrame(Models.Inspection.StackFrame frame)
+    {
+        return new Models.Inspection.AutopsyFrame(
+            Index: frame.Index,
+            Function: frame.Function,
+            Module: frame.Module,
+            IsExternal: frame.IsExternal,
+            Location: frame.Location,
+            Arguments: frame.Arguments);
     }
 }

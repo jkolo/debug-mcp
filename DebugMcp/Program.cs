@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Reflection;
 using DebugMcp.Infrastructure;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
@@ -11,9 +12,11 @@ using DebugMcp.Services.Resources;
 using DebugMcp.Prompts;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Services.Symbols;
+using DebugMcp.Services.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Extensions.Tasks;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -161,6 +164,9 @@ rootCommand.SetAction(async parseResult =>
     builder.Services.AddSingleton<DebugMcp.Services.IOutputEventSource>(sp =>
         (DebugMcp.Services.IOutputEventSource)sp.GetRequiredService<ProcessIoManager>());
 
+    // Register deterministic suspicion ranking (069-mcp-surface-modernization, US4)
+    builder.Services.AddSingleton<DebugMcp.Services.Inspection.ISuspicionRanker, DebugMcp.Services.Inspection.SuspicionRanker>();
+
     // Register exception autopsy service (022-exception-autopsy)
     builder.Services.AddSingleton<IExceptionAutopsyService, ExceptionAutopsyService>();
 
@@ -279,7 +285,11 @@ rootCommand.SetAction(async parseResult =>
         {
             var provider = request.Services!.GetRequiredService<ExpressionCompletionProvider>();
             return await provider.GetCompletionsAsync(request.Params!, ct);
-        });
+        })
+        .WithTasks(
+            new ExpiryAwareTaskStore(new InMemoryMcpTaskStore { DefaultTimeToLive = TimeSpan.FromHours(1) }),
+            opts => opts.ExecutionModeSelector = TaskExecutionPolicy.SelectMode)
+        .WithRequestFilters(f => f.AddCallToolFilter(ToolResultSerializer.IsErrorFilter));
 
     // Add MCP logger provider (must be after AddMcpServer)
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();

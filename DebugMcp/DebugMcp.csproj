@@ -53,6 +53,7 @@
         <PackageReference Include="Microsoft.Extensions.Hosting" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" />
         <PackageReference Include="ModelContextProtocol.Core" />
+        <PackageReference Include="ModelContextProtocol.Extensions.Tasks" />
         <PackageReference Include="System.CommandLine" />
 
         <!-- Roslyn Code Analysis (015-roslyn-code-analysis) -->

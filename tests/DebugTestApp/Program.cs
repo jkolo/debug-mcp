@@ -1,4 +1,21 @@
-// Test app for debugger attach testing
+// Test app for debugger attach testing.
+// --fault <Name> runs one tests/DebugTestApp/FaultScenarios fixture instead of the normal demo
+// app, for T089 live-wire validation of Scenario 4 (deterministic enrichment) — see
+// specs/069-mcp-surface-modernization/quickstart.md.
+if (args.Length == 2 && args[0] == "--fault")
+{
+    Console.WriteLine($"Running fault scenario '{args[1]}'. PID: {Environment.ProcessId}");
+    switch (args[1])
+    {
+        case "NullDereference":
+            DebugTestApp.FaultScenarios.NullDereference.Run();
+            break;
+        default:
+            throw new ArgumentException($"Unknown fault scenario: {args[1]}");
+    }
+    return;
+}
+
 var app = new Application("TestApp", 42);
 app.Run();
 

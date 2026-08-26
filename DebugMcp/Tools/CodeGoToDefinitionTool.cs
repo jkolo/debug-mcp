@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -17,8 +18,6 @@ public sealed class CodeGoToDefinitionTool
 {
     private readonly ICodeAnalysisService _codeAnalysisService;
     private readonly ILogger<CodeGoToDefinitionTool> _logger;
-
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public CodeGoToDefinitionTool(ICodeAnalysisService codeAnalysisService, ILogger<CodeGoToDefinitionTool> logger)
     {
@@ -35,16 +34,21 @@ public sealed class CodeGoToDefinitionTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Definition location(s) or error response.</returns>
     [McpServerTool(Name = "code_goto_definition", Title = "Go to Definition",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Navigate to the definition of a symbol at a given source location. Returns source file location or assembly info for metadata symbols.")]
-    public async Task<string> GoToDefinitionAsync(
+    public async Task<CodeGoToDefinitionResult> GoToDefinitionAsync(
         [Description("Absolute path to source file")] string file,
         [Description("1-based line number where the symbol appears")] int line,
         [Description("1-based column number where the symbol appears")] int column,
+        [Description("Maximum time to wait for the definition lookup, in milliseconds (default: 30000)")] int timeoutMs = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_goto_definition", JsonSerializer.Serialize(new { file, line, column }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -52,86 +56,75 @@ public sealed class CodeGoToDefinitionTool
             if (_codeAnalysisService.CurrentWorkspace is null)
             {
                 _logger.ToolError("code_goto_definition", ErrorCodes.NoWorkspace);
-                return CreateErrorResponse(ErrorCodes.NoWorkspace, "No workspace loaded. Call code_load first.");
+                return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, "No workspace loaded. Call code_load first."));
             }
 
             // Validate parameters
             if (string.IsNullOrWhiteSpace(file))
             {
                 _logger.ToolError("code_goto_definition", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, "File path is required.");
+                return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, "File path is required."));
             }
 
             if (line <= 0)
             {
                 _logger.ToolError("code_goto_definition", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, "Line must be a positive number.");
+                return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, "Line must be a positive number."));
             }
 
             if (column <= 0)
             {
                 _logger.ToolError("code_goto_definition", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, "Column must be a positive number.");
+                return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, "Column must be a positive number."));
             }
 
             // Go to definition
-            var result = await _codeAnalysisService.GoToDefinitionAsync(file, line, column, cancellationToken);
+            var result = await _codeAnalysisService.GoToDefinitionAsync(file, line, column, linkedCts.Token);
 
             if (result is null)
             {
                 _logger.ToolError("code_goto_definition", ErrorCodes.SymbolNotFound);
-                return CreateErrorResponse(ErrorCodes.SymbolNotFound, $"No symbol found at {file}:{line}:{column}");
+                return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.SymbolNotFound, $"No symbol found at {file}:{line}:{column}"));
             }
 
             stopwatch.Stop();
             _logger.ToolCompleted("code_goto_definition", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                data = new
+            return new CodeGoToDefinitionResult(
+                Success: true,
+                Data: new CodeGoToDefinitionData
                 {
-                    symbol = new
+                    Symbol = new GoToDefinitionSymbolSummary
                     {
-                        name = result.Symbol.Name,
-                        fully_qualified_name = result.Symbol.FullyQualifiedName,
-                        kind = result.Symbol.Kind.ToString(),
-                        containing_type = result.Symbol.ContainingType,
-                        containing_namespace = result.Symbol.ContainingNamespace
+                        Name = result.Symbol.Name,
+                        FullyQualifiedName = result.Symbol.FullyQualifiedName,
+                        Kind = result.Symbol.Kind.ToString(),
+                        ContainingType = result.Symbol.ContainingType,
+                        ContainingNamespace = result.Symbol.ContainingNamespace
                     },
-                    definitions_count = result.Definitions.Count,
-                    definitions = result.Definitions
-                }
-            }, JsonOptions);
+                    DefinitionsCount = result.Definitions.Count,
+                    Definitions = result.Definitions
+                });
         }
         catch (InvalidOperationException ex)
         {
             _logger.ToolError("code_goto_definition", ErrorCodes.NoWorkspace);
-            return CreateErrorResponse(ErrorCodes.NoWorkspace, ex.Message);
+            return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, ex.Message));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("code_goto_definition", ErrorCodes.Timeout);
+            return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, $"code_goto_definition timed out after {timeoutMs}ms", new { timeout = timeoutMs }));
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("code_goto_definition", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Go to definition operation was cancelled");
+            return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, "Go to definition operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("code_goto_definition", ErrorCodes.AnalysisFailed);
-            return CreateErrorResponse(ErrorCodes.AnalysisFailed, $"Go to definition failed: {ex.Message}");
+            return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.AnalysisFailed, $"Go to definition failed: {ex.Message}"));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new ErrorResponse
-            {
-                Code = code,
-                Message = message,
-                Details = details
-            }
-        }, JsonOptions);
     }
 }

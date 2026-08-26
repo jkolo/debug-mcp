@@ -1,8 +1,8 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -35,14 +35,24 @@ public sealed class VariablesGetTool
     /// <param name="expand">Variable path to expand children (e.g., 'user.Address').</param>
     /// <returns>Variables with types, values, and expandability info.</returns>
     [McpServerTool(Name = "variables_get", Title = "Get Variables",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Get local variables, arguments, and 'this' for a stack frame. The process must be paused. Each variable includes name, type, string value, scope (local/argument/this), and has_children flag. Use the expand parameter with a dot-separated path (e.g., 'user.Address') to drill into nested object fields. Use object_inspect for deeper inspection or evaluate for arbitrary expressions. Example response: {\"success\": true, \"variables\": [{\"name\": \"count\", \"type\": \"System.Int32\", \"value\": \"42\", \"scope\": \"local\", \"has_children\": false}, {\"name\": \"user\", \"type\": \"MyApp.User\", \"value\": \"{MyApp.User}\", \"scope\": \"local\", \"has_children\": true}]}")]
-    public string GetVariables(
+    public Task<VariablesGetResult> GetVariablesAsync(
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Frame index (0 = top of stack)")] int frame_index = 0,
         [Description("Which variables to return: all, locals, arguments, this")] string scope = "all",
-        [Description("Variable path to expand children")] string? expand = null)
+        [Description("Variable path to expand children")] string? expand = null,
+        // FR-034: the underlying IDebugSessionManager.GetVariables call is synchronous (no
+        // CancellationToken parameter) and touches the live ICorDebug session directly. There is
+        // nothing to race a timeout against without abandoning that call on a background thread
+        // while another call could start — which would violate this codebase's _lock/_stateLock
+        // threading invariant. So this parameter is validated but not wired to a CancellationTokenSource.
+        [Description("Maximum time to wait for variable retrieval, in milliseconds (default: 30000, min: 1, max: 300000)")] int timeout_ms = 30000,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("variables_get",
             $"{{\"thread_id\": {(thread_id?.ToString() ?? "null")}, \"frame_index\": {frame_index}, \"scope\": \"{scope}\", \"expand\": {(expand != null ? $"\"{expand}\"" : "null")}}}");
@@ -52,16 +62,23 @@ public sealed class VariablesGetTool
             // Validate parameters
             if (frame_index < 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
                     "frame_index must be >= 0",
-                    new { parameter = "frame_index", value = frame_index });
+                    new { parameter = "frame_index", value = frame_index }));
             }
 
             if (!ValidScopes.Contains(scope))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
                     $"scope must be one of: {string.Join(", ", ValidScopes)}",
-                    new { parameter = "scope", value = scope, validValues = ValidScopes });
+                    new { parameter = "scope", value = scope, validValues = ValidScopes }));
+            }
+
+            if (timeout_ms < 1 || timeout_ms > 300000)
+            {
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
+                    "timeout_ms must be between 1 and 300000",
+                    new { parameter = "timeout_ms", value = timeout_ms }));
             }
 
             // Check for active session
@@ -69,16 +86,16 @@ public sealed class VariablesGetTool
             if (session == null)
             {
                 _logger.ToolError("variables_get", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return Task.FromResult(CreateErrorResult(ErrorCodes.NoSession, "No active debug session"));
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("variables_get", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return Task.FromResult(CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot get variables: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
-                    new { currentState = session.State.ToString().ToLowerInvariant() });
+                    new { currentState = session.State.ToString().ToLowerInvariant() }));
             }
 
             // Get variables
@@ -89,78 +106,60 @@ public sealed class VariablesGetTool
             _logger.LogInformation("Retrieved {VariableCount} variables for frame {FrameIndex}",
                 variables.Count, frame_index);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                variables = variables.Select(v => BuildVariableResponse(v))
-            }, new JsonSerializerOptions { WriteIndented = true });
+            var (bounded, truncation) = ResultTruncation.Bound(
+                variables.Select(BuildVariableResult).ToList(),
+                "variables_get result exceeded the 256 KB size budget");
+
+            return Task.FromResult(new VariablesGetResult(
+                Success: true,
+                Variables: bounded,
+                Truncation: truncation));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("variables_get", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return Task.FromResult(CreateErrorResult(ErrorCodes.NoSession, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("variables_get", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return Task.FromResult(CreateErrorResult(ErrorCodes.NotPaused, ex.Message));
         }
         catch (ArgumentException ex) when (ex.Message.Contains("thread"))
         {
             _logger.ToolError("variables_get", ErrorCodes.InvalidThread);
-            return CreateErrorResponse(ErrorCodes.InvalidThread, ex.Message,
-                new { thread_id });
+            return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidThread, ex.Message,
+                new { thread_id }));
         }
         catch (ArgumentOutOfRangeException ex) when (ex.ParamName == "frameIndex")
         {
             _logger.ToolError("variables_get", ErrorCodes.InvalidFrame);
-            return CreateErrorResponse(ErrorCodes.InvalidFrame,
+            return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidFrame,
                 $"Frame index {frame_index} is out of range",
-                new { frame_index });
+                new { frame_index }));
         }
         catch (Exception ex)
         {
             _logger.ToolError("variables_get", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
-                $"Failed to retrieve variables: {ex.Message}");
+            return Task.FromResult(CreateErrorResult(ErrorCodes.VariablesFailed,
+                $"Failed to retrieve variables: {ex.Message}"));
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
+    private static VariablesGetResult CreateErrorResult(string code, string message, object? details = null)
     {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
+        return new VariablesGetResult(Success: false, Error: new ToolError(code, message, details));
     }
 
-    private static object BuildVariableResponse(Variable variable)
+    private static VariableResult BuildVariableResult(Variable variable)
     {
-        var response = new Dictionary<string, object?>
-        {
-            ["name"] = variable.Name,
-            ["type"] = variable.Type,
-            ["value"] = variable.Value,
-            ["scope"] = variable.Scope.ToString().ToLowerInvariant(),
-            ["has_children"] = variable.HasChildren
-        };
-
-        if (variable.ChildrenCount.HasValue)
-        {
-            response["children_count"] = variable.ChildrenCount.Value;
-        }
-
-        if (!string.IsNullOrEmpty(variable.Path))
-        {
-            response["path"] = variable.Path;
-        }
-
-        return response;
+        return new VariableResult(
+            Name: variable.Name,
+            Type: variable.Type,
+            Value: variable.Value,
+            Scope: variable.Scope.ToString().ToLowerInvariant(),
+            HasChildren: variable.HasChildren,
+            ChildrenCount: variable.ChildrenCount,
+            Path: string.IsNullOrEmpty(variable.Path) ? null : variable.Path);
     }
 }

@@ -1,8 +1,8 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -33,13 +33,15 @@ public sealed class EvaluateTool
     /// <param name="timeout_ms">Evaluation timeout in milliseconds (default: 5000).</param>
     /// <returns>Evaluation result with value or error.</returns>
     [McpServerTool(Name = "evaluate", Title = "Evaluate Expression",
-        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Evaluate a C# expression in the debuggee context. The process must be paused. Supports: literals; locals/arguments/this and bare instance fields; member access and property getters; indexers (arrays, List<T>, string, Dictionary with value-type keys); instance method calls; arithmetic, comparison, logical, bitwise and conditional (?:) operators; casts; and string interpolation. Examples: 'myList.Count', 'customer.Name.ToUpper()', 'x + y * 2', 'tags[0]', 'a > 0 ? a : -a'. NOT supported (returns a 'not_supported' error): lambdas / LINQ query & method syntax, and reference-typed (string/object) method or indexer arguments. Returns: value (string representation), type (CLR type name), has_children flag. On failure: error with code and message. Note: method calls and property getters run real code in the debuggee and may have side effects. Example response: {\"success\": true, \"value\": \"42\", \"type\": \"System.Int32\", \"has_children\": false}")]
-    public async Task<string> EvaluateAsync(
+    public async Task<EvaluateResult> EvaluateAsync(
         [Description("C# expression to evaluate")] string expression,
         [Description("Thread context (default: current thread)")] int? thread_id = null,
         [Description("Stack frame context (0 = top)")] int frame_index = 0,
-        [Description("Evaluation timeout in milliseconds")] int timeout_ms = 5000)
+        [Description("Evaluation timeout in milliseconds (default: 5000)")] int timeout_ms = 5000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("evaluate",
@@ -50,13 +52,13 @@ public sealed class EvaluateTool
             // Validate expression parameter
             if (string.IsNullOrWhiteSpace(expression))
             {
-                return CreateErrorResponse("syntax_error", "Expression cannot be empty", position: 0);
+                return CreateErrorResult("syntax_error", "Expression cannot be empty", position: 0);
             }
 
             // Validate timeout range (100-60000)
             if (timeout_ms < 100 || timeout_ms > 60000)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "timeout_ms must be between 100 and 60000",
                     new { parameter = "timeout_ms", value = timeout_ms });
             }
@@ -64,7 +66,7 @@ public sealed class EvaluateTool
             // Validate frame_index
             if (frame_index < 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "frame_index must be >= 0",
                     new { parameter = "frame_index", value = frame_index });
             }
@@ -74,20 +76,21 @@ public sealed class EvaluateTool
             if (session == null)
             {
                 _logger.ToolError("evaluate", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return CreateErrorResult(ErrorCodes.NoSession, "No active debug session");
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("evaluate", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot evaluate expression: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})");
             }
 
             // Evaluate expression
-            using var cts = new CancellationTokenSource(timeout_ms);
-            var result = await _sessionManager.EvaluateAsync(expression, thread_id, frame_index, timeout_ms, cts.Token);
+            using var timeoutCts = new CancellationTokenSource(timeout_ms);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var result = await _sessionManager.EvaluateAsync(expression, thread_id, frame_index, timeout_ms, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("evaluate", stopwatch.ElapsedMilliseconds);
@@ -97,94 +100,78 @@ public sealed class EvaluateTool
                 _logger.LogInformation("Evaluated expression '{Expression}' = {Value} ({Type})",
                     expression, result.Value ?? "null", result.Type ?? "void");
 
-                return JsonSerializer.Serialize(new
-                {
-                    success = true,
-                    value = result.Value,
-                    type = result.Type,
-                    has_children = result.HasChildren
-                }, new JsonSerializerOptions { WriteIndented = true });
+                return new EvaluateResult(
+                    Success: true,
+                    Value: result.Value,
+                    Type: result.Type,
+                    HasChildren: result.HasChildren);
             }
             else
             {
                 _logger.LogWarning("Expression evaluation failed: {Code} - {Message}",
                     result.Error?.Code, result.Error?.Message);
 
-                return CreateEvaluationErrorResponse(result.Error!);
+                return CreateEvaluationErrorResult(result.Error!);
             }
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("evaluate", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return CreateErrorResult(ErrorCodes.NoSession, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("evaluate", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return CreateErrorResult(ErrorCodes.NotPaused, ex.Message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("evaluate", "eval_timeout");
+            return CreateErrorResult("eval_timeout", "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("evaluate", "eval_timeout");
-            return CreateErrorResponse("eval_timeout",
+            return CreateErrorResult("eval_timeout",
                 $"Expression evaluation timed out after {timeout_ms}ms");
         }
         catch (Exception ex)
         {
             _logger.ToolError("evaluate", "eval_exception");
-            return CreateErrorResponse("eval_exception", ex.Message,
+            return CreateErrorResult("eval_exception", ex.Message,
                 new { exception_type = ex.GetType().FullName });
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null, int? position = null)
+    /// <summary>
+    /// Builds a failure result. The pre-US3 wire shape put an optional <c>position</c> directly
+    /// on the error object (alongside code/message); the shared <see cref="ToolError"/> type has
+    /// no such field, so <paramref name="position"/> is folded into <c>Error.Details</c> instead
+    /// (as <c>{ position }</c>) — same value, now one level deeper on the wire.
+    /// </summary>
+    private static EvaluateResult CreateErrorResult(string code, string message, object? details = null, int? position = null)
     {
-        var errorObj = new Dictionary<string, object?>
-        {
-            ["code"] = code,
-            ["message"] = message
-        };
-
-        if (details != null)
-        {
-            errorObj["details"] = details;
-        }
-
-        if (position.HasValue)
-        {
-            errorObj["position"] = position.Value;
-        }
-
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = errorObj
-        }, new JsonSerializerOptions { WriteIndented = true });
+        var errorDetails = position.HasValue ? (object)new { position = position.Value } : details;
+        return new EvaluateResult(Success: false, Error: new ToolError(code, message, errorDetails));
     }
 
-    private static string CreateEvaluationErrorResponse(EvaluationError error)
+    /// <summary>
+    /// Builds a failure result from an <see cref="EvaluationError"/>. The pre-US3 wire shape put
+    /// optional <c>exception_type</c>/<c>position</c> directly on the error object; both are
+    /// folded into <c>Error.Details</c> here for the same reason as <see cref="CreateErrorResult"/>.
+    /// </summary>
+    private static EvaluateResult CreateEvaluationErrorResult(EvaluationError error)
     {
-        var errorObj = new Dictionary<string, object?>
+        var hasExceptionType = !string.IsNullOrEmpty(error.ExceptionType);
+        object? details = (hasExceptionType, error.Position) switch
         {
-            ["code"] = error.Code,
-            ["message"] = error.Message
+            (true, { } position) => new { exception_type = error.ExceptionType, position },
+            (true, null) => new { exception_type = error.ExceptionType },
+            (false, { } position) => new { position },
+            _ => null
         };
 
-        if (!string.IsNullOrEmpty(error.ExceptionType))
-        {
-            errorObj["exception_type"] = error.ExceptionType;
-        }
-
-        if (error.Position.HasValue)
-        {
-            errorObj["position"] = error.Position.Value;
-        }
-
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = errorObj
-        }, new JsonSerializerOptions { WriteIndented = true });
+        return new EvaluateResult(Success: false, Error: new ToolError(error.Code, error.Message, details));
     }
 
     private static string EscapeJsonString(string value)

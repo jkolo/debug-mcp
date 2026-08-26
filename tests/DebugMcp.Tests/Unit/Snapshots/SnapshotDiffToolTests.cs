@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DebugMcp.Models.Snapshots;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Tools;
@@ -21,7 +20,7 @@ public class SnapshotDiffToolTests
     }
 
     [Fact]
-    public void DiffSnapshots_ReturnsSuccessJson_WithDiffStructure()
+    public async Task DiffSnapshots_ReturnsSuccessJson_WithDiffStructure()
     {
         var diff = new SnapshotDiff(
             "snap-a", "snap-b",
@@ -34,54 +33,50 @@ public class SnapshotDiffToolTests
 
         _serviceMock.Setup(s => s.DiffSnapshots("snap-a", "snap-b")).Returns(diff);
 
-        var result = _tool.DiffSnapshots("snap-a", "snap-b");
+        var result = await _tool.DiffSnapshotsAsync("snap-a", "snap-b");
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeTrue();
+        result.Success.Should().BeTrue();
+        result.Diff.Should().NotBeNull();
 
-        var d = root.GetProperty("diff");
-        d.GetProperty("snapshotIdA").GetString().Should().Be("snap-a");
-        d.GetProperty("snapshotIdB").GetString().Should().Be("snap-b");
-        d.GetProperty("threadMismatch").GetBoolean().Should().BeFalse();
+        var d = result.Diff!;
+        d.SnapshotIdA.Should().Be("snap-a");
+        d.SnapshotIdB.Should().Be("snap-b");
+        d.ThreadMismatch.Should().BeFalse();
 
-        var summary = d.GetProperty("summary");
-        summary.GetProperty("added").GetInt32().Should().Be(1);
-        summary.GetProperty("removed").GetInt32().Should().Be(1);
-        summary.GetProperty("modified").GetInt32().Should().Be(1);
-        summary.GetProperty("unchanged").GetInt32().Should().Be(5);
+        d.Summary.Added.Should().Be(1);
+        d.Summary.Removed.Should().Be(1);
+        d.Summary.Modified.Should().Be(1);
+        d.Summary.Unchanged.Should().Be(5);
     }
 
     [Fact]
-    public void DiffSnapshots_SnapshotNotFound_ReturnsErrorJson()
+    public async Task DiffSnapshots_SnapshotNotFound_ReturnsErrorJson()
     {
         _serviceMock.Setup(s => s.DiffSnapshots("snap-a", "snap-missing"))
             .Throws(new KeyNotFoundException("Snapshot 'snap-missing' not found."));
 
-        var result = _tool.DiffSnapshots("snap-a", "snap-missing");
+        var result = await _tool.DiffSnapshotsAsync("snap-a", "snap-missing");
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeFalse();
-        root.GetProperty("error").GetProperty("code").GetString().Should().Be("SNAPSHOT_NOT_FOUND");
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("SNAPSHOT_NOT_FOUND");
     }
 
     [Fact]
-    public void DiffSnapshots_UnexpectedError_ReturnsGenericError()
+    public async Task DiffSnapshots_UnexpectedError_ReturnsGenericError()
     {
         _serviceMock.Setup(s => s.DiffSnapshots("a", "b"))
             .Throws(new InvalidOperationException("boom"));
 
-        var result = _tool.DiffSnapshots("a", "b");
+        var result = await _tool.DiffSnapshotsAsync("a", "b");
 
-        using var doc = JsonDocument.Parse(result);
-        var root = doc.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeFalse();
-        root.GetProperty("error").GetProperty("code").GetString().Should().Be("VARIABLES_FAILED");
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("VARIABLES_FAILED");
     }
 
     [Fact]
-    public void DiffSnapshots_ModifiedEntry_HasOldAndNewValues()
+    public async Task DiffSnapshots_ModifiedEntry_HasOldAndNewValues()
     {
         var diff = new SnapshotDiff(
             "snap-a", "snap-b",
@@ -94,12 +89,11 @@ public class SnapshotDiffToolTests
 
         _serviceMock.Setup(s => s.DiffSnapshots("snap-a", "snap-b")).Returns(diff);
 
-        var result = _tool.DiffSnapshots("snap-a", "snap-b");
+        var result = await _tool.DiffSnapshotsAsync("snap-a", "snap-b");
 
-        using var doc = JsonDocument.Parse(result);
-        var modified = doc.RootElement.GetProperty("diff").GetProperty("modified");
-        modified.GetArrayLength().Should().Be(1);
-        modified[0].GetProperty("oldValue").GetString().Should().Be("0");
-        modified[0].GetProperty("newValue").GetString().Should().Be("42");
+        var modified = result.Diff!.Modified;
+        modified.Should().HaveCount(1);
+        modified[0].OldValue.Should().Be("0");
+        modified[0].NewValue.Should().Be("42");
     }
 }

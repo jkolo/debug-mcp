@@ -1,8 +1,8 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Modules;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -40,28 +40,33 @@ public sealed class TypesGetTool
     /// <param name="continuation_token">Token from previous response for pagination.</param>
     /// <returns>Types with namespace hierarchy and pagination info.</returns>
     [McpServerTool(Name = "types_get", Title = "Get Types",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Get types defined in a module, organized by namespace")]
-    public async Task<string> GetTypes(
+    public async Task<TypesGetResult> GetTypes(
         [Description("Name of the module to inspect")] string module_name,
         [Description("Filter types by namespace pattern (supports * wildcard)")] string? namespace_filter = null,
         [Description("Filter by type kind: class, interface, struct, enum, delegate")] string? kind = null,
         [Description("Filter by visibility: public, internal, private, protected")] string? visibility = null,
         [Description("Maximum types to return (max: 1000)")] int max_results = 100,
-        [Description("Token from previous response for pagination")] string? continuation_token = null)
+        [Description("Token from previous response for pagination")] string? continuation_token = null,
+        [Description("Maximum time to wait for the type listing, in milliseconds (default: 30000)")] int timeout_ms = 30000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("types_get",
             $"{{\"module_name\": \"{module_name}\", \"namespace_filter\": {(namespace_filter == null ? "null" : $"\"{namespace_filter}\"")}, \"kind\": {(kind == null ? "null" : $"\"{kind}\"")}, \"max_results\": {max_results}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
             // Validate parameters
             if (string.IsNullOrWhiteSpace(module_name))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                    "module_name cannot be empty",
-                    new { parameter = "module_name" });
+                return new TypesGetResult(Success: false, Error: new ToolError(
+                    ErrorCodes.InvalidParameter, "module_name cannot be empty", new { parameter = "module_name" }));
             }
 
             // Parse kind filter
@@ -70,9 +75,10 @@ public sealed class TypesGetTool
             {
                 if (!Enum.TryParse<TypeKind>(kind, ignoreCase: true, out var parsedKind))
                 {
-                    return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                    return new TypesGetResult(Success: false, Error: new ToolError(
+                        ErrorCodes.InvalidParameter,
                         $"Invalid kind value: {kind}. Valid values: class, interface, struct, enum, delegate",
-                        new { parameter = "kind", value = kind, validValues = new[] { "class", "interface", "struct", "enum", "delegate" } });
+                        new { parameter = "kind", value = kind, validValues = new[] { "class", "interface", "struct", "enum", "delegate" } }));
                 }
                 kindFilter = parsedKind;
             }
@@ -83,9 +89,10 @@ public sealed class TypesGetTool
             {
                 if (!Enum.TryParse<Visibility>(visibility, ignoreCase: true, out var parsedVisibility))
                 {
-                    return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                    return new TypesGetResult(Success: false, Error: new ToolError(
+                        ErrorCodes.InvalidParameter,
                         $"Invalid visibility value: {visibility}. Valid values: public, internal, private, protected",
-                        new { parameter = "visibility", value = visibility, validValues = new[] { "public", "internal", "private", "protected" } });
+                        new { parameter = "visibility", value = visibility, validValues = new[] { "public", "internal", "private", "protected" } }));
                 }
                 visibilityFilter = parsedVisibility;
             }
@@ -101,7 +108,7 @@ public sealed class TypesGetTool
             if (session == null)
             {
                 _logger.ToolError("types_get", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return new TypesGetResult(Success: false, Error: new ToolError(ErrorCodes.NoSession, "No active debug session"));
             }
 
             // Type browsing works with running or paused process (metadata only)
@@ -113,7 +120,8 @@ public sealed class TypesGetTool
                 kindFilter,
                 visibilityFilter,
                 max_results,
-                continuation_token);
+                continuation_token,
+                linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("types_get", stopwatch.ElapsedMilliseconds);
@@ -121,77 +129,61 @@ public sealed class TypesGetTool
                 result.ReturnedCount, result.TotalCount, module_name);
 
             // Build response
-            var typeList = result.Types.Select(t => new Dictionary<string, object?>
-            {
-                ["fullName"] = t.FullName,
-                ["name"] = t.Name,
-                ["namespace"] = t.Namespace,
-                ["kind"] = t.Kind.ToString().ToLowerInvariant(),
-                ["visibility"] = t.Visibility.ToString().ToLowerInvariant(),
-                ["isGeneric"] = t.IsGeneric,
-                ["genericParameters"] = t.GenericParameters,
-                ["isNested"] = t.IsNested,
-                ["declaringType"] = t.DeclaringType,
-                ["moduleName"] = t.ModuleName,
-                ["baseType"] = t.BaseType,
-                ["interfaces"] = t.Interfaces
-            }).ToList();
+            var typeList = result.Types.Select(t => new TypeSummaryInfo(
+                FullName: t.FullName,
+                Name: t.Name,
+                Namespace: t.Namespace,
+                Kind: t.Kind.ToString().ToLowerInvariant(),
+                Visibility: t.Visibility.ToString().ToLowerInvariant(),
+                IsGeneric: t.IsGeneric,
+                GenericParameters: t.GenericParameters,
+                IsNested: t.IsNested,
+                DeclaringType: t.DeclaringType,
+                ModuleName: t.ModuleName,
+                BaseType: t.BaseType,
+                Interfaces: t.Interfaces)).ToList();
 
-            var namespaceList = result.Namespaces.Select(n => new Dictionary<string, object?>
-            {
-                ["name"] = n.Name,
-                ["fullName"] = n.FullName,
-                ["typeCount"] = n.TypeCount,
-                ["childNamespaces"] = n.ChildNamespaces,
-                ["depth"] = n.Depth
-            }).ToList();
+            // Item-count pagination (max_results/continuation_token) is the primary bounding
+            // mechanism here; this is an additional byte-budget safety net for pathologically
+            // large individual type entries (long interface/generic-parameter lists).
+            var (boundedTypes, sizeTruncation) = ResultTruncation.Bound(
+                typeList, "types_get result exceeded the 256 KB size budget");
 
-            var response = new Dictionary<string, object?>
-            {
-                ["success"] = true,
-                ["moduleName"] = result.ModuleName,
-                ["namespaceFilter"] = result.NamespaceFilter,
-                ["types"] = typeList,
-                ["namespaces"] = namespaceList,
-                ["totalCount"] = result.TotalCount,
-                ["returnedCount"] = result.ReturnedCount,
-                ["truncated"] = result.Truncated,
-                ["continuationToken"] = result.ContinuationToken
-            };
-
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+            return new TypesGetResult(
+                Success: true,
+                ModuleName: result.ModuleName,
+                NamespaceFilter: result.NamespaceFilter,
+                Types: boundedTypes,
+                Namespaces: result.Namespaces,
+                TotalCount: result.TotalCount,
+                ReturnedCount: sizeTruncation is null ? result.ReturnedCount : boundedTypes.Count,
+                Truncated: result.Truncated || sizeTruncation is not null,
+                ContinuationToken: result.ContinuationToken,
+                Truncation: sizeTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not attached"))
         {
             _logger.ToolError("types_get", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return new TypesGetResult(Success: false, Error: new ToolError(ErrorCodes.NoSession, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
             _logger.ToolError("types_get", ErrorCodes.ModuleNotFound);
-            return CreateErrorResponse(ErrorCodes.ModuleNotFound, ex.Message,
-                new { moduleName = module_name });
+            return new TypesGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.ModuleNotFound, ex.Message, new { moduleName = module_name }));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("types_get", ErrorCodes.Timeout);
+            return new TypesGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.Timeout, $"types_get timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (Exception ex)
         {
             _logger.ToolError("types_get", ErrorCodes.MetadataError);
             _logger.LogError(ex, "Type browsing failed for module '{ModuleName}'", module_name);
-            return CreateErrorResponse(ErrorCodes.MetadataError,
-                $"Failed to browse types: {ex.Message}");
+            return new TypesGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.MetadataError, $"Failed to browse types: {ex.Message}"));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
     }
 }

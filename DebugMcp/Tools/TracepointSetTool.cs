@@ -3,6 +3,7 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
@@ -43,19 +44,24 @@ public sealed class TracepointSetTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Tracepoint information or error response.</returns>
     [McpServerTool(Name = "tracepoint_set", Title = "Set Tracepoint",
-        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Set a tracepoint (non-blocking observation point) at a source location. Unlike breakpoints, tracepoints do not pause execution but send notifications when code passes through.")]
-    public async Task<string> SetTracepointAsync(
+    public async Task<TracepointSetResult> SetTracepointAsync(
         [Description("Source file path (absolute or relative to project)")] string file,
         [Description("1-based line number")] int line,
         [Description("1-based column for targeting lambdas/inline statements (optional)")] int? column = null,
         [Description("Log message template with {expression} placeholders for variable interpolation, e.g., \"Counter is {i}, sum is {sum}\"")] string? log_message = null,
         [Description("Send notification every Nth hit (0 = every hit)")] int hit_count_multiple = 0,
         [Description("Auto-disable tracepoint after N notifications (0 = unlimited)")] int max_notifications = 0,
+        [Description("Maximum time to wait for the tracepoint to be set/verified, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("tracepoint_set", JsonSerializer.Serialize(new { file, line, column, log_message, hit_count_multiple, max_notifications }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -63,31 +69,41 @@ public sealed class TracepointSetTool
             if (string.IsNullOrWhiteSpace(file))
             {
                 _logger.ToolError("tracepoint_set", ErrorCodes.InvalidFile);
-                return CreateErrorResponse(ErrorCodes.InvalidFile, "File path cannot be empty");
+                return new TracepointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidFile, "File path cannot be empty"));
             }
 
             if (line < 1)
             {
                 _logger.ToolError("tracepoint_set", ErrorCodes.InvalidLine);
-                return CreateErrorResponse(ErrorCodes.InvalidLine, $"Line must be >= 1, got: {line}");
+                return new TracepointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidLine, $"Line must be >= 1, got: {line}"));
             }
 
             if (column.HasValue && column.Value < 1)
             {
                 _logger.ToolError("tracepoint_set", ErrorCodes.InvalidColumn);
-                return CreateErrorResponse(ErrorCodes.InvalidColumn, $"Column must be >= 1, got: {column}");
+                return new TracepointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidColumn, $"Column must be >= 1, got: {column}"));
             }
 
             if (hit_count_multiple < 0)
             {
                 _logger.ToolError("tracepoint_set", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, $"hit_count_multiple must be >= 0, got: {hit_count_multiple}");
+                return new TracepointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidParameter, $"hit_count_multiple must be >= 0, got: {hit_count_multiple}"));
             }
 
             if (max_notifications < 0)
             {
                 _logger.ToolError("tracepoint_set", ErrorCodes.InvalidParameter);
-                return CreateErrorResponse(ErrorCodes.InvalidParameter, $"max_notifications must be >= 0, got: {max_notifications}");
+                return new TracepointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidParameter, $"max_notifications must be >= 0, got: {max_notifications}"));
             }
 
             // Check for active session (optional - tracepoint can be pending)
@@ -99,70 +115,56 @@ public sealed class TracepointSetTool
 
             // Set the tracepoint
             var tracepoint = await _breakpointManager.SetTracepointAsync(
-                file, line, column, log_message, hit_count_multiple, max_notifications, cancellationToken);
+                file, line, column, log_message, hit_count_multiple, max_notifications, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("tracepoint_set", stopwatch.ElapsedMilliseconds);
             _logger.LogInformation("Set tracepoint {TracepointId} at {File}:{Line} (state: {State})",
                 tracepoint.Id, file, line, tracepoint.State);
 
-            // Return success response
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                tracepoint = SerializeTracepoint(tracepoint)
-            }, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+            return new TracepointSetResult(
+                Success: true,
+                Tracepoint: ToTracepointInfo(tracepoint));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("tracepoint_set", ErrorCodes.Timeout);
+            return new TracepointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, $"tracepoint_set timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("tracepoint_set", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return new TracepointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, "Operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("tracepoint_set", ErrorCodes.InvalidLine);
-            return CreateErrorResponse(
-                ErrorCodes.InvalidLine,
-                $"Failed to set tracepoint: {ex.Message}",
-                new { file, line, exceptionType = ex.GetType().Name });
+            return new TracepointSetResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.InvalidLine,
+                    $"Failed to set tracepoint: {ex.Message}",
+                    new { file, line, exceptionType = ex.GetType().Name }));
         }
     }
 
-    private static object SerializeTracepoint(Breakpoint tp)
-    {
-        return new
-        {
-            id = tp.Id,
-            type = "tracepoint",
-            location = new
-            {
-                file = tp.Location.File,
-                line = tp.Location.Line,
-                column = tp.Location.Column,
-                functionName = tp.Location.FunctionName,
-                moduleName = tp.Location.ModuleName
-            },
-            state = tp.State.ToString().ToLowerInvariant(),
-            enabled = tp.Enabled,
-            logMessage = tp.LogMessage,
-            hitCountMultiple = tp.HitCountMultiple > 0 ? tp.HitCountMultiple : (int?)null,
-            maxNotifications = tp.MaxNotifications > 0 ? tp.MaxNotifications : (int?)null
-        };
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        var response = new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        };
-
-        return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static TracepointInfo ToTracepointInfo(Breakpoint tp) =>
+        new(
+            Id: tp.Id,
+            Type: "tracepoint",
+            Location: new TracepointLocation(
+                File: tp.Location.File,
+                Line: tp.Location.Line,
+                Column: tp.Location.Column,
+                FunctionName: tp.Location.FunctionName,
+                ModuleName: tp.Location.ModuleName),
+            State: tp.State.ToString().ToLowerInvariant(),
+            Enabled: tp.Enabled,
+            LogMessage: tp.LogMessage,
+            HitCountMultiple: tp.HitCountMultiple > 0 ? tp.HitCountMultiple : null,
+            MaxNotifications: tp.MaxNotifications > 0 ? tp.MaxNotifications : null);
 }

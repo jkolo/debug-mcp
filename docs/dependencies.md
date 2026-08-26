@@ -46,6 +46,18 @@ The SDK marks the underlying APIs `[Obsolete]`, which surfaces as compiler warni
 
 **Do not widen the `<NoWarn>` scope** (e.g. to `Directory.Build.props`) to silence a *different* warning — each new suppression needs its own justification and its own line.
 
+## MCP Tasks extension package
+
+`ModelContextProtocol.Extensions.Tasks` 2.2.0 was added alongside the core SDK packages
+(feature 069) to back the deferred-result path for the five long-running tools
+(`resharper_inspect_solution`, `resharper_inspect_project`, `batch_evaluate`, `debug_launch`,
+`code_load`). It is a separate package from `ModelContextProtocol.Core` in this SDK version —
+Tasks support did not ship in the core package. See
+[`specs/069-mcp-surface-modernization/research.md`](../specs/069-mcp-surface-modernization/research.md)
+R1 for the opt-in mechanics and
+[`contracts/deferred-result-contract.md`](../specs/069-mcp-surface-modernization/contracts/deferred-result-contract.md)
+for the wire behaviour.
+
 ## Deliberately not adopted from MCP SDK v2
 
 Reviewed and rejected as not applicable to this server's shape (stdio, single client, no HTTP transport):

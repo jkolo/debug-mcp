@@ -49,7 +49,7 @@ MCP Client (Claude, GPT, etc.)
     ↓ stdio (JSON-RPC)
 Program.cs — DI container, MCP server setup, CLI options
     ↓
-Tools/ (40 tools)          Resources/ (4 resources)       Completions/
+Tools/ (39 tools)          Resources/ (7 resources)       Completions/
     ↓                           ↓                              ↓
 Services/
 ├── DebugSessionManager    — Session lifecycle (launch/attach/disconnect)
@@ -106,7 +106,7 @@ Tools are discovered via reflection: classes with `[McpServerToolType]`, methods
 ```
 DebugMcp/                        # Main project (packaged as dotnet tool)
 ├── Program.cs                   # Entry point, DI, MCP server config
-├── Tools/                       # 36 MCP tool classes
+├── Tools/                       # 39 MCP tool classes
 ├── Services/                    # Core business logic
 ├── Models/                      # Positional records (Breakpoints/, Inspection/, Memory/, Modules/)
 └── Infrastructure/              # Logging, MCP logger provider
@@ -157,8 +157,11 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 - In-memory ring buffer (cap 10,000 events with oldest-eviction); `TimelineStore` singleton (032-unified-debugging-timeline)
 - C# 13 / .NET 10.0 + JetBrains.ReSharper.GlobalTools (runtime-acquired dotnet tool `jb inspectcode`), `System.Xml.Linq` SARIF/XML parsing, `System.Diagnostics.Process` (034-resharper-inspect)
 - On-disk engine cache at `~/.debug-mcp/resharper/<version>/` (version-pinned, lazy-installed via `dotnet tool install --tool-path`); stateless per-call inspection (034-resharper-inspect)
+- C# 13 / .NET 10.0 + ModelContextProtocol(.Extensions.Tasks) 2.2.0 (up from 1.3.0), `IProgressReporter`/`ProgressReporterAdapter` over the SDK's `IProgress<ProgressNotificationValue>`, `ExpiryAwareTaskStore` decorating `InMemoryMcpTaskStore` (069-mcp-surface-modernization)
+- No new persistence; `TimeoutPolicy`/`TaskExecutionPolicy` are static in-memory classification tables keyed by tool name; `SuspicionRanker` is stateless, deterministic, no LLM/network call (069-mcp-surface-modernization)
 
 ## Recent Changes
+- 069-mcp-surface-modernization: MCP SDK 1.3.0 → 2.2.0. **US1** progress reporting (`IProgressReporter`) + `CancellationToken` on all 39 tools. **US2** the 5 longest-running tools (`resharper_inspect_solution/project`, `batch_evaluate`, `debug_launch`, `code_load`) defer to `ModelContextProtocol.Extensions.Tasks` for clients that opt in, returning a pollable/cancellable handle. **US3** every tool migrated to `[McpServerTool(UseStructuredContent = true)]` returning a typed record instead of a hand-rolled JSON string — shared `ToolError`/`TruncationInfo` contract, centralized `isError` derivation via `ToolResultSerializer.IsErrorFilter`, 256 KB result-size budget on the 14 collection-returning tools (`ResultTruncation`). **US4** deterministic (model-free) suspicion ranking — `SuspicionRanker` (`Services/Inspection/`) — added to `exception_get_context` and `stacktrace_get`, 5 documented constant-weight heuristics, 10-fixture fault corpus in `tests/DebugTestApp/FaultScenarios/`. **US5** every blocking tool (31 of 39) now accepts an optional timeout parameter with a documented default (`TimeoutPolicy`); 8 in-memory-only tools deliberately did not gain one. Absorbs ROADMAP #061, #062, #066 in full and half of #037; see `specs/069-mcp-surface-modernization/`. Tool count unchanged at 39 (all now typed)
 - 034-resharper-inspect: Added `resharper_inspect_solution` + `resharper_inspect_project` MCP tools (39 tools total), `IReSharperInspectionService`/`IReSharperEngineProvider`/`IReSharperRunner`/`IInspectionReportParser` services in `Services/ReSharper/`, `ReSharperOptions` (opt-out via `--no-resharper`, mirrors `--no-roslyn`), `InspectionFinding`/`InspectionResult`/`ReSharperSeverity` models. Engine self-installs lazily on first use. Parser uses ReSharper **XML** output (SARIF collapses suggestion/hint → note; native severity preserved via `<IssueType Severity=…>`). New error codes: PREREQUISITE_MISSING/ENGINE_ACQUISITION_FAILED/INSPECTION_FAILED/BUILD_FAILED.
 - 032-unified-debugging-timeline: Added `timeline_query` MCP tool, `debugger://timeline` MCP resource, `ITimelineStore`/`TimelineStore` service, `IOutputEventSource` interface; added `ThreadCreated`/`ThreadExited` events to `IProcessDebugger`/`ProcessDebugger`; `ProcessIoManager` now implements `IOutputEventSource` and fires `OutputReceived(content, stream, truncated)` event; 37 tools total
 - 031-batch-evaluate: Added `batch_evaluate` MCP tool, `IBatchRunner`/`BatchRunner` service, `IBreakpointEventSource` interface, `ResolvedBreakpointHitEventArgs` event args class; `BreakpointManager` now fires `BreakpointResolved` event after each hit; 36 tools total
@@ -168,5 +171,5 @@ Branch naming: `{number}-{short-name}` (e.g., `024-mcp-best-practices`).
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-specs/034-resharper-inspect/plan.md
+specs/069-mcp-surface-modernization/plan.md
 <!-- SPECKIT END -->

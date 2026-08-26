@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.Inspection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -29,9 +30,10 @@ public sealed class CollectionAnalyzeTool
     /// Replaces 5-50+ tool calls typically needed to understand a collection's contents.
     /// </summary>
     [McpServerTool(Name = "collection_analyze", Title = "Analyze Collection",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Analyze a collection (array, List, Dictionary, HashSet, etc.) and return a single-call summary: count, element types, null count, first/last N element previews, numeric statistics (min/max/avg), and type distribution for mixed-type collections.")]
-    public async Task<string> AnalyzeCollection(
+    public async Task<CollectionAnalyzeResult> AnalyzeCollection(
         [Description("Variable name or expression evaluating to a collection")]
         string expression,
         [Description("Number of first/last elements to include in preview (1-50, default: 5)")]
@@ -40,7 +42,7 @@ public sealed class CollectionAnalyzeTool
         int? thread_id = null,
         [Description("Stack frame context (0 = top of stack)")]
         int frame_index = 0,
-        [Description("Evaluation timeout in milliseconds")]
+        [Description("Evaluation timeout in milliseconds (default: 5000)")]
         int timeout_ms = 5000,
         CancellationToken cancellationToken = default)
     {
@@ -54,62 +56,78 @@ public sealed class CollectionAnalyzeTool
             stopwatch.Stop();
             _logger.ToolCompleted("collection_analyze", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                summary = new
-                {
-                    count = summary.Count,
-                    elementType = summary.ElementType,
-                    collectionType = summary.CollectionType,
-                    kind = summary.Kind.ToString(),
-                    nullCount = summary.NullCount,
-                    numericStats = summary.NumericStats is { } ns ? new { min = ns.Min, max = ns.Max, average = ns.Average } : null,
-                    typeDistribution = summary.TypeDistribution?.Select(td => new { typeName = td.TypeName, count = td.Count }),
-                    firstElements = summary.FirstElements.Select(e => new { index = e.Index, value = e.Value, type = e.Type }),
-                    lastElements = summary.LastElements.Select(e => new { index = e.Index, value = e.Value, type = e.Type }),
-                    keyValuePairs = summary.KeyValuePairs?.Select(kv => new { key = kv.Key, keyType = kv.KeyType, value = kv.Value, valueType = kv.ValueType }),
-                    isSampled = summary.IsSampled
-                }
-            }, new JsonSerializerOptions { WriteIndented = true });
+            const int perCollectionBudget = ResultTruncation.DefaultBudgetBytes / 4;
+            var (firstElements, firstTruncation) = ResultTruncation.Bound(
+                summary.FirstElements.Select(e => new CollectionElementPreview(e.Index, e.Value, e.Type)).ToList(),
+                "firstElements exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (lastElements, lastTruncation) = ResultTruncation.Bound(
+                summary.LastElements.Select(e => new CollectionElementPreview(e.Index, e.Value, e.Type)).ToList(),
+                "lastElements exceeded its share of the 256 KB size budget", perCollectionBudget);
+            var (typeDistribution, typeDistTruncation) = summary.TypeDistribution is { } td
+                ? ResultTruncation.Bound(
+                    td.Select(t => new CollectionTypeCount(t.TypeName, t.Count)).ToList(),
+                    "typeDistribution exceeded its share of the 256 KB size budget", perCollectionBudget)
+                : (null, null);
+            var (keyValuePairs, kvpTruncation) = summary.KeyValuePairs is { } kvp
+                ? ResultTruncation.Bound(
+                    kvp.Select(k => new CollectionKeyValuePreview(k.Key, k.KeyType, k.Value, k.ValueType)).ToList(),
+                    "keyValuePairs exceeded its share of the 256 KB size budget", perCollectionBudget)
+                : (null, null);
+
+            var truncations = new[] { firstTruncation, lastTruncation, typeDistTruncation, kvpTruncation }
+                .Where(t => t is not null).Cast<TruncationInfo>().ToList();
+            var combinedTruncation = truncations.Count == 0
+                ? null
+                : new TruncationInfo(
+                    Returned: truncations.Sum(t => t.Returned),
+                    Available: truncations.Sum(t => t.Available ?? 0),
+                    Reason: string.Join("; ", truncations.Select(t => t.Reason)));
+
+            return new CollectionAnalyzeResult(
+                Success: true,
+                Summary: new CollectionAnalyzeSummary(
+                    Count: summary.Count,
+                    ElementType: summary.ElementType,
+                    CollectionType: summary.CollectionType,
+                    Kind: summary.Kind.ToString(),
+                    NullCount: summary.NullCount,
+                    NumericStats: summary.NumericStats is { } ns ? new CollectionNumericStats(ns.Min, ns.Max, ns.Average) : null,
+                    TypeDistribution: typeDistribution,
+                    FirstElements: firstElements,
+                    LastElements: lastElements,
+                    KeyValuePairs: keyValuePairs,
+                    IsSampled: summary.IsSampled),
+                Truncation: combinedTruncation);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not a recognized collection"))
         {
             _logger.ToolError("collection_analyze", "NOT_COLLECTION");
-            return CreateErrorResponse("not_collection", ex.Message);
+            return new CollectionAnalyzeResult(Success: false, Error: new ToolError("not_collection", ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("paused") || ex.Message.Contains("Paused"))
         {
             _logger.ToolError("collection_analyze", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused,
-                "Process is not paused. Cannot inspect variables while running.");
+            return new CollectionAnalyzeResult(Success: false, Error: new ToolError(
+                ErrorCodes.NotPaused, "Process is not paused. Cannot inspect variables while running."));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("session"))
         {
             _logger.ToolError("collection_analyze", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return new CollectionAnalyzeResult(Success: false, Error: new ToolError(ErrorCodes.NoSession, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("available") || ex.Message.Contains("scope") || ex.Message.Contains("Failed to evaluate"))
         {
             _logger.ToolError("collection_analyze", "VARIABLE_UNAVAILABLE");
-            return CreateErrorResponse("variable_unavailable",
-                $"Variable '{expression}' is not available in the current scope.");
+            return new CollectionAnalyzeResult(Success: false, Error: new ToolError(
+                "variable_unavailable", $"Variable '{expression}' is not available in the current scope."));
         }
         catch (Exception ex)
         {
             _logger.ToolError("collection_analyze", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
+            return new CollectionAnalyzeResult(Success: false, Error: new ToolError(
+                ErrorCodes.VariablesFailed,
                 $"Failed to analyze collection: {ex.Message}",
-                new { exceptionType = ex.GetType().Name });
+                new { exceptionType = ex.GetType().Name }));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message, details }
-        }, new JsonSerializerOptions { WriteIndented = true });
     }
 }

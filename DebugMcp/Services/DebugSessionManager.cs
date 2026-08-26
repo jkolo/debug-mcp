@@ -1,5 +1,6 @@
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
 
 namespace DebugMcp.Services;
@@ -106,7 +107,8 @@ public sealed class DebugSessionManager : IDebugSessionManager
         Dictionary<string, string>? env = null,
         bool stopAtEntry = true,
         TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgressReporter? progress = null)
     {
         lock (_lock)
         {
@@ -122,8 +124,14 @@ public sealed class DebugSessionManager : IDebugSessionManager
 
         _logger.LaunchingProcess(program);
 
-        var processInfo = await _processDebugger.LaunchAsync(
-            program, args, cwd, env, stopAtEntry, timeout, cancellationToken);
+        // Wrapping this call is safe: no lock is held across it (the `lock (_lock)` block above
+        // has already exited). Do not instrument ProcessDebugger.LaunchAsync itself for
+        // finer-grained stages — it runs partly on the ICorDebug callback thread the project's
+        // lock-ordering invariant protects (research.md R7).
+        var processInfo = await HeartbeatProgress.RunAsync(
+            () => _processDebugger.LaunchAsync(program, args, cwd, env, stopAtEntry, timeout, cancellationToken),
+            progress, "starting process", cancellationToken: cancellationToken);
+        progress?.ReportStage("ready");
 
         var session = new DebugSession
         {

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Models.Snapshots;
 using DebugMcp.Services.Snapshots;
 using Microsoft.Extensions.Logging;
@@ -30,14 +31,18 @@ public sealed class SnapshotDiffTool
     /// Compare two snapshots and return structured differences (added, removed, modified variables).
     /// </summary>
     [McpServerTool(Name = "snapshot_diff", Title = "Compare Two Snapshots",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Compare two snapshots and return structured differences (added, removed, modified variables with before/after values)")]
-    public string DiffSnapshots(
+    public Task<SnapshotDiffResult> DiffSnapshotsAsync(
         [Description("First snapshot ID (baseline)")]
         string snapshot_id_1,
         [Description("Second snapshot ID (comparison)")]
-        string snapshot_id_2)
+        string snapshot_id_2,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("snapshot_diff", JsonSerializer.Serialize(new { snapshot_id_1, snapshot_id_2 }));
 
@@ -48,52 +53,38 @@ public sealed class SnapshotDiffTool
             stopwatch.Stop();
             _logger.ToolCompleted("snapshot_diff", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                diff = new
-                {
-                    snapshotIdA = diff.SnapshotIdA,
-                    snapshotIdB = diff.SnapshotIdB,
-                    threadMismatch = diff.ThreadMismatch,
-                    timeDelta = diff.TimeDelta.ToString(),
-                    summary = new
-                    {
-                        added = diff.Added.Count,
-                        removed = diff.Removed.Count,
-                        modified = diff.Modified.Count,
-                        unchanged = diff.Unchanged
-                    },
-                    added = diff.Added.Select(e => new { name = e.Name, path = e.Path, type = e.Type, value = e.NewValue }),
-                    removed = diff.Removed.Select(e => new { name = e.Name, path = e.Path, type = e.Type, value = e.OldValue }),
-                    modified = diff.Modified.Select(e => new { name = e.Name, path = e.Path, type = e.Type, oldValue = e.OldValue, newValue = e.NewValue })
-                }
-            }, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-            });
+            return Task.FromResult(new SnapshotDiffResult(
+                Success: true,
+                Diff: new SnapshotDiffInfo(
+                    SnapshotIdA: diff.SnapshotIdA,
+                    SnapshotIdB: diff.SnapshotIdB,
+                    ThreadMismatch: diff.ThreadMismatch,
+                    TimeDelta: diff.TimeDelta.ToString(),
+                    Summary: new SnapshotDiffSummary(
+                        Added: diff.Added.Count,
+                        Removed: diff.Removed.Count,
+                        Modified: diff.Modified.Count,
+                        Unchanged: diff.Unchanged),
+                    Added: diff.Added.Select(e => new SnapshotDiffValueEntry(e.Name, e.Path, e.Type, e.NewValue)).ToList(),
+                    Removed: diff.Removed.Select(e => new SnapshotDiffValueEntry(e.Name, e.Path, e.Type, e.OldValue)).ToList(),
+                    Modified: diff.Modified.Select(e => new SnapshotDiffModifiedEntry(e.Name, e.Path, e.Type, e.OldValue, e.NewValue)).ToList())));
         }
         catch (KeyNotFoundException ex)
         {
             _logger.ToolError("snapshot_diff", ErrorCodes.SnapshotNotFound);
-            return CreateErrorResponse(ErrorCodes.SnapshotNotFound, ex.Message);
+            return Task.FromResult(new SnapshotDiffResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.SnapshotNotFound, ex.Message)));
         }
         catch (Exception ex)
         {
             _logger.ToolError("snapshot_diff", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
-                $"Failed to diff snapshots: {ex.Message}",
-                new { exceptionType = ex.GetType().Name });
+            return Task.FromResult(new SnapshotDiffResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.VariablesFailed,
+                    $"Failed to diff snapshots: {ex.Message}",
+                    new { exceptionType = ex.GetType().Name })));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message, details }
-        }, new JsonSerializerOptions { WriteIndented = true });
     }
 }

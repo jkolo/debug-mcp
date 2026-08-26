@@ -194,4 +194,21 @@ public static class ErrorCodes
 
     /// <summary>The engine's pre-analysis build of the target failed.</summary>
     public const string BuildFailed = "BUILD_FAILED";
+
+    // Batch evaluate error codes (031-batch-evaluate)
+
+    /// <summary>Batch request parameters failed validation.</summary>
+    public const string ValidationError = "validation_error";
+
+    /// <summary>A batch run is already in progress.</summary>
+    public const string BatchAlreadyRunning = "batch_already_running";
+
+    /// <summary>Batch request JSON could not be parsed.</summary>
+    public const string InvalidJson = "invalid_json";
+
+    /// <summary>The batch run was cancelled.</summary>
+    public const string Cancelled = "cancelled";
+
+    /// <summary>An internal error occurred while running the batch.</summary>
+    public const string InternalError = "internal_error";
 }

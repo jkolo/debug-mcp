@@ -3,6 +3,7 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Breakpoints;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using DebugMcp.Services.Breakpoints;
 using Microsoft.Extensions.Logging;
@@ -46,17 +47,22 @@ public sealed class BreakpointSetTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Breakpoint information or error response.</returns>
     [McpServerTool(Name = "breakpoint_set", Title = "Set Breakpoint",
-        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Set a breakpoint at a source location (file and line). The debugger will pause execution when this line is reached. If a debug session is active, the breakpoint is verified immediately; otherwise it stays pending until a session starts. Supports optional column targeting for lambdas and conditional expressions. Returns: breakpoint object with id (bp-{guid}), location, state (verified/pending/error), enabled, verified, condition, hitCount. Use breakpoint_list to see all breakpoints, breakpoint_remove to delete. Example response: {\"success\": true, \"breakpoint\": {\"id\": \"bp-a1b2c3\", \"location\": {\"file\": \"Program.cs\", \"line\": 42}, \"state\": \"verified\", \"enabled\": true, \"hitCount\": 0}}")]
-    public async Task<string> SetBreakpointAsync(
+    public async Task<BreakpointSetResult> SetBreakpointAsync(
         [Description("Source file path (absolute or relative to project)")] string file,
         [Description("1-based line number")] int line,
         [Description("1-based column for targeting lambdas/inline statements (optional)")] int? column = null,
         [Description("C# condition expression (breakpoint only triggers when true)")] string? condition = null,
+        [Description("Maximum time to wait for the breakpoint to be set/verified, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("breakpoint_set", JsonSerializer.Serialize(new { file, line, column, condition }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -64,19 +70,25 @@ public sealed class BreakpointSetTool
             if (string.IsNullOrWhiteSpace(file))
             {
                 _logger.ToolError("breakpoint_set", ErrorCodes.InvalidFile);
-                return CreateErrorResponse(ErrorCodes.InvalidFile, "File path cannot be empty");
+                return new BreakpointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidFile, "File path cannot be empty"));
             }
 
             if (line < 1)
             {
                 _logger.ToolError("breakpoint_set", ErrorCodes.InvalidLine);
-                return CreateErrorResponse(ErrorCodes.InvalidLine, $"Line must be >= 1, got: {line}");
+                return new BreakpointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidLine, $"Line must be >= 1, got: {line}"));
             }
 
             if (column.HasValue && column.Value < 1)
             {
                 _logger.ToolError("breakpoint_set", ErrorCodes.InvalidColumn);
-                return CreateErrorResponse(ErrorCodes.InvalidColumn, $"Column must be >= 1, got: {column}");
+                return new BreakpointSetResult(
+                    Success: false,
+                    Error: new ToolError(ErrorCodes.InvalidColumn, $"Column must be >= 1, got: {column}"));
             }
 
             // Check for active session (optional - breakpoint can be pending)
@@ -88,7 +100,7 @@ public sealed class BreakpointSetTool
 
             // Set the breakpoint
             var breakpoint = await _breakpointManager.SetBreakpointAsync(
-                file, line, column, condition, cancellationToken);
+                file, line, column, condition, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("breakpoint_set", stopwatch.ElapsedMilliseconds);
@@ -98,40 +110,50 @@ public sealed class BreakpointSetTool
             // Check if this was a duplicate (condition might have changed)
             var isDuplicate = breakpoint.Message?.Contains("already exists") == true;
 
-            // Return success response
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                breakpoint = SerializeBreakpoint(breakpoint),
-                duplicate = isDuplicate ? true : (bool?)null
-            }, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+            return new BreakpointSetResult(
+                Success: true,
+                Breakpoint: ToBreakpointInfo(breakpoint),
+                Duplicate: isDuplicate ? true : null);
         }
         catch (ArgumentException ex)
         {
             _logger.ToolError("breakpoint_set", ErrorCodes.InvalidCondition);
-            return CreateErrorResponse(ErrorCodes.InvalidCondition, ex.Message);
+            return new BreakpointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.InvalidCondition, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
             _logger.ToolError("breakpoint_set", ErrorCodes.InvalidFile);
-            return await CreateInvalidLineResponseAsync(file, line, ex.Message);
+            return await CreateInvalidLineResultAsync(file, line, ex.Message);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("breakpoint_set", ErrorCodes.Timeout);
+            return new BreakpointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, $"breakpoint_set timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("breakpoint_set", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Operation was cancelled");
+            return new BreakpointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, "Operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("breakpoint_set", ErrorCodes.InvalidLine);
-            return CreateErrorResponse(
-                ErrorCodes.InvalidLine,
-                $"Failed to set breakpoint: {ex.Message}",
-                new { file, line, exceptionType = ex.GetType().Name });
+            return new BreakpointSetResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.InvalidLine,
+                    $"Failed to set breakpoint: {ex.Message}",
+                    new { file, line, exceptionType = ex.GetType().Name }));
         }
     }
 
-    private async Task<string> CreateInvalidLineResponseAsync(string file, int requestedLine, string originalMessage)
+    private async Task<BreakpointSetResult> CreateInvalidLineResultAsync(string file, int requestedLine, string originalMessage)
     {
         // Try to find nearest valid line
         int? nearestLine = null;
@@ -175,52 +197,27 @@ public sealed class BreakpointSetTool
 
         if (nearestLine.HasValue)
         {
-            return CreateErrorResponse(
-                ErrorCodes.InvalidLine,
-                originalMessage,
-                new { requestedLine, nearestValidLine = nearestLine.Value });
+            return new BreakpointSetResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.InvalidLine,
+                    originalMessage,
+                    new { requestedLine, nearestValidLine = nearestLine.Value }));
         }
 
-        return CreateErrorResponse(ErrorCodes.InvalidLine, originalMessage, new { file, line = requestedLine });
+        return new BreakpointSetResult(
+            Success: false,
+            Error: new ToolError(ErrorCodes.InvalidLine, originalMessage, new { file, line = requestedLine }));
     }
 
-    private static object SerializeBreakpoint(Breakpoint bp)
-    {
-        return new
-        {
-            id = bp.Id,
-            location = new
-            {
-                file = bp.Location.File,
-                line = bp.Location.Line,
-                column = bp.Location.Column,
-                endLine = bp.Location.EndLine,
-                endColumn = bp.Location.EndColumn,
-                functionName = bp.Location.FunctionName,
-                moduleName = bp.Location.ModuleName
-            },
-            state = bp.State.ToString().ToLowerInvariant(),
-            enabled = bp.Enabled,
-            verified = bp.Verified,
-            condition = bp.Condition,
-            hitCount = bp.HitCount,
-            message = bp.Message
-        };
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        var response = new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        };
-
-        return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static BreakpointInfo ToBreakpointInfo(Breakpoint bp) =>
+        new(
+            Id: bp.Id,
+            Location: bp.Location,
+            State: bp.State.ToString().ToLowerInvariant(),
+            Enabled: bp.Enabled,
+            Verified: bp.Verified,
+            HitCount: bp.HitCount,
+            Condition: bp.Condition,
+            Message: bp.Message);
 }

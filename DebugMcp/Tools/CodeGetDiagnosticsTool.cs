@@ -4,6 +4,7 @@ using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.CodeAnalysis;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -18,8 +19,6 @@ public sealed class CodeGetDiagnosticsTool
 {
     private readonly ICodeAnalysisService _codeAnalysisService;
     private readonly ILogger<CodeGetDiagnosticsTool> _logger;
-
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public CodeGetDiagnosticsTool(ICodeAnalysisService codeAnalysisService, ILogger<CodeGetDiagnosticsTool> logger)
     {
@@ -36,16 +35,21 @@ public sealed class CodeGetDiagnosticsTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of diagnostics or error response.</returns>
     [McpServerTool(Name = "code_get_diagnostics", Title = "Get Diagnostics",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Get compilation diagnostics (errors and warnings) for projects in the workspace.")]
-    public async Task<string> GetDiagnosticsAsync(
+    public async Task<CodeGetDiagnosticsResult> GetDiagnosticsAsync(
         [Description("Optional project name. If omitted, returns diagnostics for all projects.")] string? projectName = null,
         [Description("Minimum severity to include: Hidden, Info, Warning (default), Error")] string? minSeverity = null,
         [Description("Maximum number of diagnostics to return (default: 100, max: 500)")] int? maxResults = null,
+        [Description("Maximum time to wait for diagnostics retrieval, in milliseconds (default: 30000)")] int timeoutMs = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_get_diagnostics", JsonSerializer.Serialize(new { projectName, minSeverity, maxResults }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -53,7 +57,7 @@ public sealed class CodeGetDiagnosticsTool
             if (_codeAnalysisService.CurrentWorkspace is null)
             {
                 _logger.ToolError("code_get_diagnostics", ErrorCodes.NoWorkspace);
-                return CreateErrorResponse(ErrorCodes.NoWorkspace, "No workspace loaded. Call code_load first.");
+                return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, "No workspace loaded. Call code_load first."));
             }
 
             // Parse severity
@@ -63,7 +67,7 @@ public sealed class CodeGetDiagnosticsTool
                 if (!Enum.TryParse<DiagnosticSeverity>(minSeverity, ignoreCase: true, out severity))
                 {
                     _logger.ToolError("code_get_diagnostics", ErrorCodes.InvalidParameter);
-                    return CreateErrorResponse(ErrorCodes.InvalidParameter, $"Invalid severity: {minSeverity}. Valid values: Hidden, Info, Warning, Error.");
+                    return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.InvalidParameter, $"Invalid severity: {minSeverity}. Valid values: Hidden, Info, Warning, Error."));
                 }
             }
 
@@ -79,9 +83,9 @@ public sealed class CodeGetDiagnosticsTool
                 projectName,
                 severity,
                 limit,
-                cancellationToken);
+                linkedCts.Token);
 
-            // Group by severity for summary
+            // Group by severity for summary (computed from the full set, before size-truncation)
             var summary = diagnostics
                 .GroupBy(d => d.Severity)
                 .ToDictionary(g => g.Key.ToString().ToLowerInvariant(), g => g.Count());
@@ -89,51 +93,46 @@ public sealed class CodeGetDiagnosticsTool
             stopwatch.Stop();
             _logger.ToolCompleted("code_get_diagnostics", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                data = new
+            // maxResults is the primary bounding mechanism; this is an additional byte-budget
+            // safety net for pathologically large individual diagnostic messages/locations.
+            var (boundedDiagnostics, truncation) = ResultTruncation.Bound(
+                diagnostics.ToList(), "code_get_diagnostics result exceeded the 256 KB size budget");
+
+            return new CodeGetDiagnosticsResult(
+                Success: true,
+                Data: new CodeGetDiagnosticsData
                 {
-                    total_count = diagnostics.Count,
-                    limited_to = limit,
-                    summary,
-                    diagnostics
-                }
-            }, JsonOptions);
+                    TotalCount = diagnostics.Count,
+                    LimitedTo = truncation is null ? limit : boundedDiagnostics.Count,
+                    Summary = summary,
+                    Diagnostics = boundedDiagnostics
+                },
+                Truncation: truncation);
         }
         catch (ArgumentException ex)
         {
             _logger.ToolError("code_get_diagnostics", ErrorCodes.ProjectNotFound);
-            return CreateErrorResponse(ErrorCodes.ProjectNotFound, ex.Message);
+            return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.ProjectNotFound, ex.Message));
         }
         catch (InvalidOperationException ex)
         {
             _logger.ToolError("code_get_diagnostics", ErrorCodes.NoWorkspace);
-            return CreateErrorResponse(ErrorCodes.NoWorkspace, ex.Message);
+            return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, ex.Message));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("code_get_diagnostics", ErrorCodes.Timeout);
+            return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, $"code_get_diagnostics timed out after {timeoutMs}ms", new { timeout = timeoutMs }));
         }
         catch (OperationCanceledException)
         {
             _logger.ToolError("code_get_diagnostics", ErrorCodes.Timeout);
-            return CreateErrorResponse(ErrorCodes.Timeout, "Get diagnostics operation was cancelled");
+            return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, "Get diagnostics operation was cancelled"));
         }
         catch (Exception ex)
         {
             _logger.ToolError("code_get_diagnostics", ErrorCodes.AnalysisFailed);
-            return CreateErrorResponse(ErrorCodes.AnalysisFailed, $"Get diagnostics failed: {ex.Message}");
+            return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.AnalysisFailed, $"Get diagnostics failed: {ex.Message}"));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new ErrorResponse
-            {
-                Code = code,
-                Message = message,
-                Details = details
-            }
-        }, JsonOptions);
     }
 }

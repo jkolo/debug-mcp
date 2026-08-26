@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using DebugMcp.Models.ReSharper;
+using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
 
 namespace DebugMcp.Services.ReSharper;
@@ -38,7 +39,8 @@ public sealed partial class ReSharperInspectionService : IReSharperInspectionSer
         bool noBuild,
         int inspectionTimeoutSeconds,
         int maxResults,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgressReporter? progress = null)
     {
         var threshold = ParseSeverityThreshold(severity); // throws ArgumentException on bad value
 
@@ -59,7 +61,9 @@ public sealed partial class ReSharperInspectionService : IReSharperInspectionSer
             acqCts.CancelAfter(TimeSpan.FromSeconds(_options.AcquisitionTimeoutSeconds));
             try
             {
-                engine = await _engineProvider.EnsureEngineAsync(acqCts.Token);
+                engine = await HeartbeatProgress.RunAsync(
+                    () => _engineProvider.EnsureEngineAsync(acqCts.Token),
+                    progress, "acquiring engine", cancellationToken: acqCts.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -76,10 +80,12 @@ public sealed partial class ReSharperInspectionService : IReSharperInspectionSer
             inspCts.CancelAfter(TimeSpan.FromSeconds(inspectionTimeoutSeconds));
             try
             {
-                reportXml = await _runner.RunInspectCodeAsync(
-                    new InspectionRunRequest(target, severity, project, noBuild),
-                    engine.JbPath,
-                    inspCts.Token);
+                reportXml = await HeartbeatProgress.RunAsync(
+                    () => _runner.RunInspectCodeAsync(
+                        new InspectionRunRequest(target, severity, project, noBuild),
+                        engine.JbPath,
+                        inspCts.Token),
+                    progress, "running inspection", cancellationToken: inspCts.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -88,6 +94,7 @@ public sealed partial class ReSharperInspectionService : IReSharperInspectionSer
             }
         }
 
+        progress?.ReportStage("parsing report");
         var solutionDir = Path.GetDirectoryName(Path.GetFullPath(target)) ?? Directory.GetCurrentDirectory();
         var all = _parser.Parse(reportXml, solutionDir);
 

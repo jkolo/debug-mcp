@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Breakpoints
 
-Breakpoint tools let you set, manage, and wait for breakpoints — the primary mechanism for stopping execution at specific points in your code.
+Breakpoint tools let you set and manage breakpoints — the primary mechanism for stopping execution at specific points in your code.
 
 import AsciinemaPlayer from '@site/src/components/AsciinemaPlayer';
 
@@ -13,14 +13,14 @@ import AsciinemaPlayer from '@site/src/components/AsciinemaPlayer';
 
 ## When to Use
 
-Use breakpoint tools to control where execution pauses. You can break on specific source lines, function entries, exception types, or conditions. Use `breakpoint_wait` to block until a breakpoint is actually hit.
+Use breakpoint tools to control where execution pauses. You can break on specific source lines, function entries, exception types, or conditions. After continuing execution, either subscribe to the `debugger/breakpointHit` [notification](#breakpoint-notifications) or read the `debugger://breakpoints` resource to see whether/what fired.
 
-**Typical flow:** `breakpoint_set` → `debug_continue` → `breakpoint_wait` → *(inspect state)*
+**Typical flow:** `breakpoint_set` → `debug_continue` → *(`debugger/breakpointHit` notification arrives)* → *(inspect state)*
 
 ## Tools
 
 **On this page:**
-[`breakpoint_set`](#breakpoint_set) | [`breakpoint_remove`](#breakpoint_remove) | [`breakpoint_list`](#breakpoint_list) | [`breakpoint_enable`](#breakpoint_enable) | [`breakpoint_set_exception`](#breakpoint_set_exception) | [`tracepoint_set`](#tracepoint_set) | [`breakpoint_wait`](#breakpoint_wait) | [`exception_get_context`](#exception_get_context) | [Notifications](#breakpoint-notifications)
+[`breakpoint_set`](#breakpoint_set) | [`breakpoint_remove`](#breakpoint_remove) | [`breakpoint_enable`](#breakpoint_enable) | [`breakpoint_set_exception`](#breakpoint_set_exception) | [`tracepoint_set`](#tracepoint_set) | [`exception_get_context`](#exception_get_context) | [Notifications](#breakpoint-notifications)
 
 ### breakpoint_set
 
@@ -41,6 +41,7 @@ Set a breakpoint in source code.
 | `condition` | string | No | Condition expression |
 | `hit_count` | integer | No | Break after N hits |
 | `log_message` | string | No | Log message (logpoint — doesn't break) |
+| `timeout_ms` | integer | No | Maximum time to wait for the breakpoint to be set/verified, in milliseconds (default: 30000) |
 
 *Either `file`+`line` or `function` is required.
 
@@ -128,41 +129,13 @@ Remove a breakpoint.
 
 ---
 
-### breakpoint_list
+## Listing breakpoints
 
-List all breakpoints.
-
-**Requires:** Active session (running or paused)
-
-**When to use:** Review which breakpoints are set, their hit counts, and whether they're verified (bound to code).
-
-**Parameters:** None
-
-**Response:**
-```json
-{
-  "breakpoints": [
-    {
-      "id": 1,
-      "verified": true,
-      "enabled": true,
-      "file": "/app/Services/UserService.cs",
-      "line": 42,
-      "hit_count": 3,
-      "condition": null
-    },
-    {
-      "id": 2,
-      "verified": false,
-      "enabled": true,
-      "file": "/app/Services/OrderService.cs",
-      "line": 100,
-      "hit_count": 0,
-      "condition": "order.Total > 1000"
-    }
-  ]
-}
-```
+There is no `breakpoint_list` tool. Read the **`debugger://breakpoints`** MCP resource instead
+— it returns both regular breakpoints and tracepoints (each with `id`, `type`, `location`,
+`enabled`, `verified`, `state`, `hitCount`, `condition`, `logMessage`, and tracepoint-specific
+fields like `hitCountMultiple`/`maxNotifications`/`notificationsSent`) plus exception
+breakpoints, in one call, without needing a round-trip tool call.
 
 ---
 
@@ -274,6 +247,7 @@ Set a tracepoint (non-blocking observation point) at a source location.
 | `log_message` | string | No | Log message template with `{expression}` placeholders |
 | `hit_count_multiple` | integer | No | Notify only every Nth hit (0 = every hit) |
 | `max_notifications` | integer | No | Auto-disable after N notifications (0 = unlimited) |
+| `timeout_ms` | integer | No | Maximum time to wait for the tracepoint to be set/verified, in milliseconds (default: 30000) |
 
 **Examples:**
 
@@ -350,58 +324,7 @@ High-frequency tracepoint with filtering:
 
 **Real-world use case:** An AI agent investigating slow order processing sets tracepoints at key stages with `hit_count_multiple: 1000`. After running a load test, the notifications reveal that 95% of time is spent in the validation step — without ever stopping the application.
 
-**Managing tracepoints:** Use `breakpoint_list` to see all tracepoints (they appear with `type: "tracepoint"`). Use `breakpoint_enable` to temporarily disable notifications. Use `breakpoint_remove` to delete.
-
----
-
-### breakpoint_wait
-
-Wait for any breakpoint to be hit.
-
-**Requires:** Active session (running or paused)
-
-**When to use:** After setting breakpoints and continuing execution, use this to block until a breakpoint fires. Without this, you'd have to poll `debug_state`.
-
-**Parameters:**
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `timeout_ms` | integer | No | Timeout in milliseconds (default: 30000) |
-| `breakpoint_id` | integer | No | Wait for a specific breakpoint |
-
-**Example:**
-```json
-{
-  "timeout_ms": 60000,
-  "breakpoint_id": 1
-}
-```
-
-**Response (hit):**
-```json
-{
-  "hit": true,
-  "breakpoint_id": 1,
-  "thread_id": 5,
-  "location": {
-    "file": "/app/Services/UserService.cs",
-    "line": 42,
-    "column": 8,
-    "function": "GetUser",
-    "module": "MyApp.dll"
-  },
-  "hit_count": 1
-}
-```
-
-**Response (timeout):**
-```json
-{
-  "hit": false,
-  "reason": "timeout",
-  "message": "No breakpoint hit within 60000ms"
-}
-```
+**Managing tracepoints:** Read the `debugger://breakpoints` resource to see all tracepoints (they appear with `type: "tracepoint"`). Use `breakpoint_enable` to temporarily disable notifications. Use `breakpoint_remove` to delete.
 
 ---
 
@@ -420,6 +343,7 @@ Get full exception context when paused at an exception.
 | `max_frames` | integer | No | Maximum stack frames to return (1–100, default: 10) |
 | `include_variables_for_frames` | integer | No | Number of top frames to include local variables for (0–10, default: 1). Set to 0 to skip variable collection. |
 | `max_inner_exceptions` | integer | No | Maximum inner exception chain depth (0–20, default: 5). Set to 0 to skip inner exceptions. |
+| `timeout_ms` | integer | No | Maximum time to wait for exception context retrieval, in milliseconds (default: 30000) |
 
 **Example request:**
 ```json
@@ -514,13 +438,16 @@ Get full exception context when paused at an exception.
 }
 ```
 
-**Real-world use case:** An AI agent catches a `NullReferenceException` via `breakpoint_wait`. Instead of making 3 separate calls to get the stack trace, variables, and exception details, it calls `exception_get_context` once. The response shows that `users` is an empty list and the code called `.First()` without checking — the agent immediately identifies the fix: use `.FirstOrDefault()` with a null check.
+**Real-world use case:** An AI agent catches a `NullReferenceException` via a `debugger/breakpointHit` notification. Instead of making 3 separate calls to get the stack trace, variables, and exception details, it calls `exception_get_context` once. The response shows that `users` is an empty list and the code called `.First()` without checking — the agent immediately identifies the fix: use `.FirstOrDefault()` with a null check.
 
 ---
 
 ## Breakpoint Notifications
 
-In addition to polling with `breakpoint_wait`, the debugger sends **push notifications** via MCP when breakpoints and tracepoints are hit. This enables event-driven debugging workflows.
+The debugger sends **push notifications** via MCP when breakpoints and tracepoints are hit —
+there is no polling tool for this. This enables event-driven debugging workflows: continue
+execution, then wait for the `debugger/breakpointHit` notification to arrive (or read the
+`debugger://breakpoints` resource afterward to confirm hit counts).
 
 ### Notification Method
 
@@ -577,11 +504,14 @@ For exception breakpoints, the notification includes exception details:
 }
 ```
 
-### Using Notifications vs. `breakpoint_wait`
+### Notifications vs. Polling the Resource
 
 | Approach | Use Case |
 |----------|----------|
-| `breakpoint_wait` | Simple workflows — set breakpoint, wait for hit, inspect |
-| Notifications | Complex workflows — multiple breakpoints, tracepoints, event-driven agents |
+| `debugger/breakpointHit` notification | Event-driven agents — react the instant a breakpoint or tracepoint fires, no polling loop |
+| `debugger://breakpoints` resource | Point-in-time inspection — confirm current hit counts, or check state after missing a notification |
 
-Both work together: `breakpoint_wait` still returns when a breakpoint is hit, AND a notification is sent. Use whichever fits your workflow.
+Both reflect the same underlying hits: the notification is pushed the moment a breakpoint or
+tracepoint fires; the resource reflects the same `hitCount` the next time it's read. Use
+whichever fits your workflow — most agents subscribe to the notification and only fall back to
+reading the resource if they need to double-check state.

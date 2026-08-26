@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -31,37 +31,43 @@ public sealed class MemoryReadTool
     /// <param name="format">Output format: 'hex', 'hex_ascii' (default), 'raw'.</param>
     /// <returns>Memory dump with hex bytes and optional ASCII representation.</returns>
     [McpServerTool(Name = "memory_read", Title = "Read Memory",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Read raw memory bytes from the debuggee process")]
-    public async Task<string> ReadMemory(
+    public async Task<MemoryReadResult> ReadMemory(
         [Description("Memory address in hex (0x...) or decimal")] string address,
         [Description("Number of bytes to read (max: 65536)")] int size = 256,
-        [Description("Output format: hex, hex_ascii, raw")] string format = "hex_ascii")
+        [Description("Output format: hex, hex_ascii, raw")] string format = "hex_ascii",
+        [Description("Maximum time to wait for the memory read, in milliseconds (default: 30000)")] int timeout_ms = 30000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("memory_read",
             $"{{\"address\": \"{address}\", \"size\": {size}, \"format\": \"{format}\"}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
             // Validate parameters
             if (string.IsNullOrWhiteSpace(address))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "address cannot be empty",
                     new { parameter = "address" });
             }
 
             if (size <= 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "size must be positive",
                     new { parameter = "size", value = size });
             }
 
             if (size > 65536)
             {
-                return CreateErrorResponse(ErrorCodes.SizeExceeded,
+                return CreateErrorResult(ErrorCodes.SizeExceeded,
                     $"Requested size {size} exceeds maximum limit of 65536 bytes",
                     new { requestedSize = size, maxSize = 65536 });
             }
@@ -69,7 +75,7 @@ public sealed class MemoryReadTool
             string[] validFormats = ["hex", "hex_ascii", "raw"];
             if (!validFormats.Contains(format))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     $"format must be one of: {string.Join(", ", validFormats)}",
                     new { parameter = "format", value = format, validValues = validFormats });
             }
@@ -79,27 +85,27 @@ public sealed class MemoryReadTool
             if (session == null)
             {
                 _logger.ToolError("memory_read", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return CreateErrorResult(ErrorCodes.NoSession, "No active debug session");
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("memory_read", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot read memory: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
                     new { currentState = session.State.ToString().ToLowerInvariant() });
             }
 
             // Read memory
-            var memory = await _sessionManager.ReadMemoryAsync(address, size);
+            var memory = await _sessionManager.ReadMemoryAsync(address, size, linkedCts.Token);
 
             // A read that returned zero bytes is a failure, not a success — surface it as an
             // error envelope instead of success:true with an embedded error string (BUG-014).
             if (memory.ActualSize == 0)
             {
                 _logger.ToolError("memory_read", ErrorCodes.MemoryReadFailed);
-                return CreateErrorResponse(ErrorCodes.MemoryReadFailed,
+                return CreateErrorResult(ErrorCodes.MemoryReadFailed,
                     memory.Error ?? $"Failed to read memory at address {address}",
                     new { address = memory.Address, requestedSize = memory.RequestedSize, actualSize = 0 });
             }
@@ -109,71 +115,47 @@ public sealed class MemoryReadTool
             _logger.LogInformation("Read {ActualSize}/{RequestedSize} bytes from address {Address}",
                 memory.ActualSize, memory.RequestedSize, memory.Address);
 
-            var response = new Dictionary<string, object?>
-            {
-                ["success"] = true,
-                ["memory"] = new Dictionary<string, object?>
-                {
-                    ["address"] = memory.Address,
-                    ["requestedSize"] = memory.RequestedSize,
-                    ["actualSize"] = memory.ActualSize,
-                    ["bytes"] = memory.Bytes
-                }
-            };
+            // The service always computes Ascii; the tool only surfaces it for hex_ascii format
+            // (legacy behavior — 'raw'/'hex' formats never included it).
+            var responseMemory = memory with { Ascii = format == "hex_ascii" ? memory.Ascii : null };
 
-            if (format == "hex_ascii" && memory.Ascii != null)
-            {
-                ((Dictionary<string, object?>)response["memory"]!)["ascii"] = memory.Ascii;
-            }
-
-            if (memory.Error != null)
-            {
-                ((Dictionary<string, object?>)response["memory"]!)["error"] = memory.Error;
-            }
-
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+            return new MemoryReadResult(Success: true, Memory: responseMemory);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("memory_read", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return CreateErrorResult(ErrorCodes.NoSession, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("memory_read", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return CreateErrorResult(ErrorCodes.NotPaused, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Failed to read memory"))
         {
             _logger.ToolError("memory_read", ErrorCodes.InvalidAddress);
-            return CreateErrorResponse(ErrorCodes.InvalidAddress, ex.Message,
+            return CreateErrorResult(ErrorCodes.InvalidAddress, ex.Message,
                 new { address });
         }
         catch (ArgumentException ex)
         {
             _logger.ToolError("memory_read", ErrorCodes.InvalidParameter);
-            return CreateErrorResponse(ErrorCodes.InvalidParameter, ex.Message);
+            return CreateErrorResult(ErrorCodes.InvalidParameter, ex.Message);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("memory_read", ErrorCodes.Timeout);
+            return CreateErrorResult(ErrorCodes.Timeout, $"memory_read timed out after {timeout_ms}ms", new { timeout = timeout_ms });
         }
         catch (Exception ex)
         {
             _logger.ToolError("memory_read", ErrorCodes.MemoryReadFailed);
             _logger.LogError(ex, "Memory read failed for address '{Address}'", address);
-            return CreateErrorResponse(ErrorCodes.MemoryReadFailed,
+            return CreateErrorResult(ErrorCodes.MemoryReadFailed,
                 $"Failed to read memory: {ex.Message}");
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
-    }
+    private static MemoryReadResult CreateErrorResult(string code, string message, object? details = null)
+        => new(Success: false, Error: new ToolError(code, message, details));
 }

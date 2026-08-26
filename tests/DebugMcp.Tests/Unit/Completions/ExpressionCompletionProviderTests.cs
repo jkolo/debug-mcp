@@ -83,7 +83,7 @@ public class ExpressionCompletionProviderTests
         var session = CreateSession(SessionState.Paused);
         _sessionManagerMock.Setup(m => m.CurrentSession).Returns(session);
         _sessionManagerMock.Setup(m => m.GetVariables(null, 0, "all", null))
-            .Returns(new List<Models.Inspection.Variable>());
+            .Returns(new List<DebugMcp.Models.Inspection.Variable>());
         var request = CreateCompleteRequest("expression", "");
 
         // Act

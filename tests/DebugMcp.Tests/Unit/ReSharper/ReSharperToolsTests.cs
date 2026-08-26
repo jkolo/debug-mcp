@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DebugMcp.Models.ReSharper;
 using DebugMcp.Services.ReSharper;
 using DebugMcp.Tools;
@@ -17,49 +16,36 @@ public sealed class ReSharperToolsTests
     private ReSharperInspectProjectTool ProjectTool() =>
         new(_service.Object, _options, NullLogger<ReSharperInspectProjectTool>.Instance);
 
-    private static (bool success, string? code) Parse(string json)
-    {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        var success = root.GetProperty("success").GetBoolean();
-        string? code = null;
-        if (!success)
-        {
-            code = root.GetProperty("error").GetProperty("code").GetString();
-        }
-        return (success, code);
-    }
-
     [Fact]
     public async Task Solution_EmptyPath_ReturnsInvalidPath()
     {
-        var (success, code) = Parse(await SolutionTool().InspectSolutionAsync(""));
-        success.Should().BeFalse();
-        code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
+        var result = await SolutionTool().InspectSolutionAsync("");
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
     }
 
     [Fact]
     public async Task Solution_WrongExtension_ReturnsInvalidPath()
     {
-        var (success, code) = Parse(await SolutionTool().InspectSolutionAsync("/x/not-a-solution.txt"));
-        success.Should().BeFalse();
-        code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
+        var result = await SolutionTool().InspectSolutionAsync("/x/not-a-solution.txt");
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
     }
 
     [Fact]
     public async Task Solution_MissingFile_ReturnsInvalidPath()
     {
-        var (success, code) = Parse(await SolutionTool().InspectSolutionAsync("/nope/Missing.sln"));
-        success.Should().BeFalse();
-        code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
+        var result = await SolutionTool().InspectSolutionAsync("/nope/Missing.sln");
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
     }
 
     [Fact]
     public async Task Project_WrongExtension_ReturnsInvalidPath()
     {
-        var (success, code) = Parse(await ProjectTool().InspectProjectAsync("/x/App.sln"));
-        success.Should().BeFalse();
-        code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
+        var result = await ProjectTool().InspectProjectAsync("/x/App.sln");
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be(DebugMcp.Models.ErrorCodes.InvalidPath);
     }
 
     [Fact]
@@ -71,10 +57,10 @@ public sealed class ReSharperToolsTests
                 It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ReSharperAcquisitionException("offline"));
 
-        var (success, code) = Parse(await SolutionTool().InspectSolutionAsync(sln));
+        var result = await SolutionTool().InspectSolutionAsync(sln);
 
-        success.Should().BeFalse();
-        code.Should().Be(DebugMcp.Models.ErrorCodes.EngineAcquisitionFailed);
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be(DebugMcp.Models.ErrorCodes.EngineAcquisitionFailed);
         File.Delete(sln);
     }
 
@@ -92,8 +78,11 @@ public sealed class ReSharperToolsTests
                 DurationMs = 5, Built = true
             });
 
-        var (success, _) = Parse(await SolutionTool().InspectSolutionAsync(sln));
-        success.Should().BeTrue();
+        var result = await SolutionTool().InspectSolutionAsync(sln);
+        result.Success.Should().BeTrue();
+        result.Error.Should().BeNull();
+        result.Data.Should().NotBeNull();
+        result.Data!.Target.Should().Be(sln);
         File.Delete(sln);
     }
 }
