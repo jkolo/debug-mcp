@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DebugMcp.Models.Batch;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.Batch;
 using DebugMcp.Services.Progress;
 using Microsoft.Extensions.Logging;
@@ -24,9 +25,10 @@ public sealed class BatchEvaluateTool
     }
 
     [McpServerTool(Name = "batch_evaluate", Title = "Batch Evaluate",
-        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Submit a batch of up to 20 micro-experiments in one call. Each experiment specifies a source location trigger, optional variable capture expressions, an optional condition, and a max hit count. Pre-existing breakpoints are disabled during the batch and restored after. Returns a structured summary with all captured variable values, hit timestamps, and a completion reason. Example response: {\"success\": true, \"completion_reason\": \"all_triggered\", \"triggered\": 2, \"not_triggered\": 0, \"experiments\": [{\"index\": 0, \"status\": \"triggered\", \"hit_count\": 1, \"hits\": [{\"thread_id\": 1, \"values\": {\"counter\": \"42\"}}]}]}")]
-    public async Task<string> BatchEvaluateAsync(
+    public async Task<BatchEvaluateResult> BatchEvaluateAsync(
         [Description("JSON array of experiment objects. Each object: {\"trigger\": {\"file\": \"path.cs\", \"line\": N}, \"mode\": \"blocking|non_blocking\", \"capture\": [\"expr1\", \"expr2\"], \"condition\": \"x > 5\", \"max_hits\": 3}. Mode defaults to blocking. max_hits defaults to 1.")] string experiments,
         [Description("Timeout in seconds before batch returns partial results (default 30)")] int timeoutSeconds = 30,
         [Description("Evaluation safety mode: safe (default, blocks unsafe expressions) or full (allows all expressions)")] string evalMode = "safe",
@@ -44,34 +46,24 @@ public sealed class BatchEvaluateTool
             var request = new BatchRequest(experimentList, timeoutSeconds, evalModeEnum, maxTotalHits);
             var result = await _batchRunner.RunAsync(request, cancellationToken, ProgressReporterAdapter.Create(progress));
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                completion_reason = ToSnakeCase(result.CompletionReason.ToString()),
-                total_experiments = result.TotalExperiments,
-                triggered = result.TriggeredCount,
-                not_triggered = result.NotTriggeredCount,
-                errors = result.ErrorCount,
-                experiments = result.ExperimentResults.Select(r => new
-                {
-                    index = r.Index,
-                    status = ToSnakeCase(r.Status.ToString()),
-                    hit_count = r.HitCount,
-                    error = r.ErrorMessage,
-                    hits = r.Hits.Select(h => new
-                    {
-                        timestamp = h.Timestamp,
-                        thread_id = h.ThreadId,
-                        location = new { file = h.Location.File, line = h.Location.Line },
-                        values = h.Values,
-                        eval_errors = h.EvalErrors.Count > 0 ? h.EvalErrors : (IReadOnlyDictionary<string, string>?)null,
-                    }),
-                }),
-            }, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-            });
+            return new BatchEvaluateResult(
+                Success: true,
+                CompletionReason: ToSnakeCase(result.CompletionReason.ToString()),
+                TotalExperiments: result.TotalExperiments,
+                Triggered: result.TriggeredCount,
+                NotTriggered: result.NotTriggeredCount,
+                Errors: result.ErrorCount,
+                Experiments: result.ExperimentResults.Select(r => new BatchExperimentResultWire(
+                    Index: r.Index,
+                    Status: ToSnakeCase(r.Status.ToString()),
+                    HitCount: r.HitCount,
+                    Error: r.ErrorMessage,
+                    Hits: r.Hits.Select(h => new BatchExperimentHitWire(
+                        Timestamp: h.Timestamp,
+                        ThreadId: h.ThreadId,
+                        Location: new BatchHitLocationWire(h.Location.File, h.Location.Line),
+                        Values: h.Values,
+                        EvalErrors: h.EvalErrors.Count > 0 ? h.EvalErrors : null)))).ToList());
         }
         catch (ArgumentException ex)
         {
@@ -142,10 +134,6 @@ public sealed class BatchEvaluateTool
         return sb.ToString();
     }
 
-    private static string Fail(string code, string message)
-        => JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message },
-        }, new JsonSerializerOptions { WriteIndented = true });
+    private static BatchEvaluateResult Fail(string code, string message)
+        => new(Success: false, Error: new ToolError(code, message));
 }
