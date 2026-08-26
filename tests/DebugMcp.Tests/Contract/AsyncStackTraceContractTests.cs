@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Services;
@@ -35,15 +36,12 @@ public class AsyncStackTraceContractTests
 
         // Act
         var result = await tool.GetStackTraceAsync();
-        var json = JsonDocument.Parse(result);
-        var framesArray = json.RootElement.GetProperty("frames");
 
         // Assert
-        foreach (var frame in framesArray.EnumerateArray())
+        result.Frames.Should().NotBeNull();
+        foreach (var frame in result.Frames!)
         {
-            frame.TryGetProperty("frame_kind", out var frameKind).Should().BeTrue(
-                "every frame must include frame_kind field");
-            frameKind.GetString().Should().BeOneOf("sync", "async", "async_continuation",
+            frame.FrameKind.Should().BeOneOf("sync", "async", "async_continuation",
                 "frame_kind must be sync, async, or async_continuation");
         }
     }
@@ -65,10 +63,9 @@ public class AsyncStackTraceContractTests
 
         // Act
         var result = await tool.GetStackTraceAsync(include_raw: true);
-        var json = JsonDocument.Parse(result);
 
         // Assert
-        json.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(
+        result.Success.Should().BeTrue(
             "include_raw parameter should be accepted without causing an error");
     }
 
@@ -109,22 +106,19 @@ public class AsyncStackTraceContractTests
 
         // Act
         var result = await tool.GetStackTraceAsync();
-        var json = JsonDocument.Parse(result);
-        var root = json.RootElement;
 
         // Assert — top-level required fields
-        root.GetProperty("success").GetBoolean().Should().BeTrue();
-        root.TryGetProperty("thread_id", out _).Should().BeTrue("response must include thread_id");
-        root.TryGetProperty("total_frames", out _).Should().BeTrue("response must include total_frames");
-        root.TryGetProperty("frames", out var framesElement).Should().BeTrue("response must include frames");
+        result.Success.Should().BeTrue();
+        result.ThreadId.Should().NotBeNull("response must include thread_id");
+        result.TotalFrames.Should().NotBeNull("response must include total_frames");
+        result.Frames.Should().NotBeNull("response must include frames");
 
-        // Assert — each frame has required fields
-        foreach (var frame in framesElement.EnumerateArray())
+        // Assert — each frame has required fields (non-nullable on the record, always present on the wire)
+        foreach (var frame in result.Frames!)
         {
-            frame.TryGetProperty("index", out _).Should().BeTrue("frame must include index");
-            frame.TryGetProperty("function", out _).Should().BeTrue("frame must include function");
-            frame.TryGetProperty("module", out _).Should().BeTrue("frame must include module");
-            frame.TryGetProperty("is_external", out _).Should().BeTrue("frame must include is_external");
+            frame.Index.Should().BeGreaterThanOrEqualTo(0, "frame must include index");
+            frame.Function.Should().NotBeNullOrEmpty("frame must include function");
+            frame.Module.Should().NotBeNullOrEmpty("frame must include module");
         }
     }
 
@@ -146,19 +140,18 @@ public class AsyncStackTraceContractTests
 
         // Act
         var result = await tool.GetStackTraceAsync();
-        var json = JsonDocument.Parse(result);
-        var frame = json.RootElement.GetProperty("frames").EnumerateArray().First();
+        var frame = result.Frames!.First();
 
         // Assert — new fields present
-        frame.GetProperty("frame_kind").GetString().Should().Be("async");
-        frame.GetProperty("is_awaiting").GetBoolean().Should().BeTrue();
-        frame.GetProperty("logical_function").GetString().Should().Be("GetDataAsync");
+        frame.FrameKind.Should().Be("async");
+        frame.IsAwaiting.Should().BeTrue();
+        frame.LogicalFunction.Should().Be("GetDataAsync");
 
         // Assert — existing fields still present
-        frame.GetProperty("index").GetInt32().Should().Be(0);
-        frame.GetProperty("function").GetString().Should().Be("MyApp.Service.GetDataAsync()");
-        frame.GetProperty("module").GetString().Should().Be("MyApp.dll");
-        frame.GetProperty("is_external").GetBoolean().Should().BeFalse();
+        frame.Index.Should().Be(0);
+        frame.Function.Should().Be("MyApp.Service.GetDataAsync()");
+        frame.Module.Should().Be("MyApp.dll");
+        frame.IsExternal.Should().BeFalse();
     }
 
     /// <summary>
@@ -191,10 +184,16 @@ public class AsyncStackTraceContractTests
 
         // Act
         var result = await tool.GetStackTraceAsync();
-        var json = JsonDocument.Parse(result);
-        var frame = json.RootElement.GetProperty("frames").EnumerateArray().First();
+        result.Frames!.First().LogicalFunction.Should().BeNull();
 
-        // Assert
+        // Assert — omitted from the actual wire JSON too, not just null in-memory
+        var wireOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+        var element = JsonSerializer.SerializeToElement(result, wireOptions);
+        var frame = element.GetProperty("frames").EnumerateArray().First();
         frame.TryGetProperty("logical_function", out _).Should().BeFalse(
             "logical_function should be omitted when null to keep response compact");
     }

@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -32,9 +32,10 @@ public sealed class ObjectInspectTool
     /// <param name="frame_index">Frame index (0 = top of stack, default: 0).</param>
     /// <returns>Object inspection with type, size, fields, and values.</returns>
     [McpServerTool(Name = "object_inspect", Title = "Inspect Object",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Inspect a heap object's contents including all fields")]
-    public async Task<string> InspectObject(
+    public async Task<ObjectInspectResult> InspectObject(
         [Description("Object reference (variable name or expression)")] string object_ref,
         [Description("Maximum depth for nested object expansion (1-10)")] int depth = 1,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
@@ -50,21 +51,21 @@ public sealed class ObjectInspectTool
             // Validate parameters
             if (string.IsNullOrWhiteSpace(object_ref))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "object_ref cannot be empty",
                     new { parameter = "object_ref" });
             }
 
             if (depth < 1 || depth > 10)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "depth must be between 1 and 10",
                     new { parameter = "depth", value = depth });
             }
 
             if (frame_index < 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "frame_index must be >= 0",
                     new { parameter = "frame_index", value = frame_index });
             }
@@ -74,14 +75,14 @@ public sealed class ObjectInspectTool
             if (session == null)
             {
                 _logger.ToolError("object_inspect", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return CreateErrorResult(ErrorCodes.NoSession, "No active debug session");
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("object_inspect", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot inspect object: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
                     new { currentState = session.State.ToString().ToLowerInvariant() });
             }
@@ -96,80 +97,61 @@ public sealed class ObjectInspectTool
             if (inspection.IsNull)
             {
                 _logger.LogInformation("Object '{ObjectRef}' is null", object_ref);
-                return JsonSerializer.Serialize(new
-                {
-                    success = true,
-                    inspection = new
-                    {
-                        isNull = true,
-                        typeName = inspection.TypeName
-                    }
-                }, new JsonSerializerOptions { WriteIndented = true });
+                return new ObjectInspectResult(
+                    Success: true,
+                    Inspection: new ObjectInspectionResult(
+                        IsNull: true,
+                        TypeName: inspection.TypeName));
             }
 
             _logger.LogInformation("Inspected object '{ObjectRef}': {TypeName} with {FieldCount} fields",
                 object_ref, inspection.TypeName, inspection.Fields.Count);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                inspection = new
-                {
-                    address = inspection.Address,
-                    typeName = inspection.TypeName,
-                    size = inspection.Size,
-                    fields = inspection.Fields.Select(f => new
-                    {
-                        name = f.Name,
-                        typeName = f.TypeName,
-                        value = f.Value,
-                        offset = f.Offset,
-                        size = f.Size,
-                        hasChildren = f.HasChildren,
-                        childCount = f.ChildCount
-                    }),
-                    isNull = inspection.IsNull,
-                    hasCircularRef = inspection.HasCircularRef,
-                    truncated = inspection.Truncated
-                }
-            }, new JsonSerializerOptions { WriteIndented = true });
+            return new ObjectInspectResult(
+                Success: true,
+                Inspection: new ObjectInspectionResult(
+                    IsNull: inspection.IsNull,
+                    TypeName: inspection.TypeName,
+                    Address: inspection.Address,
+                    Size: inspection.Size,
+                    Fields: inspection.Fields.Select(f => new InspectedFieldResult(
+                        Name: f.Name,
+                        TypeName: f.TypeName,
+                        Value: f.Value,
+                        Offset: f.Offset,
+                        Size: f.Size,
+                        HasChildren: f.HasChildren,
+                        ChildCount: f.ChildCount)).ToList(),
+                    HasCircularRef: inspection.HasCircularRef,
+                    Truncated: inspection.Truncated));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("object_inspect", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return CreateErrorResult(ErrorCodes.NoSession, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("object_inspect", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return CreateErrorResult(ErrorCodes.NotPaused, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Invalid reference"))
         {
             _logger.ToolError("object_inspect", ErrorCodes.InvalidReference);
-            return CreateErrorResponse(ErrorCodes.InvalidReference, ex.Message,
+            return CreateErrorResult(ErrorCodes.InvalidReference, ex.Message,
                 new { object_ref });
         }
         catch (Exception ex)
         {
             _logger.ToolError("object_inspect", "INSPECTION_FAILED");
             _logger.LogError(ex, "Object inspection failed for '{ObjectRef}'", object_ref);
-            return CreateErrorResponse("INSPECTION_FAILED",
+            return CreateErrorResult("INSPECTION_FAILED",
                 $"Failed to inspect object: {ex.Message}");
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
+    private static ObjectInspectResult CreateErrorResult(string code, string message, object? details = null)
     {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
+        return new ObjectInspectResult(Success: false, Error: new ToolError(code, message, details));
     }
 }

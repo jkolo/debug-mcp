@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services.Inspection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -29,9 +30,10 @@ public sealed class ObjectSummarizeTool
     /// Collection-typed fields show their element count and type inline.
     /// </summary>
     [McpServerTool(Name = "object_summarize", Title = "Summarize Object",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Summarize an object's fields in a single call: non-default valued fields, null fields, and anomalous fields (empty strings, NaN, Infinity, default dates, empty GUIDs). Collection-typed fields show element count inline.")]
-    public async Task<string> SummarizeObject(
+    public async Task<ObjectSummarizeResult> SummarizeObject(
         [Description("Variable name or expression evaluating to an object")]
         string expression,
         [Description("Max collection elements to preview inline for collection-typed fields (1-50, default: 5)")]
@@ -54,67 +56,55 @@ public sealed class ObjectSummarizeTool
             stopwatch.Stop();
             _logger.ToolCompleted("object_summarize", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                success = true,
-                summary = new
-                {
-                    typeName = summary.TypeName,
-                    size = summary.Size,
-                    isNull = summary.IsNull,
-                    totalFieldCount = summary.TotalFieldCount,
-                    inaccessibleFieldCount = summary.InaccessibleFieldCount,
-                    fields = summary.Fields.Select(f => new
-                    {
-                        name = f.Name,
-                        type = f.Type,
-                        value = f.Value,
-                        collectionCount = f.CollectionCount,
-                        collectionElementType = f.CollectionElementType
-                    }),
-                    nullFields = summary.NullFields,
-                    interestingFields = summary.InterestingFields.Select(f => new
-                    {
-                        name = f.Name,
-                        type = f.Type,
-                        value = f.Value,
-                        reason = f.Reason
-                    })
-                }
-            }, new JsonSerializerOptions { WriteIndented = true });
+            return new ObjectSummarizeResult(
+                Success: true,
+                Summary: new ObjectSummaryResult(
+                    TypeName: summary.TypeName,
+                    Size: summary.Size,
+                    IsNull: summary.IsNull,
+                    TotalFieldCount: summary.TotalFieldCount,
+                    InaccessibleFieldCount: summary.InaccessibleFieldCount,
+                    Fields: summary.Fields.Select(f => new FieldSummaryResult(
+                        Name: f.Name,
+                        Type: f.Type,
+                        Value: f.Value,
+                        CollectionCount: f.CollectionCount,
+                        CollectionElementType: f.CollectionElementType)).ToList(),
+                    NullFields: summary.NullFields,
+                    InterestingFields: summary.InterestingFields.Select(f => new InterestingFieldResult(
+                        Name: f.Name,
+                        Type: f.Type,
+                        Value: f.Value,
+                        Reason: f.Reason)).ToList()));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("paused") || ex.Message.Contains("Paused"))
         {
             _logger.ToolError("object_summarize", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused,
+            return CreateErrorResult(ErrorCodes.NotPaused,
                 "Process is not paused. Cannot inspect variables while running.");
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("session"))
         {
             _logger.ToolError("object_summarize", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return CreateErrorResult(ErrorCodes.NoSession, ex.Message);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("available") || ex.Message.Contains("scope") || ex.Message.Contains("not found"))
         {
             _logger.ToolError("object_summarize", "VARIABLE_UNAVAILABLE");
-            return CreateErrorResponse("variable_unavailable",
+            return CreateErrorResult("variable_unavailable",
                 $"Variable '{expression}' is not available in the current scope.");
         }
         catch (Exception ex)
         {
             _logger.ToolError("object_summarize", ErrorCodes.VariablesFailed);
-            return CreateErrorResponse(ErrorCodes.VariablesFailed,
+            return CreateErrorResult(ErrorCodes.VariablesFailed,
                 $"Failed to summarize object: {ex.Message}",
                 new { exceptionType = ex.GetType().Name });
         }
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null)
+    private static ObjectSummarizeResult CreateErrorResult(string code, string message, object? details = null)
     {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message, details }
-        }, new JsonSerializerOptions { WriteIndented = true });
+        return new ObjectSummarizeResult(Success: false, Error: new ToolError(code, message, details));
     }
 }
