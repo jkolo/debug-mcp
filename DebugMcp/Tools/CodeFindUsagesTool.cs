@@ -46,10 +46,14 @@ public sealed class CodeFindUsagesTool
         [Description("Absolute path to source file containing the symbol. Used with line/column.")] string? file = null,
         [Description("1-based line number where the symbol is located. Used with file/column.")] int? line = null,
         [Description("1-based column number where the symbol is located. Used with file/line.")] int? column = null,
+        [Description("Maximum time to wait for the usage search, in milliseconds (default: 30000)")] int timeoutMs = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_find_usages", JsonSerializer.Serialize(new { name, symbolKind, file, line, column }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -93,11 +97,11 @@ public sealed class CodeFindUsagesTool
 
             if (hasName)
             {
-                symbol = await _codeAnalysisService.FindSymbolByNameAsync(name!, parsedKind, cancellationToken);
+                symbol = await _codeAnalysisService.FindSymbolByNameAsync(name!, parsedKind, linkedCts.Token);
             }
             else
             {
-                symbol = await _codeAnalysisService.GetSymbolAtLocationAsync(file!, line!.Value, column!.Value, cancellationToken);
+                symbol = await _codeAnalysisService.GetSymbolAtLocationAsync(file!, line!.Value, column!.Value, linkedCts.Token);
             }
 
             if (symbol is null)
@@ -113,7 +117,7 @@ public sealed class CodeFindUsagesTool
             }
 
             // Find all usages
-            var usages = await _codeAnalysisService.FindUsagesAsync(symbol, cancellationToken);
+            var usages = await _codeAnalysisService.FindUsagesAsync(symbol, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("code_find_usages", stopwatch.ElapsedMilliseconds);
@@ -145,6 +149,11 @@ public sealed class CodeFindUsagesTool
         {
             _logger.ToolError("code_find_usages", ErrorCodes.NoWorkspace);
             return new CodeFindUsagesResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, ex.Message));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("code_find_usages", ErrorCodes.Timeout);
+            return new CodeFindUsagesResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, $"code_find_usages timed out after {timeoutMs}ms", new { timeout = timeoutMs }));
         }
         catch (OperationCanceledException)
         {

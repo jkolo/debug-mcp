@@ -37,6 +37,8 @@ public sealed class ExceptionGetContextTool
         int include_variables_for_frames = 1,
         [Description("Maximum inner exception chain depth to traverse (default: 5, min: 0, max: 20). 0 = skip inner exceptions.")]
         int max_inner_exceptions = 5,
+        [Description("Maximum time to wait for exception context retrieval, in milliseconds (default: 30000)")]
+        int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -74,10 +76,13 @@ public sealed class ExceptionGetContextTool
                 ErrorCodes.InvalidParameter, "max_inner_exceptions must be between 0 and 20.",
                 new { parameter = "max_inner_exceptions", value = max_inner_exceptions }));
 
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
         try
         {
             var result = await _autopsyService.GetExceptionContextAsync(
-                max_frames, include_variables_for_frames, max_inner_exceptions, cancellationToken);
+                max_frames, include_variables_for_frames, max_inner_exceptions, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("exception_get_context", stopwatch.ElapsedMilliseconds);
@@ -99,6 +104,12 @@ public sealed class ExceptionGetContextTool
             _logger.ToolError("exception_get_context", ErrorCodes.NoException);
             return new ExceptionGetContextResult(Success: false, Error: new ToolError(
                 ErrorCodes.NoException, "No exception context available. The debugger is not currently paused at an exception."));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("exception_get_context", ErrorCodes.Timeout);
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                ErrorCodes.Timeout, $"exception_get_context timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (Exception ex)
         {

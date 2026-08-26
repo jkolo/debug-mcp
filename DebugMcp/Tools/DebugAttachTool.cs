@@ -37,7 +37,7 @@ public sealed class DebugAttachTool
     [Description("Attach debugger to a running .NET process by process ID")]
     public async Task<DebugAttachResult> AttachAsync(
         [Description("Process ID of the .NET application to debug")] int pid,
-        [Description("Maximum time to wait for attachment in milliseconds")] int timeout = 30000,
+        [Description("Maximum time to wait for attachment in milliseconds (default: 30000)")] int timeout = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();

@@ -42,10 +42,14 @@ public sealed class CodeGetDiagnosticsTool
         [Description("Optional project name. If omitted, returns diagnostics for all projects.")] string? projectName = null,
         [Description("Minimum severity to include: Hidden, Info, Warning (default), Error")] string? minSeverity = null,
         [Description("Maximum number of diagnostics to return (default: 100, max: 500)")] int? maxResults = null,
+        [Description("Maximum time to wait for diagnostics retrieval, in milliseconds (default: 30000)")] int timeoutMs = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_get_diagnostics", JsonSerializer.Serialize(new { projectName, minSeverity, maxResults }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -79,7 +83,7 @@ public sealed class CodeGetDiagnosticsTool
                 projectName,
                 severity,
                 limit,
-                cancellationToken);
+                linkedCts.Token);
 
             // Group by severity for summary (computed from the full set, before size-truncation)
             var summary = diagnostics
@@ -114,6 +118,11 @@ public sealed class CodeGetDiagnosticsTool
         {
             _logger.ToolError("code_get_diagnostics", ErrorCodes.NoWorkspace);
             return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, ex.Message));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("code_get_diagnostics", ErrorCodes.Timeout);
+            return new CodeGetDiagnosticsResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, $"code_get_diagnostics timed out after {timeoutMs}ms", new { timeout = timeoutMs }));
         }
         catch (OperationCanceledException)
         {

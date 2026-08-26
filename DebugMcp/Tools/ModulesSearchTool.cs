@@ -48,11 +48,15 @@ public sealed class ModulesSearchTool
         [Description("Limit search to specific module (supports * wildcard)")] string? module_filter = null,
         [Description("Enable case-sensitive matching")] bool case_sensitive = false,
         [Description("Maximum results to return (max: 100)")] int max_results = 50,
+        [Description("Maximum time to wait for the module search, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("modules_search",
             $"{{\"pattern\": \"{pattern}\", \"search_type\": \"{search_type}\", \"module_filter\": {(module_filter == null ? "null" : $"\"{module_filter}\"")}, \"max_results\": {max_results}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -106,7 +110,7 @@ public sealed class ModulesSearchTool
                 module_filter,
                 case_sensitive,
                 max_results,
-                cancellationToken);
+                linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("modules_search", stopwatch.ElapsedMilliseconds);
@@ -163,6 +167,11 @@ public sealed class ModulesSearchTool
         {
             _logger.ToolError("modules_search", ErrorCodes.NoSession);
             return CreateErrorResult(ErrorCodes.NoSession, ex.Message);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("modules_search", ErrorCodes.Timeout);
+            return CreateErrorResult(ErrorCodes.Timeout, $"modules_search timed out after {timeout_ms}ms", new { timeout = timeout_ms });
         }
         catch (Exception ex)
         {

@@ -32,10 +32,16 @@ public sealed class DebugPauseTool
         ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false,
         UseStructuredContent = true)]
     [Description("Pause execution of the running debuggee process")]
-    public async Task<DebugPauseResult> PauseAsync(CancellationToken cancellationToken = default)
+    public async Task<DebugPauseResult> PauseAsync(
+        [Description("Maximum time to wait for the process to pause, in milliseconds (default: 30000)")]
+        int timeout = 30000,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_pause", "{}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -62,7 +68,7 @@ public sealed class DebugPauseTool
             }
 
             // Pause the process
-            var threads = await _sessionManager.PauseAsync(cancellationToken);
+            var threads = await _sessionManager.PauseAsync(linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("debug_pause", stopwatch.ElapsedMilliseconds);
@@ -80,6 +86,11 @@ public sealed class DebugPauseTool
         {
             _logger.ToolError("debug_pause", ErrorCodes.NoSession);
             return CreateErrorResult(ErrorCodes.NoSession, ex.Message);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("debug_pause", ErrorCodes.Timeout);
+            return CreateErrorResult(ErrorCodes.Timeout, $"debug_pause timed out after {timeout}ms", new { timeout });
         }
         catch (Exception ex)
         {

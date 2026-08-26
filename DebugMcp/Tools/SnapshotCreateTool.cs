@@ -43,12 +43,30 @@ public sealed class SnapshotCreateTool
         int frame_index = 0,
         [Description("Expansion depth for nested objects (0 = top-level only)")]
         int depth = 0,
+        // FR-034: the body below only calls synchronous ISnapshotService/IDebugSessionManager
+        // methods (wrapped in Task.FromResult) — there is no awaited, cancellable call to bound.
+        // Racing a timeout via Task.Run + Task.WhenAny here would abandon a call still touching
+        // the live ICorDebug session on a background thread while another call could start,
+        // violating this codebase's _lock/_stateLock threading invariant. So this parameter is
+        // validated but not wired to a CancellationTokenSource.
+        [Description("Maximum time to wait for the snapshot to be created, in milliseconds (default: 30000, min: 1, max: 300000)")]
+        int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("snapshot_create", JsonSerializer.Serialize(new { label, thread_id, frame_index, depth }));
+
+        if (timeout_ms < 1 || timeout_ms > 300000)
+        {
+            _logger.ToolError("snapshot_create", ErrorCodes.InvalidParameter);
+            return Task.FromResult(new SnapshotCreateResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.InvalidParameter,
+                    "timeout_ms must be between 1 and 300000",
+                    new { parameter = "timeout_ms", value = timeout_ms })));
+        }
 
         try
         {

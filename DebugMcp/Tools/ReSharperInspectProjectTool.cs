@@ -34,7 +34,7 @@ public sealed class ReSharperInspectProjectTool
         [Description("Absolute path to a .csproj file")] string projectPath,
         [Description("Minimum native severity: error | warning | suggestion | hint (optional)")] string? severity = null,
         [Description("Skip the engine's pre-analysis build (default: false)")] bool noBuild = false,
-        [Description("Per-call inspection timeout in seconds (10–1800; excludes one-time engine download)")] int? timeoutSeconds = null,
+        [Description("Per-call inspection timeout in seconds (10–1800; excludes one-time engine download) (default: 300)")] int? timeoutSeconds = null,
         [Description("Maximum findings to return (default 500, max 500)")] int? maxResults = null,
         CancellationToken cancellationToken = default,
         IProgress<ModelContextProtocol.ProgressNotificationValue>? progress = null)

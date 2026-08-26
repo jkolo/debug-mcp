@@ -41,10 +41,14 @@ public sealed class CodeGoToDefinitionTool
         [Description("Absolute path to source file")] string file,
         [Description("1-based line number where the symbol appears")] int line,
         [Description("1-based column number where the symbol appears")] int column,
+        [Description("Maximum time to wait for the definition lookup, in milliseconds (default: 30000)")] int timeoutMs = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_goto_definition", JsonSerializer.Serialize(new { file, line, column }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -75,7 +79,7 @@ public sealed class CodeGoToDefinitionTool
             }
 
             // Go to definition
-            var result = await _codeAnalysisService.GoToDefinitionAsync(file, line, column, cancellationToken);
+            var result = await _codeAnalysisService.GoToDefinitionAsync(file, line, column, linkedCts.Token);
 
             if (result is null)
             {
@@ -106,6 +110,11 @@ public sealed class CodeGoToDefinitionTool
         {
             _logger.ToolError("code_goto_definition", ErrorCodes.NoWorkspace);
             return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.NoWorkspace, ex.Message));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("code_goto_definition", ErrorCodes.Timeout);
+            return new CodeGoToDefinitionResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, $"code_goto_definition timed out after {timeoutMs}ms", new { timeout = timeoutMs }));
         }
         catch (OperationCanceledException)
         {

@@ -15,13 +15,6 @@ namespace DebugMcp.Tools;
 [McpServerToolType]
 public sealed class DebugDisconnectTool
 {
-    /// <summary>
-    /// Maximum time to wait for disconnect before returning a timeout error.
-    /// Internal timeout in ProcessDebugger.TerminateAsync is 5s for Terminate() + OS kill fallback,
-    /// so 10s gives enough headroom for the full cleanup sequence.
-    /// </summary>
-    private static readonly TimeSpan DisconnectTimeout = TimeSpan.FromSeconds(10);
-
     private readonly IDebugSessionManager _sessionManager;
     private readonly ILogger<DebugDisconnectTool> _logger;
 
@@ -43,8 +36,10 @@ public sealed class DebugDisconnectTool
     [Description("Disconnect from the current debug session. For launched processes, optionally terminates the debuggee (terminateProcess=true). For attached processes, detaches and lets the process continue running. Safe to call when no session is active (returns success). Has a 10-second internal timeout — if the process doesn't respond, it is force-killed. Returns: disconnect status with previousSession info (processId, processName, launchMode). Example response: {\"success\": true, \"state\": \"disconnected\", \"wasTerminated\": true, \"previousSession\": {\"processId\": 1234, \"processName\": \"MyApp\", \"launchMode\": \"launch\"}}")]
     public async Task<DebugDisconnectResult> DisconnectAsync(
         [Description("Terminate the process instead of detaching (only for launched processes)")] bool terminateProcess = false,
+        [Description("Maximum time to wait for disconnect before force-killing the process, in milliseconds (default: 10000)")] int timeout = 10000,
         CancellationToken cancellationToken = default)
     {
+        var disconnectTimeout = TimeSpan.FromMilliseconds(timeout);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("debug_disconnect", JsonSerializer.Serialize(new { terminateProcess }));
 
@@ -76,7 +71,7 @@ public sealed class DebugDisconnectTool
 
             // Perform disconnect with timeout to prevent hanging
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(DisconnectTimeout);
+            timeoutCts.CancelAfter(disconnectTimeout);
 
             try
             {
@@ -87,7 +82,7 @@ public sealed class DebugDisconnectTool
                 // Timeout hit, not user cancellation — force-kill the process as last resort
                 _logger.LogWarning(
                     "debug_disconnect timed out after {TimeoutSeconds}s, force-killing process {Pid}",
-                    DisconnectTimeout.TotalSeconds, currentSession.ProcessId);
+                    disconnectTimeout.TotalSeconds, currentSession.ProcessId);
 
                 ForceKillProcess(currentSession.ProcessId);
 
@@ -97,7 +92,7 @@ public sealed class DebugDisconnectTool
                     State: "disconnected",
                     WasTerminated: true,
                     TimedOut: true,
-                    Message: $"Disconnect timed out after {DisconnectTimeout.TotalSeconds}s. Process was force-killed.",
+                    Message: $"Disconnect timed out after {disconnectTimeout.TotalSeconds}s. Process was force-killed.",
                     PreviousSession: previousSessionInfo);
             }
 

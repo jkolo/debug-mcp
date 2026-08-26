@@ -35,7 +35,7 @@ public sealed class DebugStepTool
     [Description("Step through code during debugging. The process must be paused. Modes: 'in' (step into function calls), 'over' (step over, staying in current scope), 'out' (step out to caller). Returns: updated session state with new source location after the step completes. The step blocks until the debuggee re-pauses at the next source line. Example response: {\"success\": true, \"stepMode\": \"over\", \"session\": {\"processId\": 1234, \"state\": \"paused\", \"pauseReason\": \"step\", \"location\": {\"file\": \"Program.cs\", \"line\": 43, \"functionName\": \"Main\"}}}")]
     public async Task<DebugStepResult> StepAsync(
         [Description("Step mode: 'in', 'over', or 'out'")] string mode,
-        [Description("Timeout in milliseconds")] int timeout = 30000,
+        [Description("Timeout in milliseconds (default: 30000)")] int timeout = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();

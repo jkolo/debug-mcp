@@ -47,7 +47,7 @@ public sealed class DebugLaunchTool
         [Description("Working directory for the launched process")] string? cwd = null,
         [Description("Environment variables to set for the process (JSON object)")] string? env = null,
         [Description("Pause at entry point before executing user code")] bool stopAtEntry = true,
-        [Description("Maximum time to wait for launch in milliseconds")] int timeout = 30000,
+        [Description("Maximum time to wait for launch in milliseconds (default: 30000)")] int timeout = 30000,
         CancellationToken cancellationToken = default,
         IProgress<ProgressNotificationValue>? progress = null)
     {

@@ -39,11 +39,15 @@ public sealed class CodeLoadTool
     [Description("Load a .sln or .csproj file into the analysis workspace. Replaces any previously loaded workspace.")]
     public async Task<CodeLoadResult> LoadAsync(
         [Description("Absolute path to .sln or .csproj file")] string path,
+        [Description("Maximum time to wait for the workspace to load, in milliseconds (default: 30000)")] int timeoutMs = 30000,
         CancellationToken cancellationToken = default,
         IProgress<ProgressNotificationValue>? progress = null)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.ToolInvoked("code_load", JsonSerializer.Serialize(new { path }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -71,12 +75,17 @@ public sealed class CodeLoadTool
 
             // Load the workspace
             var workspaceInfo = await _codeAnalysisService.LoadAsync(
-                path, cancellationToken, ProgressReporterAdapter.Create(progress));
+                path, linkedCts.Token, ProgressReporterAdapter.Create(progress));
 
             stopwatch.Stop();
             _logger.ToolCompleted("code_load", stopwatch.ElapsedMilliseconds);
 
             return new CodeLoadResult(Success: true, Data: workspaceInfo);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("code_load", ErrorCodes.Timeout);
+            return new CodeLoadResult(Success: false, Error: new ToolError(ErrorCodes.Timeout, $"code_load timed out after {timeoutMs}ms", new { timeout = timeoutMs }));
         }
         catch (OperationCanceledException)
         {

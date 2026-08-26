@@ -54,10 +54,14 @@ public sealed class TracepointSetTool
         [Description("Log message template with {expression} placeholders for variable interpolation, e.g., \"Counter is {i}, sum is {sum}\"")] string? log_message = null,
         [Description("Send notification every Nth hit (0 = every hit)")] int hit_count_multiple = 0,
         [Description("Auto-disable tracepoint after N notifications (0 = unlimited)")] int max_notifications = 0,
+        [Description("Maximum time to wait for the tracepoint to be set/verified, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("tracepoint_set", JsonSerializer.Serialize(new { file, line, column, log_message, hit_count_multiple, max_notifications }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -111,7 +115,7 @@ public sealed class TracepointSetTool
 
             // Set the tracepoint
             var tracepoint = await _breakpointManager.SetTracepointAsync(
-                file, line, column, log_message, hit_count_multiple, max_notifications, cancellationToken);
+                file, line, column, log_message, hit_count_multiple, max_notifications, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("tracepoint_set", stopwatch.ElapsedMilliseconds);
@@ -121,6 +125,13 @@ public sealed class TracepointSetTool
             return new TracepointSetResult(
                 Success: true,
                 Tracepoint: ToTracepointInfo(tracepoint));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("tracepoint_set", ErrorCodes.Timeout);
+            return new TracepointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, $"tracepoint_set timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (OperationCanceledException)
         {

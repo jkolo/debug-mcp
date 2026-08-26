@@ -50,11 +50,15 @@ public sealed class TypesGetTool
         [Description("Filter by visibility: public, internal, private, protected")] string? visibility = null,
         [Description("Maximum types to return (max: 1000)")] int max_results = 100,
         [Description("Token from previous response for pagination")] string? continuation_token = null,
+        [Description("Maximum time to wait for the type listing, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("types_get",
             $"{{\"module_name\": \"{module_name}\", \"namespace_filter\": {(namespace_filter == null ? "null" : $"\"{namespace_filter}\"")}, \"kind\": {(kind == null ? "null" : $"\"{kind}\"")}, \"max_results\": {max_results}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -117,7 +121,7 @@ public sealed class TypesGetTool
                 visibilityFilter,
                 max_results,
                 continuation_token,
-                cancellationToken);
+                linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("types_get", stopwatch.ElapsedMilliseconds);
@@ -167,6 +171,12 @@ public sealed class TypesGetTool
             _logger.ToolError("types_get", ErrorCodes.ModuleNotFound);
             return new TypesGetResult(Success: false, Error: new ToolError(
                 ErrorCodes.ModuleNotFound, ex.Message, new { moduleName = module_name }));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("types_get", ErrorCodes.Timeout);
+            return new TypesGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.Timeout, $"types_get timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (Exception ex)
         {

@@ -42,6 +42,12 @@ public sealed class StacktraceGetTool
         [Description("Start from frame N (for pagination)")] int start_frame = 0,
         [Description("Maximum frames to return")] int max_frames = 20,
         [Description("Include raw physical frames alongside logical frames")] bool include_raw = false,
+        // FR-034: the underlying IDebugSessionManager.GetStackFrames call is synchronous (no
+        // CancellationToken parameter) and touches the live ICorDebug session directly. There is
+        // nothing to race a timeout against without abandoning that call on a background thread
+        // while another call could start — which would violate this codebase's _lock/_stateLock
+        // threading invariant. So this parameter is validated but not wired to a CancellationTokenSource.
+        [Description("Maximum time to wait for the stack trace, in milliseconds (default: 30000, min: 1, max: 300000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -65,6 +71,13 @@ public sealed class StacktraceGetTool
                 return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
                     "max_frames must be between 1 and 1000",
                     new { parameter = "max_frames", value = max_frames }));
+            }
+
+            if (timeout_ms < 1 || timeout_ms > 300000)
+            {
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
+                    "timeout_ms must be between 1 and 300000",
+                    new { parameter = "timeout_ms", value = timeout_ms }));
             }
 
             // Check for active session

@@ -38,11 +38,15 @@ public sealed class MemoryReadTool
         [Description("Memory address in hex (0x...) or decimal")] string address,
         [Description("Number of bytes to read (max: 65536)")] int size = 256,
         [Description("Output format: hex, hex_ascii, raw")] string format = "hex_ascii",
+        [Description("Maximum time to wait for the memory read, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("memory_read",
             $"{{\"address\": \"{address}\", \"size\": {size}, \"format\": \"{format}\"}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -94,7 +98,7 @@ public sealed class MemoryReadTool
             }
 
             // Read memory
-            var memory = await _sessionManager.ReadMemoryAsync(address, size, cancellationToken);
+            var memory = await _sessionManager.ReadMemoryAsync(address, size, linkedCts.Token);
 
             // A read that returned zero bytes is a failure, not a success — surface it as an
             // error envelope instead of success:true with an embedded error string (BUG-014).
@@ -137,6 +141,11 @@ public sealed class MemoryReadTool
         {
             _logger.ToolError("memory_read", ErrorCodes.InvalidParameter);
             return CreateErrorResult(ErrorCodes.InvalidParameter, ex.Message);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("memory_read", ErrorCodes.Timeout);
+            return CreateErrorResult(ErrorCodes.Timeout, $"memory_read timed out after {timeout_ms}ms", new { timeout = timeout_ms });
         }
         catch (Exception ex)
         {

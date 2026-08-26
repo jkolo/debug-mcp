@@ -24,7 +24,7 @@ public sealed class EvaluateSafeTool(
         [Description("C# expression to evaluate safely")] string expression,
         [Description("Thread context (default: current thread)")] int? thread_id = null,
         [Description("Stack frame context (0 = top)")] int frame_index = 0,
-        [Description("Evaluation timeout in milliseconds (applied only if expression passes safety check)")] int timeout_ms = 5000,
+        [Description("Evaluation timeout in milliseconds (applied only if expression passes safety check) (default: 5000)")] int timeout_ms = 5000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();

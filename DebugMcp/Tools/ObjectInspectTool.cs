@@ -40,11 +40,15 @@ public sealed class ObjectInspectTool
         [Description("Maximum depth for nested object expansion (1-10)")] int depth = 1,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Frame index (0 = top of stack)")] int frame_index = 0,
+        [Description("Maximum time to wait for the object inspection, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("object_inspect",
             $"{{\"object_ref\": \"{object_ref}\", \"depth\": {depth}, \"thread_id\": {(thread_id?.ToString() ?? "null")}, \"frame_index\": {frame_index}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -88,7 +92,7 @@ public sealed class ObjectInspectTool
             }
 
             // Inspect object
-            var inspection = await _sessionManager.InspectObjectAsync(object_ref, depth, thread_id, frame_index, cancellationToken);
+            var inspection = await _sessionManager.InspectObjectAsync(object_ref, depth, thread_id, frame_index, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("object_inspect", stopwatch.ElapsedMilliseconds);
@@ -145,6 +149,11 @@ public sealed class ObjectInspectTool
             _logger.ToolError("object_inspect", ErrorCodes.InvalidReference);
             return CreateErrorResult(ErrorCodes.InvalidReference, ex.Message,
                 new { object_ref });
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("object_inspect", ErrorCodes.Timeout);
+            return CreateErrorResult(ErrorCodes.Timeout, $"object_inspect timed out after {timeout_ms}ms", new { timeout = timeout_ms });
         }
         catch (Exception ex)
         {

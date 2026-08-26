@@ -55,10 +55,14 @@ public sealed class BreakpointSetTool
         [Description("1-based line number")] int line,
         [Description("1-based column for targeting lambdas/inline statements (optional)")] int? column = null,
         [Description("C# condition expression (breakpoint only triggers when true)")] string? condition = null,
+        [Description("Maximum time to wait for the breakpoint to be set/verified, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("breakpoint_set", JsonSerializer.Serialize(new { file, line, column, condition }));
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -96,7 +100,7 @@ public sealed class BreakpointSetTool
 
             // Set the breakpoint
             var breakpoint = await _breakpointManager.SetBreakpointAsync(
-                file, line, column, condition, cancellationToken);
+                file, line, column, condition, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("breakpoint_set", stopwatch.ElapsedMilliseconds);
@@ -122,6 +126,13 @@ public sealed class BreakpointSetTool
         {
             _logger.ToolError("breakpoint_set", ErrorCodes.InvalidFile);
             return await CreateInvalidLineResultAsync(file, line, ex.Message);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("breakpoint_set", ErrorCodes.Timeout);
+            return new BreakpointSetResult(
+                Success: false,
+                Error: new ToolError(ErrorCodes.Timeout, $"breakpoint_set timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (OperationCanceledException)
         {

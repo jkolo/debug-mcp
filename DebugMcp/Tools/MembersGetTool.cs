@@ -52,11 +52,15 @@ public sealed class MembersGetTool
         [Description("Filter by visibility: public, internal, private, protected")] string? visibility = null,
         [Description("Include static members")] bool include_static = true,
         [Description("Include instance members")] bool include_instance = true,
+        [Description("Maximum time to wait for the member listing, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("members_get",
             $"{{\"type_name\": \"{type_name}\", \"module_name\": {(module_name == null ? "null" : $"\"{module_name}\"")}, \"include_inherited\": {include_inherited.ToString().ToLowerInvariant()}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -118,7 +122,7 @@ public sealed class MembersGetTool
                 visibilityFilter,
                 include_static,
                 include_instance,
-                cancellationToken);
+                linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("members_get", stopwatch.ElapsedMilliseconds);
@@ -217,6 +221,12 @@ public sealed class MembersGetTool
             _logger.ToolError("members_get", ErrorCodes.TypeNotFound);
             return new MembersGetResult(Success: false, Error: new ToolError(
                 ErrorCodes.TypeNotFound, ex.Message, new { typeName = type_name, moduleName = module_name }));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("members_get", ErrorCodes.Timeout);
+            return new MembersGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.Timeout, $"members_get timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (Exception ex)
         {

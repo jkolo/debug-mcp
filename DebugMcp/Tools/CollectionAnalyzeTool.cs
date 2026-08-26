@@ -42,7 +42,7 @@ public sealed class CollectionAnalyzeTool
         int? thread_id = null,
         [Description("Stack frame context (0 = top of stack)")]
         int frame_index = 0,
-        [Description("Evaluation timeout in milliseconds")]
+        [Description("Evaluation timeout in milliseconds (default: 5000)")]
         int timeout_ms = 5000,
         CancellationToken cancellationToken = default)
     {

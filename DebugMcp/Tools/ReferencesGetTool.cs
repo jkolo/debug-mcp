@@ -45,11 +45,15 @@ public sealed class ReferencesGetTool
         [Description("Include array element references")] bool include_arrays = true,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Frame index (0 = top of stack)")] int frame_index = 0,
+        [Description("Maximum time to wait for the reference analysis, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("references_get",
             $"{{\"object_ref\": \"{object_ref}\", \"direction\": \"{direction}\", \"max_results\": {max_results}, \"include_arrays\": {include_arrays.ToString().ToLowerInvariant()}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -106,7 +110,7 @@ public sealed class ReferencesGetTool
 
             // Get references (currently only outbound is supported)
             var references = await _sessionManager.GetOutboundReferencesAsync(
-                object_ref, include_arrays, max_results, thread_id, frame_index, cancellationToken);
+                object_ref, include_arrays, max_results, thread_id, frame_index, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("references_get", stopwatch.ElapsedMilliseconds);
@@ -143,6 +147,12 @@ public sealed class ReferencesGetTool
             _logger.ToolError("references_get", ErrorCodes.InvalidReference);
             return new ReferencesGetResult(Success: false, Error: new ToolError(
                 ErrorCodes.InvalidReference, ex.Message, new { object_ref }));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("references_get", ErrorCodes.Timeout);
+            return new ReferencesGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.Timeout, $"references_get timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (Exception ex)
         {

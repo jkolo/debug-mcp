@@ -33,7 +33,7 @@ public sealed class DebugContinueTool
         UseStructuredContent = true)]
     [Description("Continue execution of the paused process. The process must be in the 'paused' state (from a breakpoint hit, step completion, or debug_pause). After continuing, the process runs until it hits another breakpoint, throws an exception, or exits. Returns: updated session state (typically 'running'). Use breakpoint_wait to wait for the next pause event. Example response: {\"success\": true, \"session\": {\"processId\": 1234, \"processName\": \"MyApp\", \"state\": \"running\", \"launchMode\": \"launch\"}}")]
     public async Task<DebugContinueResult> ContinueAsync(
-        [Description("Timeout in milliseconds")] int timeout = 30000,
+        [Description("Timeout in milliseconds (default: 30000)")] int timeout = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();

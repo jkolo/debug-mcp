@@ -43,6 +43,12 @@ public sealed class VariablesGetTool
         [Description("Frame index (0 = top of stack)")] int frame_index = 0,
         [Description("Which variables to return: all, locals, arguments, this")] string scope = "all",
         [Description("Variable path to expand children")] string? expand = null,
+        // FR-034: the underlying IDebugSessionManager.GetVariables call is synchronous (no
+        // CancellationToken parameter) and touches the live ICorDebug session directly. There is
+        // nothing to race a timeout against without abandoning that call on a background thread
+        // while another call could start — which would violate this codebase's _lock/_stateLock
+        // threading invariant. So this parameter is validated but not wired to a CancellationTokenSource.
+        [Description("Maximum time to wait for variable retrieval, in milliseconds (default: 30000, min: 1, max: 300000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -66,6 +72,13 @@ public sealed class VariablesGetTool
                 return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
                     $"scope must be one of: {string.Join(", ", ValidScopes)}",
                     new { parameter = "scope", value = scope, validValues = ValidScopes }));
+            }
+
+            if (timeout_ms < 1 || timeout_ms > 300000)
+            {
+                return Task.FromResult(CreateErrorResult(ErrorCodes.InvalidParameter,
+                    "timeout_ms must be between 1 and 300000",
+                    new { parameter = "timeout_ms", value = timeout_ms }));
             }
 
             // Check for active session

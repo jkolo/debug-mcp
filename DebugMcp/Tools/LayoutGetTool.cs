@@ -42,11 +42,15 @@ public sealed class LayoutGetTool
         [Description("Include padding analysis between fields")] bool include_padding = true,
         [Description("Thread ID (default: current thread)")] int? thread_id = null,
         [Description("Frame index (0 = top of stack)")] int frame_index = 0,
+        [Description("Maximum time to wait for the layout retrieval, in milliseconds (default: 30000)")] int timeout_ms = 30000,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.ToolInvoked("layout_get",
             $"{{\"type_name\": \"{type_name}\", \"include_inherited\": {include_inherited.ToString().ToLowerInvariant()}, \"include_padding\": {include_padding.ToString().ToLowerInvariant()}}}");
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout_ms));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
@@ -83,7 +87,7 @@ public sealed class LayoutGetTool
 
             // Get layout
             var layout = await _sessionManager.GetTypeLayoutAsync(
-                type_name, include_inherited, include_padding, thread_id, frame_index, cancellationToken);
+                type_name, include_inherited, include_padding, thread_id, frame_index, linkedCts.Token);
 
             stopwatch.Stop();
             _logger.ToolCompleted("layout_get", stopwatch.ElapsedMilliseconds);
@@ -118,6 +122,12 @@ public sealed class LayoutGetTool
             _logger.ToolError("layout_get", ErrorCodes.TypeNotFound);
             return new LayoutGetResult(Success: false, Error: new ToolError(
                 ErrorCodes.TypeNotFound, ex.Message, new { type_name }));
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.ToolError("layout_get", ErrorCodes.Timeout);
+            return new LayoutGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.Timeout, $"layout_get timed out after {timeout_ms}ms", new { timeout = timeout_ms }));
         }
         catch (Exception ex)
         {
