@@ -22,15 +22,19 @@ public class HeartbeatProgressTests
     [Fact]
     public async Task RunAsync_LongWork_EmitsHeartbeats()
     {
+        // Wide margin (25x nominal ticks) and a >1 threshold (not a tight tick count): GitHub
+        // Actions macOS runners showed 6x+ Task.Delay jitter under load, collapsing a tighter
+        // interval/count pair to exactly 1 heartbeat tick and flaking the assertion. The only
+        // thing this test needs to prove is "heartbeats repeat, not just the initial report".
         var progress = new RecordingProgressReporter();
 
         await HeartbeatProgress.RunAsync(
-            async () => { await Task.Delay(TimeSpan.FromMilliseconds(120)); return 1; },
+            async () => { await Task.Delay(TimeSpan.FromMilliseconds(500)); return 1; },
             progress,
             "working",
             interval: TimeSpan.FromMilliseconds(20));
 
-        progress.Reported.Should().HaveCountGreaterThan(2);
+        progress.Reported.Should().HaveCountGreaterThan(1);
         progress.Reported.Should().OnlyContain(r => r.Stage == "working");
     }
 
