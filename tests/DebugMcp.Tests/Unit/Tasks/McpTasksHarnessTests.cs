@@ -110,13 +110,17 @@ public sealed class McpTasksHarnessTests
     [Fact]
     public async Task ExpiredTaskId_ThrowsADifferentErrorThanAnUnknownTaskId()
     {
+        // TTL must comfortably outlast PollUntilTerminalAsync's own worst-case budget (up to
+        // 100 * 20ms = 2000ms) -- a TTL shorter than that races the task expiring mid-poll
+        // (observed on a contended CI runner: GetTaskAsync failed with a generic remote error
+        // from inside the completion-poll loop, before the test ever reached the expiry check).
         await using var harness = await InProcessMcpHarness.StartAsync(
-            declareTasksCapability: true, taskTimeToLive: TimeSpan.FromMilliseconds(50));
+            declareTasksCapability: true, taskTimeToLive: TimeSpan.FromSeconds(3));
         harness.Tool.Gate = new TaskCompletionSource();
         harness.Tool.Gate.SetResult();
         var created = await harness.Client.CallToolAsTaskAsync(SlowCall("ok"), CancellationToken.None);
         await PollUntilTerminalAsync(harness.Client, RequireTask(created).TaskId);
-        await Task.Delay(200);
+        await Task.Delay(TimeSpan.FromSeconds(3.5));
 
         var expiredError = await Catch(() => McpTasksClientExtensions.GetTaskAsync(harness.Client, RequireTask(created).TaskId, CancellationToken.None).AsTask());
         var unknownError = await Catch(() => McpTasksClientExtensions.GetTaskAsync(harness.Client, "never-created-id", CancellationToken.None).AsTask());
@@ -129,14 +133,30 @@ public sealed class McpTasksHarnessTests
     [Fact]
     public async Task TasksCancel_PropagatesToTheToolsCancellationToken()
     {
+        // Deterministic — poll for the real signals (the tool having reached its cancellation
+        // wait point; the store having recorded the terminal status) instead of blind fixed
+        // delays, which raced under CI scheduling contention (same class of flake fixed above
+        // for HeartbeatProgressTests and ExpiredTaskId_ThrowsADifferentErrorThanAnUnknownTaskId).
         await using var harness = await InProcessMcpHarness.StartAsync(declareTasksCapability: true);
         var created = await harness.Client.CallToolAsTaskAsync(SlowCall("cancelwatch"), CancellationToken.None);
-        await Task.Delay(150);
+        for (var i = 0; i < 100 && harness.Tool.ProgressReports.Count == 0; i++)
+        {
+            await Task.Delay(20);
+        }
+        harness.Tool.ProgressReports.Should().NotBeEmpty("the tool must have started running before we cancel it");
 
         await McpTasksClientExtensions.CancelTaskAsync(harness.Client, RequireTask(created).TaskId, CancellationToken.None);
-        await Task.Delay(150);
 
-        var stored = await harness.RawStore.GetTaskAsync(RequireTask(created).TaskId, CancellationToken.None);
+        McpTaskInfo? stored = null;
+        for (var i = 0; i < 100; i++)
+        {
+            stored = await harness.RawStore.GetTaskAsync(RequireTask(created).TaskId, CancellationToken.None);
+            if (stored?.Status == McpTaskStatus.Cancelled)
+            {
+                break;
+            }
+            await Task.Delay(20);
+        }
         stored!.Status.Should().Be(McpTaskStatus.Cancelled, "the CancellationToken threaded through every tool (Phase 3) is exactly what tasks/cancel needs to work — no extra plumbing required");
     }
 
