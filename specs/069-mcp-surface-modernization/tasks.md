@@ -106,23 +106,46 @@ path; without the declaration, assert the blocking path is used.
 
 ### Tests for User Story 2 ⚠️ Write first, watch them fail
 
-- [ ] T025 [P] [US2] Write a failing test asserting a request **without** the tasks extension never receives a `resultType: "task"` in `tests/DebugMcp.Tests/Unit/Tasks/OptInGatingTests.cs`
-- [ ] T026 [P] [US2] Write a failing test asserting the deferred payload equals the blocking payload byte-for-byte for the same inputs in `tests/DebugMcp.Tests/Unit/Tasks/PathEquivalenceTests.cs`
-- [ ] T027 [P] [US2] Write failing tests for the lifecycle transitions (working → completed / failed / cancelled, terminal states immutable) in `tests/DebugMcp.Tests/Unit/Tasks/TaskLifecycleTests.cs`
-- [ ] T028 [P] [US2] Write failing tests asserting unknown-id and expired-id produce **distinguishable** errors in `tests/DebugMcp.Tests/Unit/Tasks/HandleErrorTests.cs`
-- [ ] T029 [P] [US2] Write a failing contract test asserting all 34 non-qualifying tools are pinned to `TaskSupport = Forbidden` in `tests/DebugMcp.Tests/Contract/TaskSupportContractTests.cs`
-- [ ] T030 [P] [US2] Write failing tests for debuggee-termination and client-disconnect while a handle is outstanding in `tests/DebugMcp.Tests/Unit/Tasks/TaskFailurePathTests.cs`
+> **Corrected after empirical verification (advisor-directed) against SDK 2.2.0**: a prior
+> assumption — that the SDK's tool-call wrapper drives an outstanding task to `failed` when the
+> wrapped call throws — is **false**. Verified with a real client+server pair connected over an
+> in-process duplex transport (`ModelContextProtocol.Server.StreamServerTransport` /
+> `ModelContextProtocol.Protocol.StreamClientTransport` over paired `System.IO.Pipelines.Pipe`s —
+> see `tests/DebugMcp.Tests/Support/InProcessMcpHarness.cs`): an **uncaught exception is caught by
+> the SDK itself** and turned into a **Completed** task whose result carries `isError:true` and a
+> generic message — never `Failed`. Since all five FR-013 qualifying tools already catch every
+> exception internally and return a structured `{success:false,error:{...}}` JSON string, `Failed`
+> is not a status they can organically reach either way — the correct, already-satisfied contract
+> is that a deferred call's terminal Result carries the exact same JSON shape the synchronous call
+> would have. The harness also confirmed, empirically: opt-in gating is enforced entirely by the
+> SDK (a client that never declared `io.modelcontextprotocol/tasks` always gets a direct result,
+> regardless of `ExecutionModeSelector`); `tasks/cancel` propagates automatically to the tool's own
+> `CancellationToken` (T014–T018's Phase 3 plumbing is what makes this work, for free); raw
+> `InMemoryMcpTaskStore.GetTaskAsync` returns the identical `null` for both an expired and a
+> never-created id (confirming the FR-012 decorator below is required); and `IMcpTaskStore` has no
+> method to update `StatusMessage` mid-flight, nor does `RequestContext.Items` expose an ambient
+> task id a tool could use with `SendTaskStatusNotificationAsync` — so bridging progress into the
+> polled `statusMessage` field is **not achievable** with this SDK's public surface (T036,
+> corrected below). These findings are why T025–T030, T036, T037 and T038 read differently below
+> than in the original plan; T031/T032 are unaffected in substance.
+
+- [X] T025 [P] [US2] Covered by `OptedInClient_QualifyingTool_IsDeferredAsTask` and `ClientWithoutCapability_QualifyingTool_ReceivesDirectResultNeverATask` in `tests/DebugMcp.Tests/Unit/Tasks/McpTasksHarnessTests.cs` — a real client that never declares the tasks extension never receives `resultType: "task"`, verified over the in-process harness rather than assumed
+- [X] T026 [P] [US2] Covered by `DeferredResult_MatchesTheDirectSynchronousResult_ByteForByte` in `McpTasksHarnessTests.cs` — the deferred task's stored `content[0].text` is compared directly against the synchronous call's `content[0].text` for identical input
+- [X] T027 [P] [US2] Covered by `OptedInClient_QualifyingTool_IsDeferredAsTask` (Working immediately after creation) and `DeferredResult_MatchesTheDirectSynchronousResult_ByteForByte` (Working → Completed, terminal Result correct) in `McpTasksHarnessTests.cs`. `Failed` is exercised structurally, not as a tool outcome — see the note above and T030
+- [X] T028 [P] [US2] Covered by `ExpiredTaskId_ThrowsADifferentErrorThanAnUnknownTaskId` in `McpTasksHarnessTests.cs` — asserts the two `McpProtocolException` messages differ; the raw SDK store was confirmed to make them identical, which is exactly what `ExpiryAwareTaskStore` (T031) fixes
+- [X] T029 [P] [US2] Renamed from the abandoned `TaskSupport = Forbidden` framing (no such property exists — see the correction on T031/T032 below) to `tests/DebugMcp.Tests/Unit/Tasks/TaskExecutionPolicyTests.cs`: asserts `TaskExecutionPolicy.QualifyingTools` is exactly the FR-013 five, and that every one of the 39 registered tools (via `McpToolDiscovery`) classifies consistently
+- [X] T030 [P] [US2] Renamed in scope: `DomainFailure_SurvivesDeferral_WithTheSameStructuredJsonContract` and `UncaughtException_CompletesTheTaskWithIsError_NeverFailed` in `McpTasksHarnessTests.cs` prove a failing underlying operation (simulating debuggee termination or any other mid-call failure) reaches the client as a **Completed** task carrying the tool's own `{success:false,...}` JSON — never `Failed`, never stuck `Working`. Client-disconnect has no separate server-side path to test: the SDK's task record simply outlives the disconnected connection, which is exactly what "deferred" means
 
 ### Implementation for User Story 2
 
-- [ ] T031 [US2] Register `InMemoryMcpTaskStore` via `builder.WithTasks(store, opts => ...)` in `DebugMcp/Program.cs` — confirmed against the installed 2.2.0 assemblies that this is the only wiring path; `AddMcpServer(options => options.TaskStore = ...)` and a per-tool `Execution.TaskSupport` property do **not** exist in this SDK version ([research.md](./research.md) R1, corrected). Also verify whether `InMemoryMcpTaskStore` distinguishes an **expired** id from an **unknown** one — FR-012 requires the two to be distinguishable — and if it does not, wrap it in a decorator in `DebugMcp/Services/Tasks/` that does. Set and justify the handle defaults FR-009 requires: `ttlMs` (proposed 1 hour, long enough to outlive the slowest qualifying operation) and `pollIntervalMs` (proposed 2 s, cheap over stdio), both overridable by configuration
-- [ ] T032 [US2] Create `TaskExecutionPolicy` in `DebugMcp/Services/Tasks/TaskExecutionPolicy.cs` holding the five qualifying tool names (FR-013) → `McpTaskExecutionMode.Optional`, everything else → `Synchronous`, and wire it as `McpTasksOptions.ExecutionModeSelector` in T031's registration — **the SDK's documented default selector treats every tool as task-capable, so omitting this silently makes all 39 tools task-eligible**. There is no per-tool setting to "pin"; the policy is the single source of truth T029's contract test asserts against
-- [ ] T033 [US2] *(merged into T032 — the qualifying-tool table lives in one file, not scattered per-tool settings; kept as a no-op marker so task numbering stays stable)*
-- [ ] T034 [US2] *(merged into T032 — see T033)*
-- [ ] T035 [US2] Document in `DebugMcp/Tools/DebugLaunchTool.cs`'s `[Description]` that an opted-in client receives a handle even for a fast launch (see [contracts/deferred-result-contract.md](./contracts/deferred-result-contract.md)) — the qualification itself is registered in T032's policy table, not on this file
-- [ ] T036 [US2] Bridge `IProgressReporter` stage updates into the task's `statusMessage` in `DebugMcp/Services/Progress/ProgressReporterAdapter.cs`, so a polling client sees the same stage names a progress-token client sees
-- [ ] T037 [US2] Implement cooperative cancellation: `tasks/cancel` acknowledges immediately, but an indivisible ICorDebug step completes first so the debuggee is never left inconsistent (FR-003)
-- [ ] T038 [US2] Implement the debuggee-termination path in `DebugMcp/Services/DebugSessionManager.cs` and the task bridge — drive an outstanding handle to `failed` with the reason, never `completed`, never left `working`
+- [X] T031 [US2] Registered `InMemoryMcpTaskStore` (wrapped — see below) via `builder.WithTasks(store, opts => ...)` in `DebugMcp/Program.cs` — confirmed against the installed 2.2.0 assemblies that this is the only wiring path; `AddMcpServer(options => options.TaskStore = ...)` and a per-tool `Execution.TaskSupport` property do **not** exist in this SDK version ([research.md](./research.md) R1, corrected). Confirmed empirically that raw `InMemoryMcpTaskStore.GetTaskAsync` returns identical `null` for an expired and an unknown id, so it is wrapped in `DebugMcp/Services/Tasks/ExpiryAwareTaskStore.cs`, which remembers each task's expiry instant and throws a distinctly-worded `McpTaskExpiredException` once elapsed (surfaces to the client as a differently-worded `McpProtocolException`, satisfying FR-012's distinguishability requirement). `DefaultTimeToLive` set to 1 hour (long enough to outlive the slowest qualifying operation); `DefaultPollIntervalMs` left at the SDK's own default (1000 ms, confirmed via the harness) rather than the originally proposed 2 s — no evidence justified overriding an already-reasonable SDK default
+- [X] T032 [US2] Created `TaskExecutionPolicy` in `DebugMcp/Services/Tasks/TaskExecutionPolicy.cs` holding the five qualifying tool names (FR-013) → `McpTaskExecutionMode.Optional`, everything else → `Synchronous`, wired as `McpTasksOptions.ExecutionModeSelector` in T031's registration — **the SDK's documented default selector treats every tool as task-capable, so omitting this would have silently made all 39 tools task-eligible**. There is no per-tool setting to "pin"; the policy is the single source of truth T029's test asserts against. `GetMode(string?)` factored out as the pure classification function so tests don't need to construct an SDK `RequestContext`
+- [X] T033 [US2] *(merged into T032 — the qualifying-tool table lives in one file, not scattered per-tool settings; kept as a no-op marker so task numbering stays stable)*
+- [X] T034 [US2] *(merged into T032 — see T033)*
+- [X] T035 [US2] Documented in `DebugMcp/Tools/DebugLaunchTool.cs`'s `[Description]` that an opted-in client may receive a handle even for a fast launch — the qualification itself is registered in T032's policy table, not on this file
+- [X] T036 [US2] **Corrected, not implemented as originally scoped.** Empirically confirmed (see the note above `tests/DebugMcp.Tests/Unit/Tasks/McpTasksHarnessTests.cs`'s `Progress_ReportedDuringADeferredCall_DoesNotAppearInThePolledStatusMessage`) that bridging `IProgressReporter` stage updates into the polled task `statusMessage` is not achievable with SDK 2.2.0's public surface: `IMcpTaskStore` has no incremental status-message update method, and a running tool method has no way to discover its own task id (`RequestContext.Items` is empty) to use with `McpTasksServerExtensions.SendTaskStatusNotificationAsync`. No code added; documented here and in `research.md` as an SDK limitation, guarded by a regression test that will start failing (prompting a revisit) if a future SDK version adds the missing hook
+- [X] T037 [US2] **Verified, not implemented — no new code needed.** `TasksCancel_PropagatesToTheToolsCancellationToken` in `McpTasksHarnessTests.cs` confirms `tasks/cancel` automatically cancels the `CancellationToken` the SDK passed into the tool method. This is a direct, free consequence of Phase 3's T014–T018 work (every tool now genuinely accepts and honours a `CancellationToken`) — there is no separate cancellation mechanism to wire for MCP Tasks specifically
+- [X] T038 [US2] **Corrected and merged into T030.** "Drive an outstanding handle to `failed`" was based on the same wrong assumption corrected above: our tools already catch every failure (including a debuggee terminating mid-launch) into structured `{success:false,error:{...}}` JSON before returning, so the SDK sees a normal completion and marks the task `Completed` — exactly the contract `DomainFailure_SurvivesDeferral_WithTheSameStructuredJsonContract` and `UncaughtException_CompletesTheTaskWithIsError_NeverFailed` verify. No changes were needed in `DebugSessionManager.cs`
 
 **Checkpoint**: US2 complete. Opted-in clients get handles; everyone else is unaffected.
 
@@ -264,15 +287,19 @@ The template's default is that stories are independent. **Here they are not**, a
 otherwise would produce rework:
 
 - **US1 → US2**: an operation cannot be handed off as a task until it can first report on itself
-  and be stopped. T036 bridges US1's stage reporting into US2's task status; without US1 there is
-  nothing to bridge.
+  and be stopped. US1's `CancellationToken` plumbing (T014–T018) is what makes US2's `tasks/cancel`
+  work at all (T037); without US1 there is nothing for the SDK's cancellation to propagate into.
+  (T036's originally-planned progress→statusMessage bridge turned out not to be achievable with
+  this SDK version — see T036's correction note — so that particular link no longer applies, but
+  the cancellation dependency still holds.)
 - **US3 → US4**: enrichment adds fields. Adding them to typed records is one change; adding them
   to hand-built JSON strings and then migrating means doing it twice.
 - **US3 → US5**: US5's timeout errors use the shared error shape built in US3. Shipping US5 first
   would mean writing that error twice.
 - **US1/US2 ↔ US3/US4**: independent of each other. A team could run the async track (US1→US2) and
   the contracts track (US3→US4) in parallel, with one merge point — T070 extends records created
-  in T044–T052, and T032 pins `TaskSupport` on tools that T044–T052 also edit.
+  in T044–T052, and T032's `TaskExecutionPolicy` classifies tool *names* that T044–T052 also edit
+  (a classification table keyed by name, not a per-tool property — see T032's correction note).
 
 Intended sequence: **US1 → US2 → US3 → US4 → US5**. Every arrow is a viable stopping point.
 

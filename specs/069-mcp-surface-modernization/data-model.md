@@ -86,9 +86,9 @@ Owned by `InMemoryMcpTaskStore`; the shape below is what the client observes.
 | `CreatedAt` | `DateTimeOffset` | |
 | `TtlMs` | `int` | Expiry window. After it elapses, enquiry returns an expiry error, distinguishable from not-found (FR-012). |
 | `PollIntervalMs` | `int` | Server's suggestion to the client. |
-| `StatusMessage` | `string?` | Current stage name; mirrors the latest progress update. |
-| `Result` | `ToolResult<T>?` | Populated only on `Completed`. Byte-identical to what the blocking path returns (FR-014). |
-| `Error` | `ToolError?` | Populated only on `Failed`. |
+| `StatusMessage` | `string?` | **Never populated by this feature.** Confirmed empirically against SDK 2.2.0: a running tool has no way to update its own task's `StatusMessage` (no store method, no ambient task id available to the tool body). Progress still reports via the separate `notifications/progress` channel, unaffected by deferral. |
+| `Result` | `ToolResult<T>?` | Populated on `Completed` — including when the underlying tool call threw: the SDK catches the exception itself and completes the task with `isError:true` rather than failing it. Byte-identical to what the blocking path returns (FR-014). |
+| `Error` | `ToolError?` | Populated only on `Failed`. In practice this feature's five qualifying tools never produce `Failed`: each already catches its own exceptions into a `{success:false,...}` `Completed` result (see the transition rule below), and nothing in this feature calls `IMcpTaskStore.SetFailedAsync` directly. |
 
 ### Lifecycle
 
@@ -108,8 +108,12 @@ Owned by `InMemoryMcpTaskStore`; the shape below is what the client observes.
 - Terminal states never change once reached.
 - Cancellation is **cooperative**: `tasks/cancel` is acknowledged immediately, but the task may
   still reach `Completed` or `Failed` if the work could not be interrupted safely (FR-003).
-- Debuggee termination while a handle is outstanding drives it to `Failed` carrying the reason —
-  never to `Completed`, never left hanging.
+- Debuggee termination (or any other failure) while a handle is outstanding drives it to
+  `Completed` carrying the tool's own `{success:false,error:{...}}` JSON — **not** `Failed`.
+  Corrected from the original design after empirically confirming the SDK never fails a task on
+  its own (an uncaught exception becomes `Completed`+`isError:true`), and DebugMcp's qualifying
+  tools already catch every failure into that structured JSON before returning. Never left
+  hanging either way — see `tasks.md` T030/T038.
 - Handles do not survive a process restart. An enquiry naming a handle from a previous process
   returns not-found, never a stale result.
 

@@ -11,9 +11,11 @@ using DebugMcp.Services.Resources;
 using DebugMcp.Prompts;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Services.Symbols;
+using DebugMcp.Services.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Extensions.Tasks;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -279,7 +281,10 @@ rootCommand.SetAction(async parseResult =>
         {
             var provider = request.Services!.GetRequiredService<ExpressionCompletionProvider>();
             return await provider.GetCompletionsAsync(request.Params!, ct);
-        });
+        })
+        .WithTasks(
+            new ExpiryAwareTaskStore(new InMemoryMcpTaskStore { DefaultTimeToLive = TimeSpan.FromHours(1) }),
+            opts => opts.ExecutionModeSelector = TaskExecutionPolicy.SelectMode);
 
     // Add MCP logger provider (must be after AddMcpServer)
     builder.Services.AddSingleton<ILoggerProvider, McpLoggerProvider>();

@@ -91,7 +91,7 @@ The server declares the extension in its `server/discover` capabilities (FR-007)
       "status": "working",
       "createdAt": "2026-08-25T10:14:02.117+00:00",
       "ttlMs": 3600000,
-      "pollIntervalMs": 2000
+      "pollIntervalMs": 1000
     }
   }
 }
@@ -102,8 +102,11 @@ The server declares the extension in its `server/discover` capabilities (FR-007)
 ```jsonc
 // → tasks/get { "taskId": "tsk-9f3c1a..." }
 // ← still running
-{ "taskId": "tsk-9f3c1a...", "status": "working",
-  "statusMessage": "building solution" }
+{ "taskId": "tsk-9f3c1a...", "status": "working" }
+// statusMessage is NOT populated here: confirmed empirically against SDK 2.2.0 that a running
+// tool has no way to update its own task's statusMessage (no store method, no ambient task id
+// available to the tool). Progress still reports via the normal MCP notifications/progress
+// channel — this is a separate channel from the polled task record. See tasks.md T036.
 
 // ← finished
 {

@@ -57,6 +57,38 @@ consistent with the spec quote above — no server-side code re-implements that 
   "Stateful Tools" section describes this pattern, but it would duplicate a standard mechanism,
   require the client to learn our conventions, and forfeit `tasks/cancel`.
 
+**Resolved at implementation time (T025–T030, via a real client+server pair connected over an
+in-process duplex transport — see R6's correction below): the task lifecycle around a deferred
+tool call is entirely SDK-owned, not something this feature implements.**
+- An **uncaught exception** from a tool method is caught by the SDK's own filter and turned into a
+  **Completed** task whose result carries `isError:true` and a generic message
+  (`"An error occurred invoking '<tool>'."`) — **never** a `Failed` task. `Failed` is reachable
+  only by a store consumer calling `IMcpTaskStore.SetFailedAsync` directly, which nothing in this
+  feature does. Since all five FR-013 qualifying tools already catch every exception internally
+  and return their own `{success:false,error:{...}}` JSON, they never let an exception reach the
+  SDK's filter in the first place — the practically-relevant contract is that this structured JSON
+  survives deferral unchanged (verified byte-for-byte against the synchronous path).
+- **`tasks/cancel` propagates automatically** into the `CancellationToken` the SDK passes to the
+  tool method — confirmed by cancelling a task whose tool was blocked on that exact token and
+  observing `OperationCanceledException` inside the tool body and `Cancelled` at the store. This
+  is a free consequence of R7/T014–T018 (every tool now genuinely accepts and honours a
+  `CancellationToken`); MCP Tasks needed no separate cancellation mechanism.
+- **Bridging progress into the polled task's `StatusMessage` is not achievable** with this SDK
+  version's public surface: `IMcpTaskStore` exposes no method to update `StatusMessage` mid-flight
+  (only `CreateTaskAsync`/`GetTaskAsync`/`SetCompletedAsync`/`SetFailedAsync`/`SetCancelledAsync`/
+  input-request methods), and a running tool method has no way to discover its own task id —
+  `RequestContext.Items` is empty for a deferred call, so
+  `McpTasksServerExtensions.SendTaskStatusNotificationAsync` (which does exist, and does take a
+  `TaskStatusNotificationParams` with a `TaskId`) has nothing to be called with from inside tool
+  code. `StatusMessage` therefore stays empty for every deferred call this feature produces; the
+  original T036 ("bridge `IProgressReporter` into `statusMessage`") does not have a supported
+  implementation and is documented as a known gap instead. `notifications/progress` remains
+  unaffected and continues to fire independently of whether a call is deferred.
+- Raw `InMemoryMcpTaskStore.GetTaskAsync` was confirmed to return an identical `null` for a
+  never-created id and for an id whose TTL has elapsed — the two are **not** distinguishable on
+  the SDK's own store, which is what makes the `ExpiryAwareTaskStore` decorator (T031) a
+  requirement rather than a defensive nicety.
+
 ---
 
 ## R2. Mechanism for progress reporting
@@ -146,11 +178,21 @@ in `tests/DebugMcp.Tests/Support/`, plus `McpResourceNotifier`. Progress and tas
 notifications should be reached through the same shape, so unit tests assert against a recording
 double rather than against the SDK.
 
-**End-to-end coverage** still needs a real client, because the opt-in negotiation and the polling
-loop are wire-level behaviour that a double cannot exercise. The verification method proven during
-the SDK 2.2.0 upgrade applies: drive the server over stdio with JSON-RPC, filtering responses by
-`id` because the server interleaves notification lines. That is a `quickstart.md` scenario, not a
-unit test.
+**End-to-end coverage still needs a real client** — a recording double cannot exercise the opt-in
+negotiation or the polling loop, both genuinely wire-level behaviour. **Corrected during T025–T030:
+this does not require driving the server over stdio.** `ModelContextProtocol.Core.dll` ships a
+`ModelContextProtocol.Server.StreamServerTransport` and a matching
+`ModelContextProtocol.Protocol.StreamClientTransport`, each constructed from a pair of `Stream`s.
+Pairing two `System.IO.Pipelines.Pipe`s (`reader.AsStream()` / `writer.AsStream()`) gives a real,
+in-process, full-duplex MCP connection — a real `McpClient` talking to a real hosted MCP server,
+with no child process and no serial/stdio framing to manage. `tests/DebugMcp.Tests/Support/
+InProcessMcpHarness.cs` wraps this pattern (plus a controllable `FakeQualifyingTool` registered via
+the `WithTools(builder, targetInstance)` overload — the generic `WithTools<T>()` overload does not
+guarantee it reuses a specific DI-registered instance, which silently broke the first version of
+this harness) and is what `tests/DebugMcp.Tests/Unit/Tasks/McpTasksHarnessTests.cs` runs against.
+The still-valid remaining reason for a manual stdio smoke test (`quickstart.md`, T089) is verifying
+the *real* debugger tools end-to-end, not MCP Tasks wire mechanics — those are now covered by fast,
+deterministic unit tests.
 
 **Existing anchor for FR-020**: `tests/DebugMcp.Tests/Contract/ToolAnnotationTests.cs` already
 enumerates every tool by name and asserts its annotations. The schema-presence and
