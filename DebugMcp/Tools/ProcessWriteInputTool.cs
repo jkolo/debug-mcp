@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -30,9 +31,10 @@ public sealed class ProcessWriteInputTool
     /// <param name="close_after">Close stdin after writing (send EOF)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     [McpServerTool(Name = "process_write_input", Title = "Write Process Input",
-        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+        ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Write data to the debugged process's stdin")]
-    public Task<string> WriteInputAsync(
+    public Task<ProcessWriteInputResult> WriteInputAsync(
         [Description("Data to write to stdin")] string data,
         [Description("Close stdin after writing (send EOF)")] bool close_after = false,
         CancellationToken cancellationToken = default)
@@ -52,18 +54,22 @@ public sealed class ProcessWriteInputTool
             if (!_ioManager.HasProcess)
             {
                 _logger.ToolError("process_write_input", ErrorCodes.NoSession);
-                return Task.FromResult(CreateErrorResponse(
-                    ErrorCodes.NoSession,
-                    "No process attached. Use debug_launch first."));
+                return Task.FromResult(new ProcessWriteInputResult(
+                    Success: false,
+                    Error: new ToolError(
+                        ErrorCodes.NoSession,
+                        "No process attached. Use debug_launch first.")));
             }
 
             // Validate data
             if (data == null)
             {
                 _logger.ToolError("process_write_input", ErrorCodes.InvalidParameter);
-                return Task.FromResult(CreateErrorResponse(
-                    ErrorCodes.InvalidParameter,
-                    "Data cannot be null"));
+                return Task.FromResult(new ProcessWriteInputResult(
+                    Success: false,
+                    Error: new ToolError(
+                        ErrorCodes.InvalidParameter,
+                        "Data cannot be null")));
             }
 
             // Write to stdin
@@ -79,34 +85,27 @@ public sealed class ProcessWriteInputTool
             _logger.ToolCompleted("process_write_input", stopwatch.ElapsedMilliseconds);
             _logger.LogDebug("Wrote {Bytes} bytes to stdin, closed={Closed}", bytesWritten, close_after);
 
-            return Task.FromResult(JsonSerializer.Serialize(new
-            {
-                success = true,
-                bytesWritten,
-                stdinClosed = close_after
-            }, new JsonSerializerOptions { WriteIndented = true }));
+            return Task.FromResult(new ProcessWriteInputResult(
+                Success: true,
+                BytesWritten: bytesWritten,
+                StdinClosed: close_after));
         }
         catch (InvalidOperationException ex)
         {
             var errorCode = ex.Message.Contains("closed") ? ErrorCodes.StdinClosed : ErrorCodes.NoSession;
             _logger.ToolError("process_write_input", errorCode);
-            return Task.FromResult(CreateErrorResponse(errorCode, ex.Message));
+            return Task.FromResult(new ProcessWriteInputResult(
+                Success: false,
+                Error: new ToolError(errorCode, ex.Message)));
         }
         catch (Exception ex)
         {
             _logger.ToolError("process_write_input", ErrorCodes.IoFailed);
-            return Task.FromResult(CreateErrorResponse(
-                ErrorCodes.IoFailed,
-                $"Failed to write input: {ex.Message}"));
+            return Task.FromResult(new ProcessWriteInputResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.IoFailed,
+                    $"Failed to write input: {ex.Message}")));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message }
-        }, new JsonSerializerOptions { WriteIndented = true });
     }
 }

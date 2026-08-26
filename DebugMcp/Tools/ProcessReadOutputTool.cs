@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -30,9 +31,10 @@ public sealed class ProcessReadOutputTool
     /// <param name="clear">Clear the buffer after reading (default: false)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     [McpServerTool(Name = "process_read_output", Title = "Read Process Output",
-        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Read accumulated stdout and/or stderr output from the debugged process")]
-    public Task<string> ReadOutputAsync(
+    public Task<ProcessReadOutputResult> ReadOutputAsync(
         [Description("Which stream to read: 'stdout', 'stderr', or 'both' (default)")] string stream = "both",
         [Description("Clear the buffer after reading")] bool clear = false,
         CancellationToken cancellationToken = default)
@@ -48,18 +50,22 @@ public sealed class ProcessReadOutputTool
             if (stream != "both" && stream != "stdout" && stream != "stderr")
             {
                 _logger.ToolError("process_read_output", ErrorCodes.InvalidParameter);
-                return Task.FromResult(CreateErrorResponse(
-                    ErrorCodes.InvalidParameter,
-                    $"Invalid stream: '{stream}'. Must be 'stdout', 'stderr', or 'both'"));
+                return Task.FromResult(new ProcessReadOutputResult(
+                    Success: false,
+                    Error: new ToolError(
+                        ErrorCodes.InvalidParameter,
+                        $"Invalid stream: '{stream}'. Must be 'stdout', 'stderr', or 'both'")));
             }
 
             // Check if process is attached
             if (!_ioManager.HasProcess)
             {
                 _logger.ToolError("process_read_output", ErrorCodes.NoSession);
-                return Task.FromResult(CreateErrorResponse(
-                    ErrorCodes.NoSession,
-                    "No process attached. Use debug_launch first."));
+                return Task.FromResult(new ProcessReadOutputResult(
+                    Success: false,
+                    Error: new ToolError(
+                        ErrorCodes.NoSession,
+                        "No process attached. Use debug_launch first.")));
             }
 
             // Read output
@@ -71,50 +77,34 @@ public sealed class ProcessReadOutputTool
                 stdout.Length, stderr.Length);
 
             // Build response based on requested stream
-            object response = stream switch
+            var result = stream switch
             {
-                "stdout" => new
-                {
-                    success = true,
-                    stdout,
-                    stdoutBytes = System.Text.Encoding.UTF8.GetByteCount(stdout)
-                },
-                "stderr" => new
-                {
-                    success = true,
-                    stderr,
-                    stderrBytes = System.Text.Encoding.UTF8.GetByteCount(stderr)
-                },
-                _ => new
-                {
-                    success = true,
-                    stdout,
-                    stderr,
-                    stdoutBytes = System.Text.Encoding.UTF8.GetByteCount(stdout),
-                    stderrBytes = System.Text.Encoding.UTF8.GetByteCount(stderr)
-                }
+                "stdout" => new ProcessReadOutputResult(
+                    Success: true,
+                    Stdout: stdout,
+                    StdoutBytes: System.Text.Encoding.UTF8.GetByteCount(stdout)),
+                "stderr" => new ProcessReadOutputResult(
+                    Success: true,
+                    Stderr: stderr,
+                    StderrBytes: System.Text.Encoding.UTF8.GetByteCount(stderr)),
+                _ => new ProcessReadOutputResult(
+                    Success: true,
+                    Stdout: stdout,
+                    Stderr: stderr,
+                    StdoutBytes: System.Text.Encoding.UTF8.GetByteCount(stdout),
+                    StderrBytes: System.Text.Encoding.UTF8.GetByteCount(stderr))
             };
 
-            return Task.FromResult(JsonSerializer.Serialize(response, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            }));
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger.ToolError("process_read_output", ErrorCodes.IoFailed);
-            return Task.FromResult(CreateErrorResponse(
-                ErrorCodes.IoFailed,
-                $"Failed to read output: {ex.Message}"));
+            return Task.FromResult(new ProcessReadOutputResult(
+                Success: false,
+                Error: new ToolError(
+                    ErrorCodes.IoFailed,
+                    $"Failed to read output: {ex.Message}")));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message }
-        }, new JsonSerializerOptions { WriteIndented = true });
     }
 }
