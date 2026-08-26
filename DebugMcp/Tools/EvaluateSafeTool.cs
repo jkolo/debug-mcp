@@ -1,8 +1,8 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
 using DebugMcp.Models.Inspection;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using DebugMcp.Services.SafeEval;
 using Microsoft.Extensions.Logging;
@@ -17,9 +17,10 @@ public sealed class EvaluateSafeTool(
     ILogger<EvaluateSafeTool> logger)
 {
     [McpServerTool(Name = "evaluate_safe", Title = "Evaluate Expression (Safe Mode)",
-        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Evaluate a C# expression in safe mode — static analysis blocks method calls, object construction, and assignments before they reach the debugged process. Suitable for autonomous agents. Permitted: member reads, property access, arithmetic, comparisons (==,!=,<,>,<=,>=), logical (&&,||,!), ternary (?:), indexers, null-conditional (?.,?[]), and allowlisted methods. Blocked: non-allowlisted method calls, new T(), assignments. On rejection: {\"success\": false, \"error\": {\"code\": \"safe_eval_rejected\", \"details\": {\"rejection_category\": \"MethodCall\", \"offending_expression\": \"...\"}}}. On success: {\"success\": true, \"value\": \"42\", \"type\": \"System.Int32\", \"has_children\": false}")]
-    public async Task<string> EvaluateSafeAsync(
+    public async Task<EvaluateSafeResult> EvaluateSafeAsync(
         [Description("C# expression to evaluate safely")] string expression,
         [Description("Thread context (default: current thread)")] int? thread_id = null,
         [Description("Stack frame context (0 = top)")] int frame_index = 0,
@@ -35,7 +36,7 @@ public sealed class EvaluateSafeTool(
             if (string.IsNullOrWhiteSpace(expression))
             {
                 logger.ToolError("evaluate_safe", "syntax_error");
-                return CreateErrorResponse("syntax_error", "Expression cannot be empty", position: 0);
+                return CreateErrorResult("syntax_error", "Expression cannot be empty", position: 0);
             }
 
             // Safety check FIRST — before session/pause check
@@ -43,17 +44,17 @@ public sealed class EvaluateSafeTool(
             if (!analysis.IsAllowed)
             {
                 logger.ToolError("evaluate_safe", "safe_eval_rejected");
-                return CreateRejectionResponse(analysis.Rejection!);
+                return CreateRejectionResult(analysis.Rejection!);
             }
 
             // Validate parameters
             if (timeout_ms < 100 || timeout_ms > 60000)
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "timeout_ms must be between 100 and 60000",
                     new { parameter = "timeout_ms", value = timeout_ms });
 
             if (frame_index < 0)
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return CreateErrorResult(ErrorCodes.InvalidParameter,
                     "frame_index must be >= 0",
                     new { parameter = "frame_index", value = frame_index });
 
@@ -62,13 +63,13 @@ public sealed class EvaluateSafeTool(
             if (session == null)
             {
                 logger.ToolError("evaluate_safe", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return CreateErrorResult(ErrorCodes.NoSession, "No active debug session");
             }
 
             if (session.State != SessionState.Paused)
             {
                 logger.ToolError("evaluate_safe", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return CreateErrorResult(ErrorCodes.NotPaused,
                     $"Cannot evaluate expression: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})");
             }
 
@@ -81,88 +82,73 @@ public sealed class EvaluateSafeTool(
 
             if (result.Success)
             {
-                return JsonSerializer.Serialize(new
-                {
-                    success = true,
-                    value = result.Value,
-                    type = result.Type,
-                    has_children = result.HasChildren
-                }, new JsonSerializerOptions { WriteIndented = true });
+                return new EvaluateSafeResult(
+                    Success: true,
+                    Value: result.Value,
+                    Type: result.Type,
+                    HasChildren: result.HasChildren);
             }
 
-            return CreateEvaluationErrorResponse(result.Error!);
+            return CreateEvaluationErrorResult(result.Error!);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             logger.ToolError("evaluate_safe", "eval_timeout");
-            return CreateErrorResponse("eval_timeout", "Operation was cancelled");
+            return CreateErrorResult("eval_timeout", "Operation was cancelled");
         }
         catch (OperationCanceledException)
         {
             logger.ToolError("evaluate_safe", "eval_timeout");
-            return CreateErrorResponse("eval_timeout", $"Expression evaluation timed out after {timeout_ms}ms");
+            return CreateErrorResult("eval_timeout", $"Expression evaluation timed out after {timeout_ms}ms");
         }
         catch (Exception ex)
         {
             logger.ToolError("evaluate_safe", "eval_exception");
-            return CreateErrorResponse("eval_exception", ex.Message,
+            return CreateErrorResult("eval_exception", ex.Message,
                 new { exception_type = ex.GetType().FullName });
         }
     }
 
-    private static string CreateRejectionResponse(SafeEvalRejection rejection)
+    private static EvaluateSafeResult CreateRejectionResult(SafeEvalRejection rejection)
     {
-        return JsonSerializer.Serialize(new
+        var details = new
         {
-            success = false,
-            error = new
-            {
-                code = "safe_eval_rejected",
-                message = rejection.Message,
-                details = new
-                {
-                    rejection_category = rejection.Category.ToString(),
-                    offending_expression = rejection.OffendingExpression,
-                    allowed_operations = "member reads, property access, arithmetic (+,-,*,/,%), comparisons (==,!=,<,>,<=,>=), logical (&&,||,!), ternary (?:), indexers, null-conditional (?.,?[]), and methods on the safe-eval allowlist"
-                }
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
+            rejection_category = rejection.Category.ToString(),
+            offending_expression = rejection.OffendingExpression,
+            allowed_operations = "member reads, property access, arithmetic (+,-,*,/,%), comparisons (==,!=,<,>,<=,>=), logical (&&,||,!), ternary (?:), indexers, null-conditional (?.,?[]), and methods on the safe-eval allowlist"
+        };
+        return new EvaluateSafeResult(Success: false, Error: new ToolError("safe_eval_rejected", rejection.Message, details));
     }
 
-    private static string CreateErrorResponse(string code, string message, object? details = null, int? position = null)
+    /// <summary>
+    /// Builds a failure result. The pre-US3 wire shape put an optional <c>position</c> directly
+    /// on the error object (alongside code/message); the shared <see cref="ToolError"/> type has
+    /// no such field, so <paramref name="position"/> is folded into <c>Error.Details</c> instead
+    /// (as <c>{ position }</c>) — same value, now one level deeper on the wire.
+    /// </summary>
+    private static EvaluateSafeResult CreateErrorResult(string code, string message, object? details = null, int? position = null)
     {
-        var errorObj = new Dictionary<string, object?>
-        {
-            ["code"] = code,
-            ["message"] = message
-        };
-        if (details != null) errorObj["details"] = details;
-        if (position.HasValue) errorObj["position"] = position.Value;
-
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = errorObj
-        }, new JsonSerializerOptions { WriteIndented = true });
+        var errorDetails = position.HasValue ? (object)new { position = position.Value } : details;
+        return new EvaluateSafeResult(Success: false, Error: new ToolError(code, message, errorDetails));
     }
 
-    private static string CreateEvaluationErrorResponse(EvaluationError error)
+    /// <summary>
+    /// Builds a failure result from an <see cref="EvaluationError"/>. The pre-US3 wire shape put
+    /// optional <c>exception_type</c>/<c>position</c> directly on the error object; both are
+    /// folded into <c>Error.Details</c> here for the same reason as <see cref="CreateErrorResult"/>.
+    /// </summary>
+    private static EvaluateSafeResult CreateEvaluationErrorResult(EvaluationError error)
     {
-        var errorObj = new Dictionary<string, object?>
+        var hasExceptionType = !string.IsNullOrEmpty(error.ExceptionType);
+        object? details = (hasExceptionType, error.Position) switch
         {
-            ["code"] = error.Code,
-            ["message"] = error.Message
+            (true, { } position) => new { exception_type = error.ExceptionType, position },
+            (true, null) => new { exception_type = error.ExceptionType },
+            (false, { } position) => new { position },
+            _ => null
         };
-        if (!string.IsNullOrEmpty(error.ExceptionType))
-            errorObj["exception_type"] = error.ExceptionType;
-        if (error.Position.HasValue)
-            errorObj["position"] = error.Position.Value;
 
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = errorObj
-        }, new JsonSerializerOptions { WriteIndented = true });
+        return new EvaluateSafeResult(Success: false, Error: new ToolError(error.Code, error.Message, details));
     }
 
     private static string EscapeJsonString(string value) =>

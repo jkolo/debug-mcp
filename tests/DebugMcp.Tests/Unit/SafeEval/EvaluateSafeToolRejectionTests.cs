@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DebugMcp.Services;
 using DebugMcp.Services.SafeEval;
 using DebugMcp.Tools;
@@ -10,6 +11,12 @@ namespace DebugMcp.Tests.Unit.SafeEval;
 
 public class EvaluateSafeToolRejectionTests
 {
+    private static readonly JsonSerializerOptions WireOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
     private static EvaluateSafeTool CreateTool(ISafeExpressionAnalyzer analyzer)
     {
         var sessionManager = new Mock<IDebugSessionManager>();
@@ -31,11 +38,13 @@ public class EvaluateSafeToolRejectionTests
         var rejection = new SafeEvalRejection(RejectionCategory.MethodCall, "repo.Save(entity)", "Method call 'repo.Save' is not allowed");
         var tool = CreateTool(AnalyzerReturning(SafeAnalysisResult.Rejected(rejection)));
 
-        var json = await tool.EvaluateSafeAsync("repo.Save(entity)");
-        var doc = JsonDocument.Parse(json).RootElement;
+        var result = await tool.EvaluateSafeAsync("repo.Save(entity)");
 
-        doc.GetProperty("success").GetBoolean().Should().BeFalse();
-        doc.GetProperty("error").GetProperty("code").GetString().Should().Be("safe_eval_rejected");
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("safe_eval_rejected");
+
+        var doc = JsonSerializer.SerializeToElement(result, WireOptions);
         doc.GetProperty("error").GetProperty("details").GetProperty("rejection_category").GetString()
             .Should().Be("MethodCall");
         doc.GetProperty("error").GetProperty("details").GetProperty("offending_expression").GetString()
@@ -52,11 +61,12 @@ public class EvaluateSafeToolRejectionTests
         var rejection = new SafeEvalRejection(RejectionCategory.ObjectCreation, "new List<int>()", "Object construction not allowed");
         var tool = CreateTool(AnalyzerReturning(SafeAnalysisResult.Rejected(rejection)));
 
-        var json = await tool.EvaluateSafeAsync("new List<int>()");
-        var doc = JsonDocument.Parse(json).RootElement;
+        var result = await tool.EvaluateSafeAsync("new List<int>()");
 
-        doc.GetProperty("success").GetBoolean().Should().BeFalse();
-        doc.GetProperty("error").GetProperty("code").GetString().Should().Be("safe_eval_rejected");
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be("safe_eval_rejected");
+
+        var doc = JsonSerializer.SerializeToElement(result, WireOptions);
         doc.GetProperty("error").GetProperty("details").GetProperty("rejection_category").GetString()
             .Should().Be("ObjectCreation");
     }
@@ -69,11 +79,12 @@ public class EvaluateSafeToolRejectionTests
         var rejection = new SafeEvalRejection(RejectionCategory.Assignment, "x = 5", "Assignment not allowed");
         var tool = CreateTool(AnalyzerReturning(SafeAnalysisResult.Rejected(rejection)));
 
-        var json = await tool.EvaluateSafeAsync("x = 5");
-        var doc = JsonDocument.Parse(json).RootElement;
+        var result = await tool.EvaluateSafeAsync("x = 5");
 
-        doc.GetProperty("success").GetBoolean().Should().BeFalse();
-        doc.GetProperty("error").GetProperty("code").GetString().Should().Be("safe_eval_rejected");
+        result.Success.Should().BeFalse();
+        result.Error!.Code.Should().Be("safe_eval_rejected");
+
+        var doc = JsonSerializer.SerializeToElement(result, WireOptions);
         doc.GetProperty("error").GetProperty("details").GetProperty("rejection_category").GetString()
             .Should().Be("Assignment");
     }
@@ -87,11 +98,10 @@ public class EvaluateSafeToolRejectionTests
         var rejection = new SafeEvalRejection(RejectionCategory.MethodCall, "db.Drop()", "Not allowed");
         var tool = CreateTool(AnalyzerReturning(SafeAnalysisResult.Rejected(rejection)));
 
-        var json = await tool.EvaluateSafeAsync("db.Drop()");
-        var doc = JsonDocument.Parse(json).RootElement;
+        var result = await tool.EvaluateSafeAsync("db.Drop()");
 
         // Must be safe_eval_rejected, NOT no_session
-        doc.GetProperty("error").GetProperty("code").GetString().Should().Be("safe_eval_rejected",
+        result.Error!.Code.Should().Be("safe_eval_rejected",
             "safety check must run before session check");
     }
 }
