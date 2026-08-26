@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DebugMcp.Services.Progress;
 using DebugMcp.Tests.Support;
 
@@ -22,17 +23,28 @@ public class HeartbeatProgressTests
     [Fact]
     public async Task RunAsync_LongWork_EmitsHeartbeats()
     {
-        // Wide margin (25x nominal ticks) and a >1 threshold (not a tight tick count): GitHub
-        // Actions macOS runners showed 6x+ Task.Delay jitter under load, collapsing a tighter
-        // interval/count pair to exactly 1 heartbeat tick and flaking the assertion. The only
-        // thing this test needs to prove is "heartbeats repeat, not just the initial report".
+        // Deterministic — polls for the real heartbeat event instead of racing a fixed
+        // Task.Delay against the interval. A fixed-duration race flaked under GitHub Actions
+        // scheduling contention on both macOS (collapsed to exactly 1 tick) and Windows
+        // (collapsed to zero ticks); polling for the actual event with a generous ceiling
+        // removes the race entirely, matching this repo's established fix for the same class of
+        // flake (see SnapshotsResourceTests' TaskCompletionSource-based notification wait).
         var progress = new RecordingProgressReporter();
+        var workGate = new TaskCompletionSource();
 
-        await HeartbeatProgress.RunAsync(
-            async () => { await Task.Delay(TimeSpan.FromMilliseconds(500)); return 1; },
+        var runTask = HeartbeatProgress.RunAsync(
+            async () => { await workGate.Task; return 1; },
             progress,
             "working",
             interval: TimeSpan.FromMilliseconds(20));
+
+        var stopwatch = Stopwatch.StartNew();
+        while (progress.Reported.Count <= 1 && stopwatch.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            await Task.Delay(20);
+        }
+        workGate.SetResult();
+        await runTask;
 
         progress.Reported.Should().HaveCountGreaterThan(1);
         progress.Reported.Should().OnlyContain(r => r.Stage == "working");
