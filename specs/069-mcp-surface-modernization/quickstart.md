@@ -35,13 +35,25 @@ Every scenario below speaks JSON-RPC to the server's stdin and reads its stdout.
 dotnet run --project DebugMcp --no-build
 ```
 
-Two things bite anyone writing this harness for the first time:
+Three things bite anyone writing this harness for the first time:
 
 - **Filter responses by `id`.** The server interleaves `notifications/message` lines between
   request and response. Reading "the next line" gets a log notification, not the answer.
-- **Use a real protocol version.** The handshake accepts `2024-11-05`, `2025-03-26`,
-  `2025-06-18`, `2025-11-25`. It does **not** accept `2026-07-28` — that is the specification
-  revision date, not a wire protocol version, and sending it returns `-32022`.
+- **Use a real protocol version.** The `initialize` handshake accepts `2024-11-05`,
+  `2025-03-26`, `2025-06-18`, `2025-11-25`. It does **not** accept `2026-07-28` — that is the
+  specification revision date, not a wire protocol version negotiable via `initialize`, and
+  sending it there returns `-32022`.
+- **Scenario 2 needs a second, handshake-free session.** The Tasks extension's per-request
+  opt-in (`_meta."io.modelcontextprotocol/clientCapabilities".extensions`) is a
+  2026-07-28-era (SEP-2575) mechanism: the SDK unconditionally rejects that reserved `_meta`
+  key (`-32600`) under every protocol version `initialize` can negotiate, and never backfills
+  the per-request client-capabilities check from what was declared at `initialize`. The only
+  way to reach it is to skip `initialize` entirely and carry the full `_meta` trio —
+  `io.modelcontextprotocol/protocolVersion: "2026-07-28"`, `.../clientInfo`,
+  `.../clientCapabilities` — on every request of that session, per SEP-2575's handshake-free
+  connection mode. Confirmed by decompiling `ModelContextProtocol.Core`/`.Extensions.Tasks`
+  2.2.0 (`McpSessionHandler.ValidateRequiredPerRequestMetadata`,
+  `PopulateContextFromMeta`, `HasTaskExtensionOptIn`).
 
 ---
 
@@ -90,10 +102,13 @@ acquisition.
 | 4 | **Byte-identical** (FR-014) — the strongest single assertion in this slice |
 | 5 | Cancellation acknowledged; task reaches a terminal status |
 | 6 | Two **distinguishable** errors: not-found vs expired (FR-012) |
-| 7 | Ordinary blocking result — the 34 non-qualifying tools are pinned to `TaskSupport = Forbidden` (FR-013) |
+| 7 | Ordinary blocking result — the 34 non-qualifying tools are pinned to `McpTaskExecutionMode.Synchronous` via `TaskExecutionPolicy.GetMode` (FR-013) |
 
-Step 7 is the one most likely to fail: async tools default to `Optional`, so forgetting the pin
-silently makes every tool task-eligible.
+Step 7 is the one most likely to fail: the SDK's own default execution-mode selector treats
+every tool as task-capable (`Optional`), so forgetting the pin silently makes every tool
+task-eligible. (There is no `TaskSupport` enum in SDK 2.2.0 — an earlier draft of this doc named
+one that never shipped; `TaskExecutionPolicy.cs`'s own doc comment explains the actual
+mechanism.)
 
 ---
 
