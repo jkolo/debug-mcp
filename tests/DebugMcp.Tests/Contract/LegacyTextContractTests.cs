@@ -4,15 +4,18 @@ using DebugMcp.Models.CodeAnalysis;
 using DebugMcp.Models.Inspection;
 using DebugMcp.Models.Memory;
 using DebugMcp.Models.Modules;
+using DebugMcp.Models.ReSharper;
 using DebugMcp.Models;
 using DebugMcp.Services.Breakpoints;
 using DebugMcp.Services.CodeAnalysis;
 using DebugMcp.Services.Inspection;
 using DebugMcp.Services.Progress;
+using DebugMcp.Services.ReSharper;
 using DebugMcp.Services.SafeEval;
 using DebugMcp.Services.Snapshots;
 using DebugMcp.Services;
 using DebugMcp.Tools;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Text.Json;
@@ -1533,6 +1536,104 @@ public class LegacyTextContractTests
 
         parsed.GetProperty("success").GetBoolean().Should().BeFalse();
         parsed.GetProperty("error").GetProperty("code").GetString().Should().Be("NO_WORKSPACE");
+        parsed.TryGetProperty("data", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResharperInspectSolution_Success_PreservesLegacyFieldNames()
+    {
+        var serviceMock = new Mock<IReSharperInspectionService>();
+        var sln = Path.Combine(Path.GetTempPath(), $"rs-contract-{Guid.NewGuid():N}.sln");
+        await File.WriteAllTextAsync(sln, "Microsoft Visual Studio Solution File, Format Version 12.00\n");
+        serviceMock.Setup(s => s.InspectAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InspectionResult
+            {
+                Target = sln,
+                Findings = [new InspectionFinding { Id = "RedundantCast", Message = "Redundant cast", Severity = ReSharperSeverity.Warning }],
+                TotalCount = 1, ReturnedCount = 1, Truncated = false, MaxResults = 500,
+                Summary = new Dictionary<string, int> { ["warning"] = 1 }, EngineVersion = "2026.2.1",
+                DurationMs = 42, Built = true
+            });
+        var tool = new ReSharperInspectSolutionTool(serviceMock.Object, new ReSharperOptions(),
+            NullLogger<ReSharperInspectSolutionTool>.Instance);
+
+        var result = await tool.InspectSolutionAsync(sln);
+        var parsed = JsonSerializer.SerializeToElement(result, WireOptions);
+
+        parsed.GetProperty("success").GetBoolean().Should().BeTrue();
+        var data = parsed.GetProperty("data");
+        data.GetProperty("target").GetString().Should().Be(sln);
+        data.GetProperty("total_count").GetInt32().Should().Be(1);
+        data.GetProperty("returned_count").GetInt32().Should().Be(1);
+        data.GetProperty("truncated").GetBoolean().Should().BeFalse();
+        data.GetProperty("limited_to").GetInt32().Should().Be(500);
+        data.GetProperty("engine_version").GetString().Should().Be("2026.2.1");
+        data.GetProperty("duration_ms").GetInt64().Should().Be(42);
+        data.GetProperty("built").GetBoolean().Should().BeTrue();
+        data.GetProperty("findings")[0].GetProperty("id").GetString().Should().Be("RedundantCast");
+        data.GetProperty("findings")[0].GetProperty("severity").GetString().Should().Be("warning");
+        data.GetProperty("summary").GetProperty("warning").GetInt32().Should().Be(1);
+        File.Delete(sln);
+    }
+
+    [Fact]
+    public async Task ResharperInspectSolution_Failure_PreservesLegacyFieldNames()
+    {
+        var serviceMock = new Mock<IReSharperInspectionService>();
+        var tool = new ReSharperInspectSolutionTool(serviceMock.Object, new ReSharperOptions(),
+            NullLogger<ReSharperInspectSolutionTool>.Instance);
+
+        var result = await tool.InspectSolutionAsync("/nope/Missing.sln");
+        var parsed = JsonSerializer.SerializeToElement(result, WireOptions);
+
+        parsed.GetProperty("success").GetBoolean().Should().BeFalse();
+        parsed.GetProperty("error").GetProperty("code").GetString().Should().Be("INVALID_PATH");
+        parsed.GetProperty("error").GetProperty("message").GetString().Should().NotBeNullOrEmpty();
+        parsed.TryGetProperty("data", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResharperInspectProject_Success_PreservesLegacyFieldNames()
+    {
+        var serviceMock = new Mock<IReSharperInspectionService>();
+        var csproj = Path.Combine(Path.GetTempPath(), $"rs-contract-{Guid.NewGuid():N}.csproj");
+        await File.WriteAllTextAsync(csproj, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n");
+        serviceMock.Setup(s => s.InspectAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InspectionResult
+            {
+                Target = csproj, Findings = [], TotalCount = 0, ReturnedCount = 0, Truncated = false,
+                MaxResults = 500, Summary = new Dictionary<string, int>(), EngineVersion = "2026.2.1",
+                DurationMs = 7, Built = true
+            });
+        var tool = new ReSharperInspectProjectTool(serviceMock.Object, new ReSharperOptions(),
+            NullLogger<ReSharperInspectProjectTool>.Instance);
+
+        var result = await tool.InspectProjectAsync(csproj);
+        var parsed = JsonSerializer.SerializeToElement(result, WireOptions);
+
+        parsed.GetProperty("success").GetBoolean().Should().BeTrue();
+        var data = parsed.GetProperty("data");
+        data.GetProperty("target").GetString().Should().Be(csproj);
+        data.GetProperty("returned_count").GetInt32().Should().Be(0);
+        data.GetProperty("engine_version").GetString().Should().Be("2026.2.1");
+        File.Delete(csproj);
+    }
+
+    [Fact]
+    public async Task ResharperInspectProject_Failure_PreservesLegacyFieldNames()
+    {
+        var serviceMock = new Mock<IReSharperInspectionService>();
+        var tool = new ReSharperInspectProjectTool(serviceMock.Object, new ReSharperOptions(),
+            NullLogger<ReSharperInspectProjectTool>.Instance);
+
+        var result = await tool.InspectProjectAsync("/x/App.sln");
+        var parsed = JsonSerializer.SerializeToElement(result, WireOptions);
+
+        parsed.GetProperty("success").GetBoolean().Should().BeFalse();
+        parsed.GetProperty("error").GetProperty("code").GetString().Should().Be("INVALID_PATH");
+        parsed.GetProperty("error").GetProperty("message").GetString().Should().NotBeNullOrEmpty();
         parsed.TryGetProperty("data", out _).Should().BeFalse();
     }
 }
