@@ -1,7 +1,8 @@
 using System.ComponentModel;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Memory;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -34,9 +35,10 @@ public sealed class ReferencesGetTool
     /// <param name="frame_index">Frame index (0 = top of stack, default: 0).</param>
     /// <returns>Reference analysis with outbound object references.</returns>
     [McpServerTool(Name = "references_get", Title = "Get Object References",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Analyze object references - find what objects a target references")]
-    public async Task<string> GetReferences(
+    public async Task<ReferencesGetResult> GetReferences(
         [Description("Object reference (variable name or expression)")] string object_ref,
         [Description("Reference direction: outbound, inbound, both")] string direction = "outbound",
         [Description("Maximum references to return (max: 100)")] int max_results = 50,
@@ -54,24 +56,23 @@ public sealed class ReferencesGetTool
             // Validate parameters
             if (string.IsNullOrWhiteSpace(object_ref))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                    "object_ref cannot be empty",
-                    new { parameter = "object_ref" });
+                return new ReferencesGetResult(Success: false, Error: new ToolError(
+                    ErrorCodes.InvalidParameter, "object_ref cannot be empty", new { parameter = "object_ref" }));
             }
 
             string[] validDirections = ["outbound", "inbound", "both"];
             if (!validDirections.Contains(direction))
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
+                return new ReferencesGetResult(Success: false, Error: new ToolError(
+                    ErrorCodes.InvalidParameter,
                     $"direction must be one of: {string.Join(", ", validDirections)}",
-                    new { parameter = "direction", value = direction, validValues = validDirections });
+                    new { parameter = "direction", value = direction, validValues = validDirections }));
             }
 
             if (max_results < 1)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                    "max_results must be >= 1",
-                    new { parameter = "max_results", value = max_results });
+                return new ReferencesGetResult(Success: false, Error: new ToolError(
+                    ErrorCodes.InvalidParameter, "max_results must be >= 1", new { parameter = "max_results", value = max_results }));
             }
 
             if (max_results > 100)
@@ -81,9 +82,8 @@ public sealed class ReferencesGetTool
 
             if (frame_index < 0)
             {
-                return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                    "frame_index must be >= 0",
-                    new { parameter = "frame_index", value = frame_index });
+                return new ReferencesGetResult(Success: false, Error: new ToolError(
+                    ErrorCodes.InvalidParameter, "frame_index must be >= 0", new { parameter = "frame_index", value = frame_index }));
             }
 
             // Check for active session
@@ -91,16 +91,17 @@ public sealed class ReferencesGetTool
             if (session == null)
             {
                 _logger.ToolError("references_get", ErrorCodes.NoSession);
-                return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session");
+                return new ReferencesGetResult(Success: false, Error: new ToolError(ErrorCodes.NoSession, "No active debug session"));
             }
 
             // Check if paused
             if (session.State != SessionState.Paused)
             {
                 _logger.ToolError("references_get", ErrorCodes.NotPaused);
-                return CreateErrorResponse(ErrorCodes.NotPaused,
+                return new ReferencesGetResult(Success: false, Error: new ToolError(
+                    ErrorCodes.NotPaused,
                     $"Cannot get references: process is not paused (current state: {session.State.ToString().ToLowerInvariant()})",
-                    new { currentState = session.State.ToString().ToLowerInvariant() });
+                    new { currentState = session.State.ToString().ToLowerInvariant() }));
             }
 
             // Get references (currently only outbound is supported)
@@ -112,73 +113,40 @@ public sealed class ReferencesGetTool
             _logger.LogInformation("Found {Count} outbound references for '{ObjectRef}'",
                 references.OutboundCount, object_ref);
 
-            var response = new Dictionary<string, object?>
-            {
-                ["success"] = true,
-                ["references"] = new Dictionary<string, object?>
-                {
-                    ["targetAddress"] = references.TargetAddress,
-                    ["targetType"] = references.TargetType,
-                    ["outbound"] = references.Outbound.Select(r => new
-                    {
-                        sourceAddress = r.SourceAddress,
-                        sourceType = r.SourceType,
-                        targetAddress = r.TargetAddress,
-                        targetType = r.TargetType,
-                        path = r.Path,
-                        referenceType = r.ReferenceType.ToString()
-                    }),
-                    ["outboundCount"] = references.OutboundCount,
-                    ["truncated"] = references.Truncated
-                }
-            };
+            var info = new ReferencesInfo(
+                TargetAddress: references.TargetAddress,
+                TargetType: references.TargetType,
+                Outbound: references.Outbound,
+                OutboundCount: references.OutboundCount,
+                Truncated: references.Truncated,
+                Inbound: direction is "inbound" or "both" ? Array.Empty<ReferenceInfo>() : null,
+                InboundCount: direction is "inbound" or "both" ? 0 : null,
+                InboundNote: direction is "inbound" or "both" ? "Inbound reference analysis is not yet implemented" : null);
 
-            // Add inbound placeholders when direction includes inbound
-            if (direction == "inbound" || direction == "both")
-            {
-                ((Dictionary<string, object?>)response["references"]!)["inbound"] = Array.Empty<object>();
-                ((Dictionary<string, object?>)response["references"]!)["inboundCount"] = 0;
-                ((Dictionary<string, object?>)response["references"]!)["inboundNote"] = "Inbound reference analysis is not yet implemented";
-            }
-
-            return JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+            return new ReferencesGetResult(Success: true, References: info);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("No active debug session"))
         {
             _logger.ToolError("references_get", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, ex.Message);
+            return new ReferencesGetResult(Success: false, Error: new ToolError(ErrorCodes.NoSession, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused"))
         {
             _logger.ToolError("references_get", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused, ex.Message);
+            return new ReferencesGetResult(Success: false, Error: new ToolError(ErrorCodes.NotPaused, ex.Message));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Invalid reference"))
         {
             _logger.ToolError("references_get", ErrorCodes.InvalidReference);
-            return CreateErrorResponse(ErrorCodes.InvalidReference, ex.Message,
-                new { object_ref });
+            return new ReferencesGetResult(Success: false, Error: new ToolError(
+                ErrorCodes.InvalidReference, ex.Message, new { object_ref }));
         }
         catch (Exception ex)
         {
             _logger.ToolError("references_get", "REFERENCE_ANALYSIS_FAILED");
             _logger.LogError(ex, "Reference analysis failed for '{ObjectRef}'", object_ref);
-            return CreateErrorResponse("REFERENCE_ANALYSIS_FAILED",
-                $"Failed to analyze references: {ex.Message}");
+            return new ReferencesGetResult(Success: false, Error: new ToolError(
+                "REFERENCE_ANALYSIS_FAILED", $"Failed to analyze references: {ex.Message}"));
         }
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new
-            {
-                code,
-                message,
-                details
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
     }
 }

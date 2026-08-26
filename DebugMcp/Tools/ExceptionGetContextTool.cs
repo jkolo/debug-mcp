@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text.Json;
 using DebugMcp.Infrastructure;
 using DebugMcp.Models;
+using DebugMcp.Models.Results;
 using DebugMcp.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -12,8 +12,6 @@ namespace DebugMcp.Tools;
 [McpServerToolType]
 public sealed class ExceptionGetContextTool
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-
     private readonly IExceptionAutopsyService _autopsyService;
     private readonly IDebugSessionManager _sessionManager;
     private readonly ILogger<ExceptionGetContextTool> _logger;
@@ -29,9 +27,10 @@ public sealed class ExceptionGetContextTool
     }
 
     [McpServerTool(Name = "exception_get_context", Title = "Get Exception Context",
-        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+        ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
     [Description("Get full exception context when paused at an exception. Returns exception details (type, message, isFirstChance), inner exception chain, stack frames with source locations, and local variables for the throwing frame — all in a single call. This is the recommended first tool to call when the debugger pauses due to an exception. Requires the process to be paused at an exception breakpoint. Use breakpoint_set_exception to configure which exceptions cause pauses. Example response: {\"success\": true, \"threadId\": 1, \"exception\": {\"type\": \"System.NullReferenceException\", \"message\": \"Object reference not set\", \"isFirstChance\": true}, \"frames\": [{\"index\": 0, \"function\": \"MyApp.Service.Process()\", \"module\": \"MyApp.dll\"}], \"totalFrames\": 3}")]
-    public async Task<string> GetExceptionContext(
+    public async Task<ExceptionGetContextResult> GetExceptionContext(
         [Description("Maximum stack frames to return (default: 10, min: 1, max: 100)")]
         int max_frames = 10,
         [Description("Number of top frames to include local variables for (default: 1, min: 0, max: 10). 0 = no variables, 1 = throwing frame only.")]
@@ -49,31 +48,31 @@ public sealed class ExceptionGetContextTool
         if (session == null)
         {
             _logger.ToolError("exception_get_context", ErrorCodes.NoSession);
-            return CreateErrorResponse(ErrorCodes.NoSession, "No active debug session.");
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(ErrorCodes.NoSession, "No active debug session."));
         }
 
         if (session.State != SessionState.Paused)
         {
             _logger.ToolError("exception_get_context", ErrorCodes.NotPaused);
-            return CreateErrorResponse(ErrorCodes.NotPaused,
-                "Process is not paused. Current state: " + session.State);
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                ErrorCodes.NotPaused, "Process is not paused. Current state: " + session.State));
         }
 
         // Parameter validation
         if (max_frames < 1 || max_frames > 100)
-            return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                "max_frames must be between 1 and 100.",
-                new { parameter = "max_frames", value = max_frames });
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                ErrorCodes.InvalidParameter, "max_frames must be between 1 and 100.",
+                new { parameter = "max_frames", value = max_frames }));
 
         if (include_variables_for_frames < 0 || include_variables_for_frames > 10)
-            return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                "include_variables_for_frames must be between 0 and 10.",
-                new { parameter = "include_variables_for_frames", value = include_variables_for_frames });
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                ErrorCodes.InvalidParameter, "include_variables_for_frames must be between 0 and 10.",
+                new { parameter = "include_variables_for_frames", value = include_variables_for_frames }));
 
         if (max_inner_exceptions < 0 || max_inner_exceptions > 20)
-            return CreateErrorResponse(ErrorCodes.InvalidParameter,
-                "max_inner_exceptions must be between 0 and 20.",
-                new { parameter = "max_inner_exceptions", value = max_inner_exceptions });
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                ErrorCodes.InvalidParameter, "max_inner_exceptions must be between 0 and 20.",
+                new { parameter = "max_inner_exceptions", value = max_inner_exceptions }));
 
         try
         {
@@ -83,93 +82,43 @@ public sealed class ExceptionGetContextTool
             stopwatch.Stop();
             _logger.ToolCompleted("exception_get_context", stopwatch.ElapsedMilliseconds);
 
-            return JsonSerializer.Serialize(new
-            {
-                threadId = result.ThreadId,
-                exception = new
-                {
-                    type = result.Exception.Type,
-                    message = result.Exception.Message,
-                    isFirstChance = result.Exception.IsFirstChance,
-                    stackTraceString = result.Exception.StackTraceString
-                },
-                innerExceptions = result.InnerExceptions.Select(ie => new
-                {
-                    type = ie.Type,
-                    message = ie.Message,
-                    depth = ie.Depth
-                }),
-                innerExceptionsTruncated = result.InnerExceptionsTruncated,
-                frames = result.Frames.Select(BuildFrameResponse),
-                totalFrames = result.TotalFrames,
-                throwingFrameIndex = result.ThrowingFrameIndex
-            }, JsonOptions);
+            return new ExceptionGetContextResult(
+                Success: true,
+                ThreadId: result.ThreadId,
+                Exception: result.Exception,
+                InnerExceptions: result.InnerExceptions,
+                InnerExceptionsTruncated: result.InnerExceptionsTruncated,
+                Frames: result.Frames.Select(BuildFrameResponse).ToList(),
+                TotalFrames: result.TotalFrames,
+                ThrowingFrameIndex: result.ThrowingFrameIndex);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not paused at an exception", StringComparison.OrdinalIgnoreCase))
         {
             _logger.ToolError("exception_get_context", ErrorCodes.NoException);
-            return CreateErrorResponse(ErrorCodes.NoException,
-                "No exception context available. The debugger is not currently paused at an exception.");
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                ErrorCodes.NoException, "No exception context available. The debugger is not currently paused at an exception."));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "exception_get_context failed unexpectedly");
-            return CreateErrorResponse("AUTOPSY_FAILED",
-                "Exception autopsy failed: " + ex.Message);
+            return new ExceptionGetContextResult(Success: false, Error: new ToolError(
+                "AUTOPSY_FAILED", "Exception autopsy failed: " + ex.Message));
         }
     }
 
-    private static Dictionary<string, object?> BuildFrameResponse(Models.Inspection.AutopsyFrame f)
+    private static ExceptionFrameInfo BuildFrameResponse(Models.Inspection.AutopsyFrame f)
     {
-        var frame = new Dictionary<string, object?>
-        {
-            ["index"] = f.Index,
-            ["function"] = f.Function,
-            ["module"] = f.Module,
-            ["isExternal"] = f.IsExternal,
-            ["location"] = f.Location != null ? new Dictionary<string, object?>
-            {
-                ["file"] = f.Location.File,
-                ["line"] = f.Location.Line,
-                ["column"] = f.Location.Column,
-                ["functionName"] = f.Location.FunctionName,
-                ["moduleName"] = f.Location.ModuleName
-            } : null,
-            ["arguments"] = f.Arguments?.Select(a => new Dictionary<string, object?>
-            {
-                ["name"] = a.Name,
-                ["type"] = a.Type,
-                ["value"] = a.Value,
-                ["scope"] = a.Scope.ToString(),
-                ["hasChildren"] = a.HasChildren
-            }),
-            ["variables"] = f.Variables != null ? new Dictionary<string, object?>
-            {
-                ["locals"] = f.Variables.Locals.Select(v => new Dictionary<string, object?>
-                {
-                    ["name"] = v.Name,
-                    ["type"] = v.Type,
-                    ["value"] = v.Value,
-                    ["scope"] = v.Scope.ToString(),
-                    ["hasChildren"] = v.HasChildren,
-                    ["childrenCount"] = v.ChildrenCount
-                }),
-                ["errors"] = f.Variables.Errors?.Select(e => new Dictionary<string, object?>
-                {
-                    ["name"] = e.Name,
-                    ["error"] = e.Error
-                })
-            } : null
-        };
-        return frame;
-    }
-
-    private static string CreateErrorResponse(string code, string message, object? details = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            success = false,
-            error = new { code, message, details }
-        }, JsonOptions);
+        return new ExceptionFrameInfo(
+            Index: f.Index,
+            Function: f.Function,
+            Module: f.Module,
+            IsExternal: f.IsExternal,
+            Location: f.Location,
+            Arguments: f.Arguments?.Select(a => new ExceptionFrameArgument(
+                a.Name, a.Type, a.Value, a.Scope.ToString(), a.HasChildren)).ToList(),
+            Variables: f.Variables != null ? new ExceptionFrameVariables(
+                Locals: f.Variables.Locals.Select(v => new ExceptionFrameLocal(
+                    v.Name, v.Type, v.Value, v.Scope.ToString(), v.HasChildren, v.ChildrenCount)).ToList(),
+                Errors: f.Variables.Errors) : null);
     }
 }
